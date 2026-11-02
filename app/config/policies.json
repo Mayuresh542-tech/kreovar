@@ -1,0 +1,262 @@
+{
+  "brand": "Kreovar",
+  "effectiveDate": "17 October 2026",
+  "version": "2026-10-26",
+  "supportEmail": "info@kreovar.online",
+  "policies": [
+    {
+      "slug": "terms",
+      "title": "Terms of Service",
+      "description": "The terms for using Kreovar and its content creation tools.",
+      "filename": "kreovar-terms-of-service.pdf",
+      "sections": [
+        {
+          "title": "1. About these terms",
+          "paragraphs": [
+            "These Terms govern your use of Kreovar, an online content creation studio with projects, content planning, voiceovers, stock media, captions and video editing. In these policies, \"Kreovar\", \"we\", \"us\" and \"our\" refer to the service operator trading under the Kreovar brand. Contact: info@kreovar.online.",
+            "By creating an account or purchasing a subscription, you agree to these Terms. If you do not agree, do not create an account or purchase access. These Terms apply together with our Privacy Policy and Refund & Return Policy. They do not override mandatory consumer rights."
+          ]
+        },
+        {
+          "title": "2. Accounts and eligibility",
+          "paragraphs": [
+            "You must be at least 18, or the age of majority where you live if higher, to create an account or purchase a subscription. Provide accurate information, keep your sign-in credentials secure and notify us if your account is misused. Do not share or resell account access. You are responsible for activity you authorize."
+          ]
+        },
+        {
+          "title": "3. Plans, allowances and availability",
+          "paragraphs": [
+            "Free and Pro include the features and monthly allowances displayed on our Pricing page and at checkout. Pro is currently offered at USD 19 per month or USD 190 per year, before any taxes or charges disclosed by checkout. Both billing cycles receive monthly allowances; unused allowances do not roll over. Active-project limits apply at any time. Exported videos are limited to 60 seconds. Image and video generation are excluded unless expressly offered in your plan.",
+            "Provider rate limits, outages, browser capabilities and supported file formats can affect availability. Unlimited exports do not mean unlimited AI generation or guaranteed rendering speed. We may apply reasonable security and abuse controls. We will not retroactively reduce purchased allowances for the current paid term; material future changes will be notified before they take effect."
+          ]
+        },
+        {
+          "title": "4. Payments, renewals and cancellation",
+          "paragraphs": [
+            "Payments are processed through Whop. Recurring subscriptions renew on the monthly or yearly cycle displayed at checkout unless cancelled before the next renewal. The amount, currency, applicable taxes and any additional checkout charges are shown before payment. Whop payment terms also apply to the transaction.",
+            "Pro access is activated after payment and subscription verification and is linked to the email used on the payment page. Use that email for your Kreovar account; contact support if access is not linked correctly. Manage cancellation through your Whop account or purchase receipt. Cancellation normally stops future renewals while access continues until the end of the paid period. Refunds follow our Refund & Return Policy."
+          ]
+        },
+        {
+          "title": "5. Your content and third-party assets",
+          "paragraphs": [
+            "You retain your rights in content you upload. You grant us a limited permission to store, process, transmit and display that content only as needed to operate the features you request, maintain security and provide support. You must have permission to upload and process footage, audio, personal information, voices and other material.",
+            "AI outputs may be inaccurate, similar to other outputs or unsuitable for a particular use. We do not guarantee exclusivity, copyright protection or clearance of third-party rights. Review outputs before publishing. Stock footage and sound effects remain subject to their source license, including restrictions on standalone resale and any necessary model, trademark or property permissions. We do not grant ownership of third-party stock assets."
+          ]
+        },
+        {
+          "title": "6. Acceptable use",
+          "paragraphs": [
+            "Do not use Kreovar for illegal activity, infringement, harassment, non-consensual intimate content, sexual exploitation, fraud, deceptive impersonation or other harmful misuse. Do not upload malware, attack the service, bypass security or plan limits, scrape private assets or attempt to access another user's account. Obtain the rights and consent needed for voice or likeness use."
+          ]
+        },
+        {
+          "title": "7. Projects, AI edits and exports",
+          "paragraphs": [
+            "Keep independent backups of important files. Local browser caches can be cleared, and interrupted uploads or unsupported media can affect recovery. AI editing plans should be reviewed before you apply them; you remain responsible for the final edit. Downloaded exports and local browser data are under your control. We do not promise permanent archival storage or uninterrupted service."
+          ]
+        },
+        {
+          "title": "8. Suspension, liability and disputes",
+          "paragraphs": [
+            "We may restrict access for security risks, non-payment or material misuse and will provide notice and an opportunity to resolve the issue where reasonably possible. Suspension does not remove statutory refund or other consumer rights.",
+            "The service is provided with reasonable care, but we cannot guarantee error-free AI results, uninterrupted operation or fitness for every purpose. To the extent permitted by law, we are not responsible for indirect losses or loss caused by your failure to keep backups. Nothing excludes liability or remedies that cannot legally be excluded, including applicable consumer protections.",
+            "Contact support first so we can try to resolve a dispute. Applicable law and any mandatory courts or consumer forums remain available; these Terms do not impose mandatory arbitration or waive non-waivable rights. Material updates will be dated and communicated where required. Revised terms apply prospectively, not to remove existing refund rights."
+          ]
+        }
+      ],
+      "effectiveDate": "17 October 2026",
+      "version": "2026-10-26"
+    },
+    {
+      "slug": "privacy",
+      "title": "Privacy Policy",
+      "description": "How Kreovar handles account information, creative content and service data.",
+      "filename": "kreovar-privacy-policy.pdf",
+      "sections": [
+        {
+          "title": "1. Scope and contact",
+          "paragraphs": [
+            "This Policy explains how Kreovar handles personal information when you visit the site, create an account, use creative tools or purchase a subscription. Contact Kreovar at info@kreovar.online for privacy questions or requests. This Policy covers Kreovar; third-party services have their own privacy notices."
+          ]
+        },
+        {
+          "title": "2. Information we process",
+          "paragraphs": [
+            "Account information includes your email, optional creator name, account identifier, authentication/session information and account preferences. Creative content may include uploaded video/audio/images, extracted speech audio, transcripts, captions, prompts, scripts, generated voiceovers, project timelines, saved content ideas and other assets.",
+            "Subscription records include the payment email, plan, billing cycle, payment or membership identifiers, verification status and usage counters. Technical records may include IP address, browser/device information, request and error logs, timestamps and security/rate-limit events. You may also provide information when requesting support. Whop handles payment details; Kreovar does not receive or store full card numbers or card security codes."
+          ]
+        },
+        {
+          "title": "3. Why we use information",
+          "paragraphs": [
+            "We use information to authenticate users, save projects and assets, generate requested content, transcribe speech, execute editing instructions, export media, provide support, verify payments, manage allowances and prevent abuse. We may send necessary service, security, account and billing communications.",
+            "Where applicable law requires a legal basis, we rely on performance of the service contract, legitimate interests such as security and troubleshooting, legal obligations, and consent where required. Where consent is used, you may withdraw it without affecting earlier lawful processing. We do not sell personal information or use uploaded creative content for targeted advertising."
+          ]
+        },
+        {
+          "title": "4. Service providers and AI processing",
+          "paragraphs": [
+            "Supabase provides account authentication, database and cloud asset storage. Our hosting provider processes requests and operational logs; the service may run locally during testing and on Netlify when deployed.",
+            "Requested AI features can send relevant prompts, script text, speech audio, transcripts, timeline details or selected content to configured providers: Groq for content assistance, editing planning and transcription; Voice.ai for voice generation; and Google/Gemini for enabled AI features. A local transcription engine may be used when configured. Some operations process only extracted audio or project context rather than the full original video. Provider handling and retention follow their applicable terms and settings; we do not promise that every provider has zero retention. We do not train our own general-purpose AI model on your uploaded content.",
+            "Whop processes purchases and membership/payment verification and provides the data needed to connect a purchase to the payment email. Stock searches, previews and downloads can connect to Pexels, Pixabay or their media hosts. Google Fonts delivers site fonts and can receive ordinary connection information. Providers may process data in countries different from your own. We use available contractual and technical safeguards where applicable; no particular data residency is promised."
+          ]
+        },
+        {
+          "title": "5. Cookies and device storage",
+          "paragraphs": [
+            "Authentication uses cookies to keep you signed in, with a browser lifetime of up to 30 days from each write or refresh. Browser local storage and IndexedDB can hold preferences, drafts, recovery snapshots, cached media and generated content. Referral collection is currently disabled; referral data saved by an older version may remain until it expires or you clear site data. Our Cookie Policy provides the current storage details, durations and controls.",
+            "You can manage cookies and site data through browser settings. Blocking essential session storage can prevent sign-in or saving. Clearing browser data may remove local-only files and recovery copies. Signing out or deleting a cloud project does not necessarily erase downloaded files or local caches; remove those using your device/browser controls."
+          ]
+        },
+        {
+          "title": "6. Sharing and security",
+          "paragraphs": [
+            "Private account assets are intended to be available only to authorized users and service operators/providers who need access to deliver or support the service. We do not make private assets public by default. Anyone you share a downloaded file or an accessible asset link with may retain a copy. We may disclose information where required by law, to protect users and the service, or during a business transfer subject to applicable safeguards.",
+            "We use access controls, protected server credentials, authentication and other technical measures. No online service, storage system or transmission method can be guaranteed completely secure. Do not upload content you are not authorized to share with the processors needed for the selected feature."
+          ]
+        },
+        {
+          "title": "7. Retention and deletion",
+          "paragraphs": [
+            "We retain account information, cloud projects and assets while needed to provide the service, unless deleted or no longer needed. Payment, usage, fraud-prevention and legal records may be retained longer where necessary for accounting, disputes, security or legal obligations. Operational logs and backups may persist until their normal retention cycle ends; we do not promise instant erasure from all backups.",
+            "Use available project/asset deletion controls, or email support from your account email to request account closure or deletion. We may verify ownership before responding. We will explain any information we must retain. Locally cached and downloaded files must also be removed from your device."
+          ]
+        },
+        {
+          "title": "8. Your choices, children and updates",
+          "paragraphs": [
+            "Depending on your location, you may have rights to access, correct, delete, export or restrict processing of your personal information, object to certain processing, withdraw consent or complain to the relevant data-protection authority. Email support to exercise applicable rights; we respond within applicable legal timeframes.",
+            "Kreovar accounts are intended for adults and are not directed to children. If you believe a child has provided personal information, contact us so we can investigate and take appropriate action. We will update this Policy as the service changes, show the effective date and provide additional notice when required."
+          ]
+        }
+      ],
+      "effectiveDate": "1 November 2026",
+      "version": "2026-11-01"
+    },
+    {
+      "slug": "refund",
+      "title": "Refund & Return Policy",
+      "description": "The 3-day first-payment refund window, renewals and cancellation.",
+      "filename": "kreovar-refund-return-policy.pdf",
+      "sections": [
+        {
+          "title": "1. Digital service",
+          "paragraphs": [
+            "Kreovar sells access to digital content creation tools through a subscription. No physical goods are shipped, so there is no physical return or return-shipping process. This Policy applies to Kreovar subscriptions purchased through Whop and supplements any mandatory consumer rights."
+          ]
+        },
+        {
+          "title": "2. Three-day first-payment refund window",
+          "paragraphs": [
+            "You may request a full refund of your first Kreovar subscription payment within 3 days (72 hours) of that payment. This window applies to the initial monthly or annual Pro payment. Submit the request before the deadline using the payment timestamp on your Whop receipt. Processing time after submission does not affect a request made within the window.",
+            "This first-payment window applies once per customer. After 72 hours, ordinary change-of-mind requests are normally non-refundable, except for the issues and legal rights described below. Your applicable purchase-time policy governs; later policy changes do not remove existing refund rights."
+          ]
+        },
+        {
+          "title": "3. Renewals and cancellation",
+          "paragraphs": [
+            "Monthly and annual renewal payments are normally non-refundable for change of mind. We do not normally provide prorated refunds for unused time, unused monthly allowances or cancellation partway through a paid term. Cancel before your next billing date through your Whop account or the subscription-management link associated with your receipt to prevent another renewal.",
+            "Cancellation and a refund are different: cancellation normally leaves access available until the paid period ends, while a verified full refund may remove Pro access for the refunded period. If you cannot find the cancellation option, contact support before renewal and include your receipt reference."
+          ]
+        },
+        {
+          "title": "4. Billing mistakes and service failures",
+          "paragraphs": [
+            "Contact us about duplicate charges, incorrect charges, payment without access or a material technical failure that prevents use of the purchased service. We will investigate, attempt to restore access where appropriate and provide a correction or refund when warranted or legally required. These issues can be reviewed outside the ordinary 3-day window. Do not send card numbers, passwords or security codes.",
+            "A failed AI generation and restoration of a reserved usage allowance are separate from a cash refund. Ordinary model limitations or third-party outages do not automatically create an additional money-back guarantee, but do not limit remedies for a service that is materially not delivered as purchased."
+          ]
+        },
+        {
+          "title": "5. How to request a refund",
+          "paragraphs": [
+            "Email info@kreovar.online using the subject \"Kreovar refund request\". Include the email used at payment, the Whop receipt/payment or membership reference, payment date, plan and a short reason. A request within the first-payment window does not require proof of a technical fault. You may also use the refund/dispute support available in your Whop purchase account.",
+            "We may ask for enough information to verify ownership and the transaction. Approved refunds are processed through Whop to the original payment method where supported. Settlement timing depends on Whop, the payment method and your bank; we do not promise an exact bank-processing date. We do not require payment of a separate fee to submit a refund request."
+          ]
+        },
+        {
+          "title": "6. Consumer and payment-provider rights",
+          "paragraphs": [
+            "Nothing in this Policy removes non-waivable rights, mandatory cooling-off rights, remedies for a defective or misdescribed service, or lawful card-network and payment-provider dispute rights. If an applicable right provides more protection than this Policy, that right applies. Whop may independently investigate payment disputes or process refunds under its own rules. Contact info@kreovar.online with questions."
+          ]
+        }
+      ],
+      "effectiveDate": "17 October 2026",
+      "version": "2026-10-26"
+    },
+    {
+      "slug": "cookies",
+      "title": "Cookie Policy",
+      "description": "How Kreovar uses cookies and browser storage for sign-in, preferences, drafts and media recovery, and how you can manage that data.",
+      "filename": "kreovar-cookie-policy.pdf",
+      "effectiveDate": "1 November 2026",
+      "version": "2026-11-01",
+      "sections": [
+        {
+          "title": "1. About this policy",
+          "paragraphs": [
+            "This policy covers cookies and similar browser storage used on kreovar.online. Cookies are small records the browser can send with requests to the same website. Local storage, session storage and IndexedDB keep information on your device and are different technologies, although they can serve similar purposes. Read this policy together with our Privacy Policy.",
+            "The storage used depends on whether you sign in and which tools you use. Not every item described here is created when you only read a public page. Some technical names retain the earlier fretrend or veelox prefixes; these names are used by Kreovar and do not identify a separate website operator."
+          ]
+        },
+        {
+          "title": "2. Sign-in cookies",
+          "paragraphs": [
+            "Purpose: keep your authenticated session available so you can use account tools and saved projects. Kreovar uses Supabase Auth with a custom cookie storage adapter. The cookie name starts with fretrend-auth and can be split into numbered parts such as fretrend-auth.0 and fretrend-auth.1. These cookies contain authentication information and must not be shared.",
+            "Duration: each cookie write or session refresh sets a browser lifetime of up to 30 days. An actively refreshed session can therefore last longer than 30 days overall. Signing out removes the current authentication cookie parts. Cookie lifetime does not guarantee that a session remains valid: account security settings, expiry or revocation can require you to sign in again.",
+            "The application sets these cookies for the current host with Path=/ and SameSite=Lax, and adds Secure over HTTPS. Blocking them can prevent sign-in from persisting or account tools from working. You can read public information pages without signing in."
+          ]
+        },
+        {
+          "title": "3. Temporary sign-in and password recovery storage",
+          "paragraphs": [
+            "The sign-in flow can temporarily store a PKCE code verifier using a name such as fretrend-auth-code-verifier, with numbered cookie parts when needed. This helps complete the sign-in or recovery request. The auth library normally removes it when the flow completes; if left behind, the same adapter gives a cookie write a maximum browser lifetime of 30 days.",
+            "Session storage named veelox-password-recovery records a short-lived recovery UI state. The application accepts that state for 10 minutes and clears it on sign-out or explicit recovery cleanup. The browser may retain an expired record until it is removed or the tab session ends. This record alone does not authorize a password change."
+          ]
+        },
+        {
+          "title": "4. Preferences and feature storage",
+          "paragraphs": [
+            "When you use studio features, local storage can remember settings, caption favorites and presets, custom templates, brand preferences, and cached tool results. Examples include kreovar-caption-favorites, kreovar-caption-presets, veelox_custom_caption_templates_v1 and veelox_brand_* entries. These values help restore the choices you make in the tools.",
+            "Local storage does not have a built-in expiry date. Entries can remain until the feature replaces or removes them, you clear site data, or your browser removes them. Cached results can have their own application freshness checks; that does not mean the stored record is immediately deleted when it becomes stale."
+          ]
+        },
+        {
+          "title": "5. Projects, drafts and media recovery",
+          "paragraphs": [
+            "Local storage can hold project lists and recovery snapshots, including veelox_projects_v2 and veelox_recovery_v2_* entries. IndexedDB databases such as veelox-editor-v1 can store project state and media used for browser editing and recovery. This supports the work you ask the editor to save or reopen.",
+            "These stores do not have a universal automatic deletion period. Data may remain until the application removes it, you clear site data, or the browser evicts it because of storage limits or settings. Signing out does not necessarily remove all local drafts, cached media or downloaded files. Save independent copies of important work before clearing browser storage."
+          ]
+        },
+        {
+          "title": "6. Analytics, advertising and older referral data",
+          "paragraphs": [
+            "The current Kreovar application does not load advertising pixels or optional analytics cookie tags. Service providers may still process connection, security and operational logs as described in the Privacy Policy; logs are not the same as an analytics cookie stored in your browser.",
+            "Referral collection is currently disabled. Older versions could save referral information locally and in a cookie with a lifetime of up to 30 days. Existing local records may remain until cleared. If we introduce optional tracking technologies, we will update this policy and provide the choices or consent controls required before activating them where applicable."
+          ]
+        },
+        {
+          "title": "7. Hosting, sign-in, payment and external services",
+          "paragraphs": [
+            "Netlify and Cloudflare provide hosting, delivery or security services and may use storage needed for routing or security checks when those services are active. Exact provider cookie names and lifetimes can vary with their configuration and the checks shown to you. Their privacy information explains their own processing.",
+            "If you choose Google sign-in or follow a Whop checkout link, the external service may use its own cookies on its own domains. Those services control their cookie settings and policies. A normal link to our Instagram profile does not embed an Instagram feed in this website; visiting Instagram brings you under that service's own settings and policies."
+          ]
+        },
+        {
+          "title": "8. Managing cookies and site data",
+          "paragraphs": [
+            "Use your browser settings to view, block or delete cookies and other site data for kreovar.online. Browsers often list local storage and IndexedDB under site data, storage or developer tools. Private browsing and automatic deletion settings may clear information when the session ends.",
+            "Blocking authentication cookies can sign you out or interrupt account access. Clearing local storage or IndexedDB can permanently remove local-only drafts and media recovery copies. Download or back up important work first. To request deletion of cloud account data, use the account controls or contact support; clearing browser data alone does not delete your cloud account.",
+            "Your current sign-in, cookie and storage settings can be managed through the browser and the service controls described above. This policy page does not itself create a new consent record or enable an optional tracker."
+          ]
+        },
+        {
+          "title": "9. Updates and contact",
+          "paragraphs": [
+            "We may update this policy when our storage use or service providers change. The effective date and version identify the current published policy. Questions about cookies, browser storage or privacy can be sent to info@kreovar.online. Do not include passwords, authentication cookie values, access tokens or full payment card details."
+          ]
+        }
+      ]
+    }
+  ]
+}

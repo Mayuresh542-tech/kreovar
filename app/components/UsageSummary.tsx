@@ -1,0 +1,12 @@
+"use client";
+import {useCallback,useEffect,useState} from 'react';
+import Link from 'next/link';
+import {getUsageStatus} from '@/app/lib/editor/exportAllowance';
+import {USAGE_LABELS,type UsageFeature,type UsageStatus} from '@/app/config/allowances';
+export default function UsageSummary({compact=false,feature}:{compact?:boolean;feature?:'content'|'voice'}){
+ const [usage,setUsage]=useState<UsageStatus>(),[error,setError]=useState('');
+ const load=useCallback(()=>{void getUsageStatus().then(value=>{setUsage(value);setError('');}).catch(()=>setError('Allowances could not be loaded. Refresh to retry.'));},[]);
+ useEffect(()=>{load();window.addEventListener('focus',load);window.addEventListener('kreovar_usage_changed',load);return()=>{window.removeEventListener('focus',load);window.removeEventListener('kreovar_usage_changed',load);};},[load]);
+ const features:UsageFeature[]=feature==='voice'?['voice_characters']:feature==='content'?['content_ideas','content_scripts']:['content_ideas','content_scripts','voice_characters','caption_seconds','ai_edits','exports','stock_downloads'];
+ return <section aria-label="Plan allowances" className={compact?'rounded-xl border border-slate-300/30 p-3 text-xs space-y-2':'rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 space-y-3'}><div className="flex items-center justify-between gap-3"><strong>{usage?.unlimited?'Admin':usage?.plan==='pro'?'Pro':'Free'} allowances</strong><button type="button" onClick={load} className="text-blue-500">Refresh usage</button></div>{error?<p role="alert">{error}</p>:!usage?<p>Loading allowances…</p>:<><p className="text-xs opacity-70">Resets {new Date(usage.periodEnd).toLocaleDateString()}. Unused allowance does not roll over.</p><dl className={compact?'space-y-1':'grid gap-3 sm:grid-cols-2'}>{features.map(key=>{const cap=usage.limits[key],used=usage.used[key]||0,unlimited=usage.unlimited||cap===null;return <div key={key} className="flex justify-between gap-4"><dt>{USAGE_LABELS[key]}</dt><dd>{unlimited?'Unlimited':`${Math.max(0,cap-used).toLocaleString()} / ${cap.toLocaleString()} left`}</dd></div>;})}{!feature&&<div className="flex justify-between gap-4"><dt>Active projects</dt><dd>{usage.activeProjects} / {usage.unlimited?'Unlimited':usage.projectLimit}</dd></div>}</dl><p className="text-xs opacity-70">Videos up to 60 seconds · {usage.maxResolution}p export. Standalone and editor tools share these allowances.</p></>}<Link href="/settings/billing" className="text-blue-500">View plan &amp; usage</Link></section>;
+}

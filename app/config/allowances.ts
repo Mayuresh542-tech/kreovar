@@ -1,0 +1,4 @@
+export type UsageFeature='content_ideas'|'content_scripts'|'voice_characters'|'caption_seconds'|'ai_edits'|'exports'|'stock_downloads';
+export const USAGE_LABELS:Record<UsageFeature,string>={content_ideas:'Content idea sets',content_scripts:'Scripts',voice_characters:'Voiceover characters',caption_seconds:'Caption seconds',ai_edits:'AI editing plans',exports:'Video exports',stock_downloads:'B-roll / SFX downloads'};
+export const ALLOWANCES={free:{content_ideas:3,content_scripts:3,voice_characters:1000,caption_seconds:120,ai_edits:1,exports:3,stock_downloads:10},pro:{content_ideas:30,content_scripts:30,voice_characters:20000,caption_seconds:1800,ai_edits:10,exports:null,stock_downloads:100}} as const;
+export interface UsageStatus {plan:'free'|'pro';unlimited:boolean;periodStart:string;periodEnd:string;limits:Record<UsageFeature,number|null>;used:Partial<Record<UsageFeature,number>>;activeProjects:number;projectLimit:number;maxResolution:720|1080}

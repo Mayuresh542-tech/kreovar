@@ -1,0 +1,22 @@
+import {CATEGORIES,type StyleSpec,type Category} from './model';
+import {ALL_CAPTION_TEMPLATES} from '../captions/referenceTemplates';
+import {BUILTIN_SFX} from '../assets/builtinSfx';
+const obj=(v:unknown):Record<string,unknown>=>{if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Expected structured reference data.');return v as Record<string,unknown>;};
+const num=(v:unknown,min:number,max:number)=>{if(typeof v!=='number'||!Number.isFinite(v)||v<min||v>max)throw Error('Reference parameter is outside supported limits.');return v;};
+const bool=(v:unknown)=>{if(typeof v!=='boolean')throw Error('Reference settings require explicit enabled flags.');return v;};
+export const text=(v:unknown,max=1000)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw Error('Invalid reference text.');return v.trim();};
+const choice=<T extends string>(v:unknown,values:readonly T[]):T=>{if(!values.includes(v as T))throw Error('Unsupported reference setting.');return v as T;};
+const color=(v:unknown)=>{const s=text(v,32);if(s!=='transparent'&&!/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(s))throw Error('Use supported hexadecimal reference colors.');return s;};
+export function readStyleSpec(value:unknown):StyleSpec {
+ const s=obj(value),c=obj(s.caption),p=obj(s.pacing),g=obj(s.graphics),b=obj(s.broll),z=obj(s.zooms),t=obj(s.transitions),a=obj(s.sound);
+ if(s.schemaVersion!==1)throw Error('Unsupported reference specification version.');
+ const fonts=new Set(ALL_CAPTION_TEMPLATES.map(t=>t.style.fontFamily.split(',')[0].replace(/['"]/g,'').trim()));fonts.add('Inter');
+ const font=text(c.font,80);if(!fonts.has(font))throw Error('Choose a supported font from the supplied catalog.');
+ if(!Array.isArray(g.kinds)||g.kinds.length>4||!Array.isArray(a.soundIds)||a.soundIds.length>5||a.soundIds.some(id=>!BUILTIN_SFX.some(s=>s.id===id)))throw Error('Reference graphics or audio are unsupported.');
+ if(z.enabled===true&&Number(z.maximumScale)<=1.005||b.enabled===true&&Number(b.maxCoverage)<=0)throw Error('Enabled reference zooms and B-roll need visible nonzero settings.');
+ if(!Number.isInteger(c.wordsPerCaption)||Number(b.minimumDuration)>Number(b.maximumDuration)||g.enabled===true&&!g.kinds.length||a.enabled===true&&!a.soundIds.length||!/^#[0-9a-f]{6}$/i.test(String(g.accent)))throw Error('Reference segmentation, asset choices or duration bounds are invalid.');
+ if(!Array.isArray(s.limitations)||s.limitations.length>12)throw Error('Explain reference analysis limitations.');
+ return {schemaVersion:1,summary:text(s.summary),confidence:choice(s.confidence,['low','medium','high']),limitations:s.limitations.map(v=>text(v,300)),caption:{enabled:bool(c.enabled),font,sizeRatio:num(c.sizeRatio,.02,.14),weight:num(c.weight,100,900),color:color(c.color),highlightColor:color(c.highlightColor),background:color(c.background),stroke:color(c.stroke),strokeWidth:num(c.strokeWidth,0,12),y:num(c.y,-.35,.35),maxWidth:num(c.maxWidth,.4,.9),wordsPerCaption:num(c.wordsPerCaption,1,6),motion:choice(c.motion,['none','pop','karaoke','word-reveal'])},pacing:{enabled:bool(p.enabled),minimumPause:num(p.minimumPause,.3,3),padding:num(p.padding,.05,.3),maxRemovalRatio:num(p.maxRemovalRatio,0,.3),description:text(p.description,300)},graphics:{enabled:bool(g.enabled),kinds:g.kinds.map(v=>choice(v,['label','lower-third','stat','callout'])),accent:color(g.accent),motion:choice(g.motion,['pop','slide-up','slide-left','float']),maximumPerMinute:num(g.maximumPerMinute,1,20),description:text(g.description,400)},broll:{enabled:bool(b.enabled),fit:choice(b.fit,['cover','contain']),minimumDuration:num(b.minimumDuration,.5,5),maximumDuration:num(b.maximumDuration,.5,6),maxCoverage:num(b.maxCoverage,0,.45),description:text(b.description,400)},zooms:{enabled:bool(z.enabled),maximumScale:num(z.maximumScale,1,1.25),minimumInterval:num(z.minimumInterval,3,30),description:text(z.description,300)},transitions:{enabled:bool(t.enabled),kind:choice(t.kind,['fade','dissolve','slide','zoom']),duration:num(t.duration,.1,.6)},sound:{enabled:bool(a.enabled),soundIds:a.soundIds.map(v=>text(v,80)),gain:num(a.gain,.01,.3),description:text(a.description,300)}};
+}
+export function category(v:unknown):Category{return choice(v,CATEGORIES);}
+export function uuid(v:unknown){const s=text(v,36);if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s))throw Error('Invalid reference identifier.');return s;}

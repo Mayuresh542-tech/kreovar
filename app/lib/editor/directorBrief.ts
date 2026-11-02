@@ -1,0 +1,12 @@
+import {AUTO_EDIT_STYLES,type AutoEditOptions} from './autoEdit';
+import {aiEditStyleRecipe} from '../captions/aiEditStyles';
+/** Instructions and preferences only; the model chooses every actual edit. */
+export function directorBrief(o:AutoEditOptions){
+ const style=AUTO_EDIT_STYLES.find(s=>s.id===o.styleId);if(!style)throw Error('Choose an edit direction.');const recipe=aiEditStyleRecipe(o.styleId),choosing=o.styleId==='ai-choice';
+ return `COMPLETE EDIT. YOU choose actual edit decisions and timings from sampled footage and timed speech, at ${o.intensity} intensity. Preserve speech meaning and source order. ${choosing?'Understand the subject, tone and background first. Choose a suitable caption template and visual direction from the supplied catalogue; explain why. Do not default to a minimal or plain edit just to avoid making choices.':`Make a ${style.name} edit. ${recipe?.direction||style.description}`}
+${o.captions?choosing?'Restyle the exact timed speech with your chosen real caption template.':`Reuse words/times; apply ${style.templateId}.`:'Do not create or restyle captions.'}${o.captionColor?` Text accent ${o.captionColor}.`:''}
+${o.zooms?'Choose a few purposeful camera accents.':'No camera changes.'} ${o.motionGraphics?'Choose relevant readable word graphics or original shapes with supported motion.':'No graphics/shapes/titles.'} ${o.surfaces&&recipe&&recipe.surface!=='none'?`Consider surface ${recipe.surface}.`:'No full-frame texture.'} ${o.transitions?'Transitions only at real joins.':'No transitions.'}
+${o.removeFillers?'Only verified timed hesitation cuts, for individual review.':'Do not cut, trim, reorder or change playback speed.'}
+${o.broll?'Search suitable B-roll yourself: use broll tools with concrete visual English queries tied to the surrounding speech. Choose sparse short muted inserts on an unlocked overlay track, within the source timeline; retain the speaker opening/closing. Explain any choice to omit B-roll. Never use generic business stock for unrelated topics.':'No stock B-roll.'} ${o.cutawayAssetId?`Owned media ${o.cutawayAssetId} is available${o.animateOverlays?' as an animated overlay':''}.`:''} ${o.musicAssetId?`Use owned music ${o.musicAssetId} quietly with ducking.`:'No added music/SFX.'}
+Return editorialAnalysis with your understanding, chosen caption template/reason and B-roll strategy, plus a concrete reviewable plan. No paid generation, invented media, local fallback edits or unsupported effect claims.`;
+}

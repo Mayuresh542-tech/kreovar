@@ -1,0 +1,1 @@
+export function workflowUrl(step:"trends"|"ideas"|"script",topic:string,projectId:string|null){const q=new URLSearchParams();q.set(step==="trends"?"q":"topic",topic);if(projectId)q.set("projectId",projectId);return "/"+step+"?"+q;}

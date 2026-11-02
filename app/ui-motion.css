@@ -1,0 +1,68 @@
+/* Motion only: retain every existing dimension, colour, border and layout. */
+@media (prefers-reduced-motion: no-preference) {
+  :where(button, a[href], summary) {
+    transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease,
+      box-shadow 180ms ease, opacity 180ms ease, translate 180ms cubic-bezier(.16,1,.3,1);
+  }
+
+  /* Dialogs can open after mounting (native showModal), without a new DOM node. */
+  dialog[open]::backdrop { animation: vx-backdrop-in 220ms ease-out; }
+  /* Mounted tab content and native dialogs use immediate, short slide entries. */
+  [data-vx-motion="panel"]:not(dialog), dialog[data-vx-motion="panel"][open] {
+    animation: vx-panel-in 180ms cubic-bezier(.16,1,.3,1) both;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    :where(main, .vx-topbar, .vx-dialog, .vx-ai-dialog)
+      :where(button, a[href]):not(:disabled):not([aria-disabled="true"]):not(.vx-timeline *):not(.vx-stage *):not(.vx-preview *):not([style*="transform"]):hover {
+      translate: 0 -2px;
+    }
+    :where(aside nav, nav[aria-label]) a[href]:hover { translate: 3px 0; }
+  }
+
+  :where(button, a[href]):not(:disabled):not([aria-disabled="true"]):not(.vx-timeline *):not(.vx-stage *):not(.vx-preview *):active { translate: 0 1px; }
+}
+
+@keyframes vx-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vx-panel-in { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, a[href], summary) { translate: none !important; }
+}
+
+/* Entry motion is owned by UiMotion; avoid fading the entire page a second time. */
+
+/* CSS-only landing-page marquees never wait for hydration. */
+@media (prefers-reduced-motion: no-preference) {
+ .vx-marquee-left { animation: vx-marquee-left 25s linear infinite; }
+ .vx-marquee-right { animation: vx-marquee-right 30s linear infinite; }
+ .vx-marquee-left:hover,.vx-marquee-right:hover { animation-play-state: paused; }
+}
+@keyframes vx-marquee-left { from {transform:translateX(0)} to {transform:translateX(-50%)} }
+@keyframes vx-marquee-right { from {transform:translateX(-50%)} to {transform:translateX(0)} }
+
+/* Same soft background tones without large blur-filter raster surfaces. */
+.vx-landing-lighting { background:radial-gradient(ellipse 500px 275px at 50% 0%,rgb(219 234 254 / .5),rgb(241 245 249 / .25) 55%,transparent 100%),radial-gradient(circle 300px at 0% 50%,rgb(224 242 254 / .4),transparent 100%),radial-gradient(circle 300px at 100% 80%,rgb(238 242 255 / .5),transparent 100%); }
+@media (prefers-reduced-motion:no-preference) { .vx-loading-track { animation:vx-loading-track 1.4s ease-in-out infinite; } }
+@keyframes vx-loading-track { from {transform:translateX(-100%)} to {transform:translateX(100%)} }
+
+/* Deliberate studio motion: transforms and paint only, no layout animation. */
+@media (prefers-reduced-motion: no-preference) {
+ .vx-route-entry { animation: vx-route-arrive 380ms cubic-bezier(.16,1,.3,1) both; }
+ :where(main,.vx-workspace) :where(input:not([type="range"]),textarea,select) { transition: border-color 180ms ease,box-shadow 180ms ease,background-color 180ms ease; }
+ :where(main,.vx-workspace) :where(input:not([type="range"]),textarea,select):focus-visible { box-shadow:0 0 0 3px rgb(37 99 235 / .12); }
+ [data-vx-motion="panel"]:not(dialog),dialog[data-vx-motion="panel"][open] { animation: vx-panel-arrive 320ms cubic-bezier(.16,1,.3,1) both; }
+ :where(main,.vx-workspace) :where(button,a[href]):not(:disabled):not([aria-disabled="true"]):not(.vx-timeline *):not(.vx-stage *):not(.vx-preview *):not([style*="transform"]) { transition-duration:220ms; }
+ @media (hover:hover) and (pointer:fine) {
+  :where(main,.vx-workspace) .grid > :is(article,a,button,div)[class*="rounded"]:not(:has(.fixed,.sticky)):not(.vx-editor *):not([style*="transform"]) { transition:translate 260ms cubic-bezier(.16,1,.3,1),box-shadow 260ms ease,border-color 220ms ease; }
+  :where(main,.vx-workspace) .grid > :is(article,a,button,div)[class*="rounded"]:not(:has(.fixed,.sticky)):not(.vx-editor *):not([style*="transform"]):hover { translate:0 -4px;box-shadow:0 12px 28px -18px rgb(15 23 42 / .4); }
+  :where(main,.vx-workspace) button:not(:disabled):not(.vx-editor *):hover { box-shadow:0 6px 16px -10px rgb(15 23 42 / .35); }
+ }
+ :where(main,.vx-workspace) button:not(:disabled):not(.vx-editor *):active { scale:.97; }
+ :where(main,.vx-workspace) button:not(.vx-editor *) { transition:scale 140ms ease,translate 220ms ease,box-shadow 220ms ease,background-color 180ms ease,border-color 180ms ease; }
+ :where(main,.vx-workspace) details[open] > :not(summary) { animation:vx-details-arrive 260ms ease-out; }
+ .vx-mobile-tabs button { transition:background-color 200ms ease,color 200ms ease,border-color 200ms ease,box-shadow 200ms ease; }
+}
+@keyframes vx-route-arrive { from {opacity:.65} to {opacity:1} }
+@keyframes vx-panel-arrive { from {opacity:0;translate:0 20px;scale:.985} to {opacity:1;translate:0 0;scale:1} }
+@keyframes vx-details-arrive { from {opacity:0;translate:0 -6px} to {opacity:1;translate:0 0} }

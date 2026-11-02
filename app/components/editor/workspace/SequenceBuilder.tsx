@@ -1,0 +1,14 @@
+"use client";
+import {useState} from 'react';
+import {useProject} from '@/app/lib/editor/store';
+import {appendSequence} from '@/app/lib/editor/sequence';
+import {useEditor} from './EditorContext';
+export default function SequenceBuilder(){
+ const {store,select,notify,playback}=useEditor(),p=useProject(store),[picked,setPicked]=useState<string[]>([]),videos=Object.values(p.assets).filter(a=>a.kind==='video'),ids=picked.filter(id=>p.assets[id]?.kind==='video');
+ const total=ids.reduce((n,id)=>n+p.assets[id].duration,0);
+ const track=p.trackOrder.map(id=>p.tracks[id]).find(t=>t.kind==="video"&&!t.locked),end=track?Math.max(0,...track.clipIds.map(id=>p.clips[id].startTime+p.clips[id].duration)):0;
+ if(!videos.length)return null;
+ function shift(index:number,delta:number){const next=[...ids],other=index+delta;if(other<0||other>=next.length)return;[next[index],next[other]]=[next[other],next[index]];setPicked(next);}
+ function add(){try{let added:string[]=[];store.execute(q=>{const result=appendSequence(q,ids);added=result.clipIds;return result.project;});select(added);playback.set(store.getSnapshot().clips[added[0]].startTime,false);setPicked([]);notify('Added '+added.length+' clips in sequence. Undo removes this batch.');}catch(error){notify(error instanceof Error?error.message:'Could not build the sequence.');}}
+ return <details className="vx-feature-note" open={videos.length>1}><summary>Build a video sequence</summary><p>Choose clips, set their order, then append them to the end of the video track. The total edit must fit within 60 seconds.</p><div className="vx-quick-actions"><button type="button" onClick={()=>setPicked(videos.map(a=>a.id))}>Select all videos</button><button type="button" onClick={()=>setPicked([])}>Clear sequence selection</button></div>{videos.map(a=><label className="vx-check" key={a.id}><input type="checkbox" aria-label={'Include '+a.name+' in sequence'} checked={ids.includes(a.id)} onChange={e=>setPicked(e.target.checked?[...ids,a.id]:ids.filter(id=>id!==a.id))}/>{a.name} · {a.duration.toFixed(2)}s</label>)}{!!ids.length&&<ol className="vx-sequence-order">{ids.map((id,i)=><li key={id}><span>{i+1}. {p.assets[id].name}</span><button type="button" aria-label={'Move '+p.assets[id].name+' earlier in sequence'} disabled={i===0} onClick={()=>shift(i,-1)}>↑</button><button type="button" aria-label={'Move '+p.assets[id].name+' later in sequence'} disabled={i===ids.length-1} onClick={()=>shift(i,1)}>↓</button></li>)}</ol>}<p className="vx-hint" role="status">Selected: {total.toFixed(2)}s · After append: {(end+total).toFixed(2)}s / 60s{end+total>60?" · Shorten your selection first.":""}</p><button type="button" className="vx-primary vx-wide" disabled={!ids.length||!track||end+total>60} onClick={add}>Add in sequence ({ids.length})</button></details>;
+}

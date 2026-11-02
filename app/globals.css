@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+:root {
+  --font-inter: var(--font-inter-loaded), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: var(--font-mono-loaded), ui-monospace, monospace;
+  
+  --background: #FAFAFA;
+  --foreground: #0F172A;
+  --sidebar-bg: #FFFFFF;
+  --card-surface: #FFFFFF;
+  --card-surface-hover: #F8FAFC;
+  --card-surface-nested: #F1F5F9;
+  
+  --border-subtle: #F1F5F9;
+  --border-light: #E2E8F0;
+  --border-dark: #CBD5E1;
+  
+  --brand-accent: #2563EB;
+  --brand-accent-hover: #1D4ED8;
+  --brand-primary: #0F172A;
+  --brand-primary-hover: #1E293B;
+  
+  --text-primary: #0F172A;
+  --text-muted: #64748B;
+  --text-dim: #94A3B8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand-surface: #FFFFFF;
+  --color-brand-card: #FFFFFF;
+  --color-brand-card-hover: #F8FAFC;
+  --color-brand-border: #E2E8F0;
+  --color-brand-border-light: #F1F5F9;
+  --color-brand-accent: #2563EB;
+  --color-brand-accent-hover: #1D4ED8;
+  --color-brand-primary: #0F172A;
+  --color-brand-primary-hover: #1E293B;
+  
+  --font-sans: var(--font-inter), sans-serif;
+  --font-heading: var(--font-inter), sans-serif;
+  --font-mono: var(--font-mono), monospace;
+}
+
+body {
+  background-color: #FAFAFA;
+  color: #0F172A;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-inter), sans-serif;
+  letter-spacing: -0.015em;
+}
+
+/* Subtle clean scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E2E8F0;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #CBD5E1;
+}
+
+/* Subtle SaaS Card Transitions */
+.card-hover-transition {
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card-hover-transition:hover {
+  border-color: #CBD5E1;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .card-hover-transition:hover {
+    transform: none;
+  }
+}

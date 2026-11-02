@@ -1,0 +1,6 @@
+"use client";
+import {Square,Circle,Triangle,ArrowRight,Minus,Star,Plus} from 'lucide-react';
+import {SHAPE_KINDS,addShape} from '@/app/lib/editor/shapes';
+import {useEditor} from './EditorContext';
+const icons={rectangle:Square,ellipse:Circle,triangle:Triangle,arrow:ArrowRight,line:Minus,star:Star};
+export default function ShapeLibrary(){const {run,playback,select}=useEditor();return <section aria-label="Shapes"><p className="vx-hint">Add an editable shape at the playhead. Change its colours, size and animation in Clip controls.</p><div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:8}}>{SHAPE_KINDS.map(kind=>{const Icon=icons[kind];return <button className="vx-secondary" key={kind} aria-label={`Add ${kind} shape`} style={{minHeight:90,flexDirection:'column',gap:10}} onClick={()=>{let id:string|undefined;run(p=>{const next=addShape(p,kind,playback.getSnapshot().time,Math.min(3,60-playback.getSnapshot().time));id=Object.keys(next.clips).find(id=>!p.clips[id]);return next;});if(id)select([id]);}}><Icon size={30} strokeWidth={1.6}/><span style={{display:'inline-flex',gap:4,alignItems:'center',fontSize:11,textTransform:'capitalize'}}><Plus size={12}/>{kind}</span></button>;})}</div></section>;}

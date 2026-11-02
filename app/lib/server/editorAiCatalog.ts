@@ -1,0 +1,3 @@
+import {getAdminClient} from "./adminAuth";
+import type {AiCatalogAsset} from "../editor/aiTools";
+export async function loadAiCatalog(userId:string):Promise<AiCatalogAsset[]>{const {data,error}=await getAdminClient().from("studio_assets").select("id,filename,kind,metadata").eq("user_id",userId).eq("status","ready").in("kind",["video","image","audio"]).order("created_at",{ascending:false}).limit(100);if(error)throw new Error("Asset Library is temporarily unavailable.");return (data||[]).map(a=>({id:a.id,name:String(a.filename).slice(0,180),kind:a.kind,duration:Number(a.metadata?.duration)||0}));}

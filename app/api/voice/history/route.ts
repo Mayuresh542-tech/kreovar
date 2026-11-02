@@ -1,0 +1,22 @@
+import {legacyStorageEndpoint} from "@/app/lib/media/legacyStorage";
+import {NextRequest, NextResponse} from "next/server";
+import {getAdminClient,getAuthenticatedUserId} from "@/app/lib/server/adminAuth";
+import {withSafeResponse} from "@/app/lib/server/safeResponse";
+import {voiceFileAsset} from "@/app/lib/server/voiceFile";
+import {assetView} from "@/app/lib/server/assetStore";
+export const dynamic="force-dynamic";
+export const GET=withSafeResponse(async(req:NextRequest)=>{
+ const userId=await getAuthenticatedUserId(req);
+ if(!userId)return NextResponse.json({error:"Sign in to view your voiceovers."},{status:401});
+ const offset=Number(req.nextUrl.searchParams.get("offset")||0);
+ if(!Number.isInteger(offset)||offset<0||offset>10000)return NextResponse.json({error:"Invalid history page."},{status:400});
+ const db=getAdminClient();
+ const result=await db.from("voice_generations").select("id,voice_id,voice_name,script_text,audio_url,duration,created_at,settings").eq("user_id",userId).eq("status","completed").order("created_at",{ascending:false}).order("id",{ascending:false}).range(offset,offset+19);
+ if(result.error)throw new Error("Could not load voiceover history.");
+ const records=result.data||[];
+ const ids=records.map(row=>String(row.audio_url).match(/^\/api\/assets\/([a-f0-9-]+)\/file$/i)?.[1]).filter((id):id is string=>!!id);
+ const assets=ids.length?await db.from("studio_assets").select("*").eq("user_id",userId).eq("status","ready").in("id",ids):{data:[],error:null};
+ if(assets.error)throw new Error("Could not load saved voiceover files.");
+ const mapped=new Map((assets.data||[]).map(row=>[row.id,assetView(row)]));
+ return NextResponse.json({generations:records.map(row=>{const {settings,...entry}=row;return {...entry,audio_url:entry.audio_url?legacyStorageEndpoint(entry.audio_url):entry.audio_url,asset:mapped.get(String(row.audio_url).split("/")[3])||voiceFileAsset({...entry,settings})};}),nextOffset:records.length===20?offset+20:null},{headers:{"Cache-Control":"private, no-store"}});
+});

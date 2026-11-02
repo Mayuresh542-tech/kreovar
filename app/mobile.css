@@ -1,0 +1,71 @@
+/* Responsive refinements shared by studio routes. Desktop styling is unchanged. */
+@media (max-width: 1023px) {
+  .vx-shell { min-width: 0; }
+  .vx-topheader { padding-top: env(safe-area-inset-top); min-height: calc(56px + env(safe-area-inset-top)); height: auto; }
+  .vx-topheader button, .vx-topheader a { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  .vx-mobile-drawer aside { width: min(300px, calc(100vw - 36px)); padding-top: calc(16px + env(safe-area-inset-top)); padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  .vx-mobile-drawer aside > div:first-child { min-height: 0; overscroll-behavior-y: contain; }
+  .vx-mobile-drawer aside > div:last-child { flex-shrink: 0; }
+  .vx-mobile-drawer aside nav a, .vx-mobile-drawer aside nav button { min-height: 44px; }
+  .vx-mobile-drawer aside > div:first-child > a { padding-right: 42px; min-height: 44px; }
+  .vx-drawer-close { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 10px; z-index: 40; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 10px; background: white; color: #475569; }
+}
+@media (max-width: 639px) {
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: 16px; }
+  .vx-workspace { padding: 16px 12px calc(24px + env(safe-area-inset-bottom)); scroll-padding-block: 16px; }
+  .vx-route-entry, .vx-route-entry > *, .vx-workspace .grid > *, .vx-workspace .flex > .flex-1 { min-width: 0; }
+  .vx-workspace :is(input,textarea,select) { max-width: 100%; min-width: 0; }
+  .vx-workspace .inline-flex { max-width: 100%; }
+  .vx-workspace .flex.justify-between:not(.overflow-x-auto):not(.flex-col) { flex-wrap: wrap; row-gap: 12px; }
+  .vx-workspace .grid-cols-3:not(.sm\:grid-cols-3) { grid-template-columns: repeat(1, minmax(0,1fr)); }
+  .vx-workspace .p-6, .vx-workspace .p-8 { padding: 16px; }
+  .vx-workspace button, .vx-workspace select, .vx-workspace a.inline-flex { min-height: 44px; }
+  .vx-workspace button:not(:has(svg)):not([role="switch"]) { overflow-wrap: anywhere; }
+  .vx-workspace video, .vx-workspace audio, .vx-workspace img { max-width: 100%; }
+  .vx-workspace audio { min-width: 0; width: 100%; }
+  .vx-workspace table { display: block; width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+  .vx-workspace pre { max-width: 100%; overflow-x: auto; }
+  .vx-workspace label, .vx-workspace p { overflow-wrap: anywhere; }
+  .vx-mobile-wrap { flex-wrap: wrap; overflow: visible; }
+  .vx-mobile-tabs { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; touch-action: pan-x; padding-bottom: 8px; }
+  .vx-mobile-tabs > button { flex-shrink: 0; white-space: nowrap; }
+  .vx-project-heading { min-width: 0; }
+  .vx-project-heading h1 { min-width: 0; flex: 1; }
+  .vx-project-heading > button { flex-shrink: 0; min-width: 44px; }
+  .vx-project-heading > input { flex: 1; width: 0; }
+  [role="dialog"], dialog { max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; }
+  [role="dialog"] :is(input,textarea,select), dialog :is(input,textarea,select) { max-width: 100%; min-width: 0; }
+  [role="dialog"] :is(button,a.inline-flex), dialog :is(button,a.inline-flex) { min-height: 44px; }
+  [role="dialog"] .grid-cols-2:not(.sm\:grid-cols-2) { grid-template-columns: minmax(0,1fr); }
+  .vx-mobile-drawer[role="dialog"] { max-width: none; max-height: none; overflow: hidden; }
+  .vx-auth-shell { min-height: 100dvh; padding-bottom: env(safe-area-inset-bottom); }
+  .vx-auth-shell button, .vx-auth-shell a { min-height: 44px; }
+  .vx-auth-shell header a { display: inline-flex; align-items: center; }
+  .vx-landing-banner { flex-wrap: wrap; row-gap: 4px; }
+  .vx-landing-banner span { min-width: 0; overflow-wrap: anywhere; }
+  .vx-landing-nav { gap: 8px; }
+  .vx-landing-nav > a { gap: 6px; }
+  .vx-landing-nav > div:last-child { gap: 4px; }
+  .vx-landing-nav a { min-height: 44px; }
+  .vx-landing-footer nav { gap: 8px 16px; }
+  .vx-landing-footer a { display: inline-flex; align-items: center; min-height: 44px; }
+}
+@media (max-width: 359px) {
+  .vx-workspace .grid-cols-2:not(.vx-keep-columns) { grid-template-columns: minmax(0,1fr); }
+  .vx-landing-nav > a > div > span:last-child { display: none; }
+  .vx-landing-nav > div:last-child > a { padding-inline: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vx-workspace { scroll-behavior: auto; }
+}
+
+@media (max-width: 639px) {
+  /* Older tool modals share an overlay/card layout without dialog roles. */
+  .fixed.inset-0.z-50 > [class*="rounded"] { max-width: 100%; max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; }
+  .fixed.inset-0.z-50 > [class*="rounded"] :is(button,a.inline-flex) { min-height: 44px; }
+  .fixed.inset-0.z-50 > [class*="rounded"] :is(input,textarea,select) { min-width: 0; max-width: 100%; }
+}
+
+@media(max-width:639px){.vx-auth-shell{overflow-x:clip;}nav[aria-label='Legal policies'] a{min-height:44px;display:inline-flex;align-items:center;}}
+
+@media(max-width:639px){.vx-workspace label:has(>input[type=file]){min-height:44px;}}
