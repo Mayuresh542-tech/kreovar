@@ -34,10 +34,10 @@ The short-video editing workflow is bounded to 60 seconds. Export format, resolu
 - Next.js 16.4.3, React 19.2.4, TypeScript, and Tailwind CSS 4.
 - Supabase authentication, PostgreSQL, private storage, and migrations.
 - Remotion preview/composition, Mediabunny media handling, and FFmpeg-dependent server finishing where supported.
-- Groq for configured content/transcription paths; the main AI editor uses the fixed model configured in `app/lib/server/radoxConfig.ts` through the Radox adapter, with a visible Groq fallback for specific service outages/timeouts.
+- Groq is the default AI editor provider: Qwen handles bounded visual observations and GPT-OSS 120B plans edits. Radox is an explicit legacy opt-in (`EDITOR_AI_PRIMARY_PROVIDER=radox`), not an automatic retry target. Content/transcription paths retain their configured adapters.
 - Voice.ai and other source-configured provider adapters; stock-media integrations require their own keys and applicable usage rights.
 - Whop subscriptions and signed webhook processing. Dodo integration is sandbox-only.
-- Netlify deployment configuration and a Windows adapter build plugin.
+- Cloudflare Workers Free build support, plus the existing Netlify build configuration for rollback.
 
 Provider/model identifiers describe the current source configuration, not an independent certification of provider availability or capabilities. Some internal package names, auth keys, tests, and historical documents still use Fretrend/VeeloX names to preserve compatibility.
 
@@ -65,7 +65,7 @@ Then configure:
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Server database/storage access. Keep the service-role key server-only. |
 | `ENCRYPTION_SECRET` | Stable server-only encryption secret for stored provider keys; follow the format in `.env.example`. |
 | `GROQ_API_KEY`, optional `GROQ_TRANSCRIPTION_API_KEY` | Content/transcription and configured editor fallback. An enabled encrypted provider configuration can take precedence over environment fallback. |
-| `RADOX_API_KEY` | Primary AI editor provider. |
+| `RADOX_API_KEY` | Optional legacy editor provider; not used by the default Groq flow. |
 | `VOICE_AI_API_KEY` or `VOICE_AI_API_KEYS` | Voice synthesis integration. |
 | `PEXELS_API_KEY`, `PIXABAY_API_KEY` | Optional stock-media integrations. |
 | `WHOP_*` | Your own account, plans, checkout return URL, and signed webhook integration. |
@@ -115,7 +115,7 @@ npm run build
 
 Focused suites include `test:security`, `test:chat-routing`, `test:geo-aeo`, `test:reference-presets`, and `test:dodo`. `npm run lint` runs repository-wide ESLint. Tests include deterministic/static regression checks; they do not by themselves prove successful live AI, payment, OAuth, or cloud rendering behavior. External-service probe scripts can make real requests and should only be run deliberately with your own credentials.
 
-For a local production server, run `npm run build` followed by `npm start`. See [Netlify deployment notes](docs/NETLIFY_DEPLOY.md) for hosted builds.
+For a local production server, run `npm run build` followed by `npm start`. See [Cloudflare deployment notes](docs/CLOUDFLARE_DEPLOY.md) for Workers builds and their runtime boundaries. [Netlify deployment notes](docs/NETLIFY_DEPLOY.md) remain available for the earlier host.
 
 ## Current boundaries
 

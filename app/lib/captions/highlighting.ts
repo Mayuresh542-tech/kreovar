@@ -19,6 +19,6 @@ export function distinctHighlight(textColor:string,highlightColor:string){
  if(rgb(textColor)!==rgb(highlightColor))return highlightColor;
  return ['#facc15','#ffe600','#ffd27d','#d9ff43'].includes(rgb(textColor))?'#22D3EE':'#FACC15';
 }
-export function wordHighlight(mode:string,word:string,index:number,current:boolean,custom=''){
- return mode==='full-line'||(mode==='keyword'?isImportantWord(word,custom):mode==='alternating'?index%2===1:current);
+export function wordHighlight(mode:string,word:string,index:number,current:boolean,custom='',started=current){
+ return mode==='cumulative'?started:mode==='full-line'||(mode==='keyword'?isImportantWord(word,custom):mode==='alternating'?index%2===1:current);
 }

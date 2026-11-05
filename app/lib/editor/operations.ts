@@ -1,3 +1,4 @@
+import {anchorVisualTreatment} from './visualTreatment';
 import {readStyleSurface} from "./styleSurface";
 import {studioStyleFromEditor} from './captionStyleBridge';
 import {readFontAccent} from "../captions/typography";
@@ -27,7 +28,7 @@ export function addClip(p: EditorProject, assetId: string, trackId: string, star
   if (!Number.isFinite(c.duration) || c.duration<1/p.settings.fps) throw new Error("The media has no usable duration.");
   return {...put(p,c),tracks:{...p.tracks,[trackId]:{...track,clipIds:[...track.clipIds,c.id]}}};
 }
-export function addAsset(p: EditorProject, asset: MediaAsset): EditorProject { return {...p,assets:{...p.assets,[asset.id]:asset}}; }
+export function addAsset(p: EditorProject, asset: MediaAsset): EditorProject { return {...p,assets:{...p.assets,[asset.id]:asset},...(p.removedProjectAssetIds?{removedProjectAssetIds:p.removedProjectAssetIds.filter(id=>id!==asset.id&&id!==asset.libraryId)}:{})}; }
 export function removeClip(p: EditorProject,id: string): EditorProject {
   const c=editable(p,id), clips={...p.clips}, textLayers={...p.textLayers}, captions={...p.captions};
   delete clips[id]; if(c.contentId){delete textLayers[c.contentId];delete captions[c.contentId];}
@@ -47,17 +48,17 @@ export function trimClip(p: EditorProject,id: string,edge: "left"|"right",time: 
   if(edge==="left") {
     const start=clamp(time,bounded?Math.max(0,c.startTime-c.sourceStart/c.speed):0,c.startTime+c.duration-min);
     const delta=start-c.startTime;
-    return cleanTransitions(put(p,{...c,startTime:start,duration:c.duration-delta,sourceStart:c.sourceStart+delta*c.speed}));
+    return cleanTransitions(put(p,{...c,...(c.visualTreatment?{visualTreatment:anchorVisualTreatment(c)}:{}),startTime:start,duration:c.duration-delta,sourceStart:c.sourceStart+delta*c.speed}));
   }
   const end=clamp(time,c.startTime+min,bounded?c.startTime+(asset.duration-c.sourceStart)/c.speed:86400);
-  return cleanTransitions(put(p,{...c,duration:end-c.startTime,sourceEnd:c.sourceStart+(end-c.startTime)*c.speed}));
+  return cleanTransitions(put(p,{...c,...(c.visualTreatment?{visualTreatment:anchorVisualTreatment(c)}:{}),duration:end-c.startTime,sourceEnd:c.sourceStart+(end-c.startTime)*c.speed}));
 }
 export function splitClip(p: EditorProject,id: string,time: number): EditorProject {
   const c=editable(p,id), left=time-c.startTime,min=1/p.settings.fps;
   if(left<min || c.duration-left<min) throw new Error("Move the playhead inside the clip to split.");
   const newId=uid(), contentId=c.contentId?uid():undefined, source=c.sourceStart+left*c.speed;
-  const right: Clip={...c,id:newId,contentId,startTime:time,duration:c.duration-left,sourceStart:source,fadeIn:0};
-  const next=put(put(p,{...c,duration:left,sourceEnd:source,fadeOut:0}),right);
+  const visual=anchorVisualTreatment(c),right: Clip={...c,...(visual?{visualTreatment:visual}:{}),id:newId,contentId,startTime:time,duration:c.duration-left,sourceStart:source,fadeIn:0};
+  const next=put(put(p,{...c,...(visual?{visualTreatment:visual}:{}),duration:left,sourceEnd:source,fadeOut:0}),right);
   return cleanTransitions({...next,tracks:{...p.tracks,[c.trackId]:{...p.tracks[c.trackId],clipIds:[...p.tracks[c.trackId].clipIds,newId]}},textLayers:contentId&&c.contentId&&p.textLayers[c.contentId]?{...p.textLayers,[contentId]:{...p.textLayers[c.contentId],id:contentId}}:p.textLayers,captions:contentId&&c.contentId&&p.captions[c.contentId]?{...p.captions,[contentId]:{...p.captions[c.contentId],id:contentId}}:p.captions});
 }
 export function duplicateClip(p: EditorProject,id: string,time?:number): EditorProject {

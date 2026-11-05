@@ -66,7 +66,7 @@ export default function AdminSettingsPage() {
             </div>
 
             <div className="p-4 rounded-xl bg-[#12151E] border border-[#202534] space-y-1">
-              <span className="text-slate-400 text-[10px] uppercase">Gemini AI Model</span>
+              <span className="text-slate-400 text-[10px] uppercase">AI content service</span>
               <div className="text-white font-bold flex items-center gap-1.5">
                 <span className="text-emerald-400">✓</span>
                 <span>Centralized Server AI Layer</span>

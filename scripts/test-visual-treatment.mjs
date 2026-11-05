@@ -17,7 +17,7 @@ test('entrance and exit operate within trimmed source boundaries and keep neutra
 });
 test('invalid effect ranges, unsupported card fields, overlapping intervals and unreasonable sizes are rejected',()=>{
  for(const value of [{},{card:{width:0}},{card:{width:.8,height:2}},{card:{width:.8,background:'url(private)'}},{effects:Array(13).fill({sourceStart:0,sourceEnd:1,blur:2})},{effects:[{sourceStart:2,sourceEnd:1,blur:4}]},{effects:[{sourceStart:1,sourceEnd:2,rampIn:1,rampOut:1,blur:4}]},{effects:[{sourceStart:1,sourceEnd:3},{sourceStart:2,sourceEnd:4}]},{entrance:{sourceDuration:0,blur:24}},{effects:[{sourceStart:1,sourceEnd:2,blur:25}]}])assert.throws(()=>visual.readVisualTreatment(value));
- assert.deepEqual(visual.readVisualTreatment({card:{width:.8,height:.45,unknown:'discard'},untrusted:'ignored'}),{card:{width:.8,height:.45}});
+ assert.throws(()=>visual.readVisualTreatment({card:{width:.8,height:.45,unknown:'discard'},untrusted:'ignored'}));
 });
 function commands(){const calls=[],properties=[];return {calls,properties,ctx:new Proxy({}, {get:(_,key)=>(...values)=>calls.push([key,...values]),set:(_,key,value)=>(properties.push([key,value]),true)})};}
 test('a real square media card clips the actual source, preserves its crop and draws a bounded shadow',()=>{

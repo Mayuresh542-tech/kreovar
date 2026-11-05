@@ -35,7 +35,7 @@ export function drawStudioCaption(ctx:CanvasRenderingContext2D,segment:CaptionSe
  const requested=(style.highlightWords||'').split(',').map(w=>w.trim().toLocaleLowerCase()).filter(Boolean);
  const words=source.map((w,index)=>{
   const manual=isEmphasis(segment,d,index,count)||!segment.emphasizedWords&&requested.includes(w.word.toLocaleLowerCase().replace(/[\p{P}]/gu,''));
-  const active=style.highlightingMode==='current-word'?index===current:style.highlightingMode==='alternating'?index%2===0:style.highlightingMode==='full-line'?true:manual;
+  const active=style.highlightingMode==='cumulative'?time>=w.start:style.highlightingMode==='current-word'?index===current:style.highlightingMode==='alternating'?index%2===0:style.highlightingMode==='full-line'?true:manual;
   const edge=!!d.edgeFont&&(index===0||index===count-1),emphasis=manual,font=emphasis?(d.emphasisFont||style.fontAccent?.font||style.fontFamily):edge?d.edgeFont!:style.fontFamily;
   const fontSize=size*(emphasis?(d.emphasisScale||1):edge?d.edgeScale||1:1),weight=emphasis?(d.emphasisWeight||style.fontAccent?.weight||style.fontWeight):style.fontWeight;
   const casing=emphasis&&d.emphasisCase?d.emphasisCase:d.lowercase?'lowercase':style.textTransform;

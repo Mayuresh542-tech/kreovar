@@ -174,7 +174,7 @@ export default function VoiceGeneratorModal({
           {/* Footer Actions */}
           <div className="pt-2 border-t border-[#171B26] flex items-center justify-between">
             <span className="text-[11px] text-slate-500 font-mono">
-              Server-Managed ElevenLabs Engine
+              Secure voice generation
             </span>
             <button
               type="button"

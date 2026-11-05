@@ -8,3 +8,20 @@ test('composition rejects locked clips and nonexistent word emphasis without par
 test('selected template cannot override a composed per-shot position and word hierarchy',()=>{const load=loader(),{p,id}=source(load),caption=p.captions[p.clips[id].contentId];caption.studioData={templateId:'edit-prism'};const next=load('app/lib/editor/captionComposition').composeCaption(p,id,{yPercent:88,fontWeight:300,emphasisWeight:900,emphasizedWords:[2],build:'accumulate'}),c=next.captions[next.clips[id].contentId],segment=load('app/lib/editor/editorCaptionStudio').studioSegment(next,next.clips[id]),style=load('app/lib/captions/studioCanvas').resolveCaptionStyle(segment,c.studioStyle);assert.equal(style.positionYPercent,88);assert.equal(style.fontWeight,300);assert.equal(style.studio.emphasisWeight,900);assert.equal(segment.emphasizedWords[0],2);});
 test('explicit position keeps relative source keyframes; typography-only changes preserve physical anchor',()=>{const load=loader(),{p,id}=source(load),{composeCaption}=load('app/lib/editor/captionComposition');p.clips[id].transform={x:.1,y:.2,scale:1.1,rotation:8,opacity:.9};p.clips[id].keyframes=[{sourceTime:0,value:{...p.clips[id].transform},easing:'linear'},{sourceTime:2,value:{...p.clips[id].transform,y:.3},easing:'smooth'}];const moved=composeCaption(p,id,{yPercent:50});assert.equal(moved.clips[id].transform.y,0);assert.ok(Math.abs(moved.clips[id].keyframes[1].value.y-.1)<1e-9);assert.equal(moved.clips[id].transform.scale,1.1);assert.equal(moved.clips[id].transform.rotation,8);assert.equal(moved.clips[id].keyframes[1].sourceTime,2);const anchors=load('app/lib/editor/captionAnchors'),old=anchors.captionVisualAnchor(p,p.clips[id]),restyled=composeCaption(p,id,{fontWeight:300}),next=anchors.captionVisualAnchor(restyled,restyled.clips[id]);assert.ok(Math.abs(old.x-next.x)<1e-9&&Math.abs(old.y-next.y)<1e-9);});
 
+
+test('cumulative highlighting keeps spoken words active through gaps and never activates future words',()=>{
+ const load=loader(),{wordHighlight}=load('app/lib/captions/highlighting');
+ assert.equal(wordHighlight('cumulative','spoken',0,false,'',true),true);
+ assert.equal(wordHighlight('cumulative','future',1,false,'',false),false);
+ assert.equal(wordHighlight('current-word','spoken',0,false,'',true),false);
+});
+test('Paper recipe draws cumulative dark words with gray upcoming words using real word starts',()=>{
+ const load=loader(),recipe=load('app/lib/captions/aiEditStyles').aiEditStyleRecipe('captions-paper');
+ assert.equal(recipe.caption.highlightingMode,'cumulative');
+ const {readStudioStyle}=load('app/lib/editor/editorCaptionStudio');assert.equal(readStudioStyle(recipe.caption).highlightingMode,'cumulative');
+ const {drawStudioCaption}=load('app/lib/captions/studioCanvas'),segment={id:'paper',text:'This is yours',start:0,end:3,words:[{word:'This',start:0,end:.5},{word:'is',start:1,end:1.5},{word:'yours',start:2,end:3}]};
+ function colors(time){const ink=[],stack=[],data={fillStyle:'',globalAlpha:1,font:'',letterSpacing:'0px'},ctx=new Proxy(data,{get(target,key){if(key in target)return target[key];if(key==='measureText')return text=>({width:text.length*15});if(key==='fillText')return text=>ink.push({text,color:target.fillStyle});if(key==='save')return()=>stack.push({...target});if(key==='restore')return()=>Object.assign(target,stack.pop());if(key==='createLinearGradient')return()=>({addColorStop(){}});return()=>{};}});drawStudioCaption(ctx,segment,recipe.caption,time,720,1280);return ink.filter(i=>['This','is','yours'].includes(i.text)).map(i=>i.color);}
+ assert.deepEqual(colors(.75),['#151515','#9b9b9b','#9b9b9b']);
+ assert.deepEqual(colors(1.7),['#151515','#151515','#9b9b9b']);
+ assert.deepEqual(colors(2.5),['#151515','#151515','#151515']);
+});

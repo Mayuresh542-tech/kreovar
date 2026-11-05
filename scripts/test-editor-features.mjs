@@ -22,7 +22,9 @@ function loader(mocks = {}) {
     const loadedModule = { exports: {} }; cache.set(filename, loadedModule);
     const source = ts.transpileModule(fs.readFileSync(filename, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText.replaceAll("import.meta.url",JSON.stringify(pathToFileURL(filename).href));
     const localRequire = specifier => Object.hasOwn(mocks,specifier)?mocks[specifier]:specifier.startsWith("@/") ? load(specifier.slice(2)) : specifier.startsWith(".") ? load(path.relative(root, path.resolve(path.dirname(filename), specifier))) : require(specifier);
-    new vm.Script(`(function(require,module,exports){${source}\n})`, { filename }).runInThisContext()(localRequire, loadedModule, loadedModule.exports);
+    // Existing Radox mocks explicitly exercise the legacy adapter; default Groq routing has dedicated real-boundary tests.
+    const moduleProcess=key==="app/lib/server/editorProvider.ts"&&mocks["app/lib/server/radoxService.ts"]?{env:{...process.env,EDITOR_AI_PRIMARY_PROVIDER:"radox"}}:process;
+    new vm.Script(`(function(require,module,exports,process){${source}\n})`, { filename }).runInThisContext()(localRequire, loadedModule, loadedModule.exports,moduleProcess);
     return loadedModule.exports;
   }
   return load;
@@ -126,7 +128,7 @@ test("AI route reports missing editing-provider configuration and rejects invali
   const request = body => new NextRequest("http://localhost/api/editor/ai-edit", { method: "POST", headers: { Authorization: "Bearer test-session" }, body: JSON.stringify(body) });
   const bad = await route.POST(request({ instruction: "", project: fixture(), selectedClipIds: [] })); assert.equal(bad.status, 400); assert.equal(calls, 0);
   const oversized = await route.POST(request({ instruction: "x".repeat(1100000) })); assert.equal(oversized.status, 413);
-  const missing = await route.POST(request({ instruction: "Make portrait", project: fixture(), selectedClipIds: [] })); assert.equal(missing.status, 503); const missingData=await missing.json(); assert.equal(missingData.code,'GROQ_NOT_CONFIGURED'); assert.match(missingData.error, /Groq fallback is disabled or not configured/); assert.equal(calls,1);
+  const missing = await route.POST(request({ instruction: "Make portrait", project: fixture(), selectedClipIds: [] })); assert.equal(missing.status, 503); const missingData=await missing.json(); assert.equal(missingData.code,'AI_NOT_CONFIGURED'); assert.match(missingData.error, /AI editing is temporarily unavailable/); assert.equal(calls,1);
 });
 test("client download hands correct filename to the browser and releases temporary resources", async () => {
   const originals = { fetch: globalThis.fetch, document: globalThis.document, create: URL.createObjectURL, revoke: URL.revokeObjectURL, timer: globalThis.setTimeout };

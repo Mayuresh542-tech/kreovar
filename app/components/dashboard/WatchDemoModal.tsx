@@ -100,7 +100,7 @@ export default function WatchDemoModal({
             </div>
             <div className="p-2 rounded-xl bg-[#141824] border border-[#23293D]">
               <span className="text-blue-400 font-bold block mb-0.5">2. Script & Hooks</span>
-              <span className="text-[11px] text-slate-400">Gemini 2.0 AI Brain</span>
+              <span className="text-[11px] text-slate-400">AI content tools</span>
             </div>
             <div className="p-2 rounded-xl bg-[#141824] border border-[#23293D]">
               <span className="text-emerald-400 font-bold block mb-0.5">3. Multi-Platform</span>

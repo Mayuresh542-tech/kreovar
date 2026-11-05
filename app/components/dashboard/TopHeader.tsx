@@ -1,4 +1,5 @@
 "use client";
+import ThemeToggle from "../ThemeToggle";
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -25,7 +26,7 @@ export default function TopHeader({
   onMobileMenuToggle,
   mobileMenuOpen = false,
   alertCount = 0,
-  userName = "Alex Carter",
+  userName = "Your account",
   userRole = "Free Plan",
   avatarUrl,
 }: TopHeaderProps) {
@@ -65,7 +66,7 @@ export default function TopHeader({
         <button
           type="button"
           onClick={onMobileMenuToggle}
-          className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+          className="lg:hidden inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           aria-label="Toggle Navigation"
           aria-expanded={mobileMenuOpen}
           aria-controls="kreovar-mobile-navigation"
@@ -79,11 +80,12 @@ export default function TopHeader({
       </div>
 
       {/* Right: Notifications & Profile Avatar */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <ThemeToggle />
         {/* Notification Bell */}
         <Link
           href="/trends"
-          className="relative p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+          className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors"
           title="Notifications"
           aria-label="Notifications"
         >

@@ -12,8 +12,9 @@ export interface CaptionComposition {
  emphasisWeight?:number;emphasisItalic?:boolean;emphasisScale?:number;emphasisFont?:typeof EMPHASIS_FONTS[number];
  emphasizedWords?:number[];build?:'accumulate'|'all';entrance?:CaptionTransition;exit?:CaptionTransition;transitionDuration?:number;
  layout?:'inline'|'stacked'|'hero'|'split'|'dynamic';
+ highlightingMode?:'keyword'|'current-word'|'cumulative'|'alternating'|'full-line';
 }
-const fields=['xPercent','yPercent','fontSize','fontWeight','maxWordsPerLine','alignment','textColor','emphasisColor','emphasisWeight','emphasisItalic','emphasisScale','emphasisFont','emphasizedWords','build','entrance','exit','transitionDuration','layout'];
+const fields=['xPercent','yPercent','fontSize','fontWeight','maxWordsPerLine','alignment','textColor','emphasisColor','emphasisWeight','emphasisItalic','emphasisScale','emphasisFont','emphasizedWords','build','entrance','exit','transitionDuration','layout','highlightingMode'];
 /** Closed AI presentation boundary. No arbitrary CSS, fonts, media or code is accepted. */
 export function readCaptionComposition(value:unknown):CaptionComposition {
  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Invalid caption composition.');
@@ -22,6 +23,7 @@ export function readCaptionComposition(value:unknown):CaptionComposition {
  const number=(key:string,min:number,max:number,integer=false)=>{if(raw[key]===undefined)return;const v=raw[key];if(typeof v!=='number'||!Number.isFinite(v)||v<min||v>max||integer&&!Number.isInteger(v))throw Error('Caption composition number is outside its supported range.');out[key]=v;};
  number('xPercent',5,95);number('yPercent',8,92);number('fontSize',8,160);number('fontWeight',100,900);number('maxWordsPerLine',1,8,true);number('emphasisWeight',100,900);number('emphasisScale',.8,1.6);number('transitionDuration',.05,1);
  const choice=(key:string,values:readonly string[])=>{if(raw[key]===undefined)return;if(typeof raw[key]!=='string'||!values.includes(raw[key]))throw Error('Unsupported caption composition option.');out[key]=raw[key];};
+ choice('highlightingMode',['keyword','current-word','cumulative','alternating','full-line']);
  choice('alignment',['left','center','right']);choice('build',['accumulate','all']);choice('layout',['inline','stacked','hero','split','dynamic']);choice('emphasisFont',EMPHASIS_FONTS);choice('entrance',CAPTION_IN_OUT);choice('exit',CAPTION_IN_OUT);
  for(const key of ['textColor','emphasisColor'])if(raw[key]!==undefined){if(typeof raw[key]!=='string'||!/^#[0-9a-f]{6}$/i.test(raw[key]))throw Error('Caption colors require a six-digit hex color.');out[key]=raw[key];}
  if(raw.emphasisItalic!==undefined){if(typeof raw.emphasisItalic!=='boolean')throw Error('Invalid caption emphasis.');out.emphasisItalic=raw.emphasisItalic;}
@@ -46,7 +48,8 @@ export function composeCaption(project:EditorProject,clipId:string,presentation:
   ...(p.yPercent===undefined?{}:{position:'custom',positionYPercent:p.yPercent}),
   ...(p.fontSize===undefined?{}:{fontSize:p.fontSize}),...(p.fontWeight===undefined?{}:{fontWeight:p.fontWeight}),
   ...(p.maxWordsPerLine===undefined?{}:{maxWordsPerLine:p.maxWordsPerLine}),...(p.alignment===undefined?{}:{alignment:p.alignment}),
-  ...(p.textColor===undefined?{}:{textColor:p.textColor}),...(p.emphasisColor===undefined?{}:{highlightColor:p.emphasisColor}),...((p.emphasisColor===undefined&&p.emphasizedWords===undefined)?{}:{highlightingMode:'keyword'}),
+  ...(p.textColor===undefined?{}:{textColor:p.textColor}),...(p.emphasisColor===undefined?{}:{highlightColor:p.emphasisColor}),...((p.emphasisColor===undefined&&p.emphasizedWords===undefined)?{}:{highlightingMode:p.highlightingMode||'keyword'}),
+  ...(p.highlightingMode===undefined?{}:{highlightingMode:p.highlightingMode}),
   ...(p.build===undefined?{}:{animation:p.build==='accumulate'?'word-by-word':'fade'}),
  });
  const data=readStudioData({...caption.studioData,styleOverride:style,...(p.emphasizedWords===undefined?{}:{emphasizedWords:p.emphasizedWords})});

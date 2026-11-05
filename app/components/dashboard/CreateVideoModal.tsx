@@ -54,7 +54,7 @@ export default function CreateVideoModal({
           <path d="M12 2l2.4 7.4L22 12l-7.6 2.6L12 22l-2.4-7.4L2 12l7.6-2.6z" />
         </svg>
       ),
-      badge: "Gemini 2.0",
+      badge: "AI assistance",
       accent: "hover:border-sky-500/40 hover:bg-[#141826]",
     },
     {
@@ -162,7 +162,7 @@ export default function CreateVideoModal({
 
           {/* Footer Note */}
           <div className="pt-2 border-t border-[#181D2A] flex items-center justify-between text-xs text-slate-500">
-            <span>Powered by Gemini 2.0 & Kreovar Audio Engine</span>
+            <span>Create with AI content and voice tools</span>
             <button
               type="button"
               onClick={() => {

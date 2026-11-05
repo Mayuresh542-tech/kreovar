@@ -75,7 +75,7 @@ export default function BrandKitModal({ open, onClose }: BrandKitModalProps) {
                   Creator Brand Kit
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Calibrate Gemini 2.0 to write in your authentic voice and format.
+                  Set your preferred writing voice and format.
                 </p>
               </div>
             </div>

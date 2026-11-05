@@ -1,3 +1,4 @@
+import {publicErrorMessage,publicServiceText} from '../serviceMessages';
 import {captureFootageEvidence} from './footageFramesClient';
 import {analysisFootage,type FootageFrame} from './footageContext';
 import {speechContext} from './speechContext';
@@ -36,9 +37,9 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
   if(!token)throw Error('Sign in to use AI editing.');
   if(!frames)await readFrames(project,job.selection);
   const response=await fetch('/api/editor/ai-edit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,'Idempotency-Key':job.id+':'+stage},body:JSON.stringify({instruction:stageInstruction(stage,job),pipelineStage:stage,editingJobId:job.id,project:aiProjectSnapshot(project),selectedClipIds:job.selection.filter(id=>!!project.clips[id]),footageFrames:frames,fallbackFootageFrames:fallbackFrames}),signal:AbortSignal.any([signal,AbortSignal.timeout(85000)])});
-  const result=await response.json();if(!response.ok)throw Error(result.error||'AI stage failed.');
+  const result=await response.json();if(!response.ok)throw Error(publicErrorMessage(result.error,'This AI stage could not be completed. Please retry.'));
   if(result.list?.projectId!==project.id||result.list?.baseRevision!==project.revision)throw Error('AI returned a stale stage plan.');
-  const validated=validateAiPlan({summary:result.summary,decisions:result.list.decisions},project),requests=validateAiTools(result.toolRequests,stage==='applyRequestedEdits'?buildStageProject(project,{summary:result.summary,decisions:validated.list.decisions}):project,result.catalog||[]);
+  const validated=validateAiPlan({summary:publicServiceText(result.summary),decisions:result.list.decisions},project),requests=validateAiTools(result.toolRequests,stage==='applyRequestedEdits'?buildStageProject(project,{summary:result.summary,decisions:validated.list.decisions}):project,result.catalog||[]);
   assertStagePlan(stage,validated.list.decisions,requests,project);
   return {summary:validated.summary,decisions:validated.list.decisions,requests,operations:result.requiredOperations} as StageOutput;
  };

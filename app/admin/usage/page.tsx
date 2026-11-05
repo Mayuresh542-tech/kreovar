@@ -1,4 +1,5 @@
 "use client";
+import {serviceLabel} from "@/app/lib/serviceMessages";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -164,12 +165,12 @@ export default function AdminUsagePage() {
                   className="bg-[#12151E] border border-[#202534] text-xs text-white rounded-lg px-2.5 py-1.5 outline-none focus:border-sky-500"
                 >
                   <option value="all">All Providers</option>
-                  <option value="gemini">Google Gemini</option>
-                  <option value="voiceai">Voice.ai</option>
+                  <option value="gemini">Content service</option>
+                  <option value="voiceai">Voice service</option>
                   <option value="local">Local transcription</option>
-                  <option value="elevenlabs">ElevenLabs (legacy)</option>
-                  <option value="groq">Groq</option>
-                  <option value="pollinations">Pollinations</option>
+                  <option value="elevenlabs">Legacy voice service</option>
+                  <option value="groq">Editing &amp; content service</option>
+                  <option value="pollinations">Image service</option>
                 </select>
               </div>
 
@@ -224,7 +225,7 @@ export default function AdminUsagePage() {
                       <tr key={log.id} className="hover:bg-[#12151E]/50 transition">
                         <td className="py-3 px-4 font-semibold text-white capitalize">
                           <span className="px-2 py-0.5 rounded bg-[#161A26] border border-[#202534] text-[11px] font-mono">
-                            {log.provider_key}
+                            {serviceLabel(log.provider_key)}
                           </span>
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-300">

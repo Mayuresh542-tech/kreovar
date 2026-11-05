@@ -7,7 +7,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),require=createRequire(path.join(root,'package.json')),ts=require('typescript');
 function loader(mocks={},extra={}){
- const cache=new Map(),context=vm.createContext({console,URL,Headers,Response,Buffer,Error,AbortSignal,AbortController,Uint8Array,crypto:globalThis.crypto,setTimeout,clearTimeout,fetch:globalThis.fetch,process:{env:{}},...extra});
+ const cache=new Map(),context=vm.createContext({console,URL,Headers,Response,Buffer,Error,AbortSignal,AbortController,Uint8Array,crypto:globalThis.crypto,setTimeout,clearTimeout,fetch:globalThis.fetch,process:{env:{EDITOR_AI_PRIMARY_PROVIDER:'radox'}},...extra});
  function load(relative){let filename=path.resolve(root,relative);if(!path.extname(filename))filename+='.ts';const key=path.relative(root,filename).replaceAll('\\','/');if(key in mocks)return mocks[key];if(cache.has(filename))return cache.get(filename);const exports={};cache.set(filename,exports);const code=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;new vm.Script(`(function(require,module,exports){${code}\n})`,{filename}).runInContext(context)(s=>s.startsWith('@/')?load(s.slice(2)):s.startsWith('.')?load(path.relative(root,path.resolve(path.dirname(filename),s))):require(s),{exports},exports);return exports;}return load;
 }
 const opts={prompt:'PRIVATE_PROMPT',systemInstruction:'Return JSON.'};
@@ -37,7 +37,7 @@ test('auth, billing, request size, malformed output and model mismatch never byp
 });
 test('disabled Groq fails clearly without sending a Groq request or exposing private response text',async()=>{
  let calls=0;const s=setup(async()=>{calls++;return maintenance();},{'app/lib/server/providerRegistry.ts':{getProviderCredential:async p=>p==='groq'?null:'PRIVATE',recordProviderUsage:async()=>{}}});
- await assert.rejects(s.service().generateEditPlanJson(opts),e=>e.code==='GROQ_NOT_CONFIGURED'&&e.message.includes('Groq')&&!e.message.includes('PRIVATE'));assert.equal(calls,1);
+ await assert.rejects(s.service().generateEditPlanJson(opts),e=>e.code==='GROQ_NOT_CONFIGURED'&&e.message.includes('temporarily unavailable')&&!/Groq|Radox/i.test(e.message)&&!e.message.includes('PRIVATE'));assert.equal(calls,1);
 });
 test('fallback rate limits and malformed output stop after two calls and expose only safe errors',async()=>{
  for(const bad of [()=>Response.json({error:{message:'PRIVATE_ORG PRIVATE_PROMPT'}},{status:429,headers:{'retry-after':'12'}}),()=>reply('openai/gpt-oss-120b','[]'),()=>reply('unrequested-model'),()=>new Response('x'.repeat(1024*1024+1))]){let calls=0;const s=setup(async url=>{calls++;return url.includes('radox')?maintenance():bad();});await assert.rejects(s.service().generateEditPlanJson(opts),e=>e.code?.startsWith('GROQ_')&&!e.message.includes('PRIVATE'));assert.equal(calls,2);}
@@ -47,7 +47,7 @@ test('validation correction can stay on Groq without another failed primary requ
 });
 test('blocked model permissions explain the configuration problem without blaming the API key',async()=>{
  const s=setup(async url=>url.includes('radox')?maintenance():Response.json({error:{code:'model_permission_blocked_project',message:'PRIVATE_ORG'}},{status:403}));
- await assert.rejects(s.service().generateEditPlanJson(opts),e=>e.code==='GROQ_MODEL_BLOCKED'&&e.message.includes('model permissions')&&!e.message.includes('PRIVATE'));
+ await assert.rejects(s.service().generateEditPlanJson(opts),e=>e.code==='GROQ_MODEL_BLOCKED'&&e.message.includes('contact support')&&!/Groq|Radox/i.test(e.message)&&!e.message.includes('PRIVATE'));
 });
 test('primary and fallback reserve and settle separately under the same job budget',async()=>{
  const reserves=[],settles=[],s=setup(async url=>url.includes('radox')?maintenance():reply('openai/gpt-oss-120b'),{'app/lib/server/editorTokenBudget.ts':{reserveEditorTokens:async(user,budget,amount)=>{reserves.push({user,budget,amount});return 'lease-'+reserves.length;},settleEditorTokens:async(...args)=>settles.push(args),worstCaseTokens:()=>20000}});
@@ -73,10 +73,46 @@ test('invalid fallback decisions get one correction on Groq and stop at three pr
 test('actual planner validates Groq edits, reports fallback and leaves the source project unchanged',async()=>{
  const s=setup(async url=>url.includes('radox')?maintenance():reply('openai/gpt-oss-120b',JSON.stringify({summary:'Set portrait framing',decisions:[{op:'setAspectRatio',aspectRatio:'9:16'}],toolRequests:[]})),{'app/lib/server/editorAiCatalog.ts':{loadAiCatalog:async()=>[]},'app/lib/server/editorStyleReferences.ts':{editorStyleReferenceContext:()=>({references:[],images:[],selectedIds:[]})}});
  const project=s.load('app/lib/editor/model').createProject('fallback-project'),before=JSON.stringify(project);const result=await s.load('app/lib/server/editorAi').planAiEdit(project,'Set portrait framing',[],'owner',new AbortController().signal);
- assert.equal(result.planner.provider,'groq');assert.equal(result.planner.model,'openai/gpt-oss-120b');assert.equal(result.modelRequests,2);assert.match(result.summary,/Groq fallback/);assert.equal(result.list.decisions[0].op,'setAspectRatio');assert.equal(JSON.stringify(project),before);
+ assert.equal(result.planner.provider,'groq');assert.equal(result.planner.model,'openai/gpt-oss-120b');assert.equal(result.modelRequests,2);assert.equal(result.summary,'Set portrait framing');assert.equal(result.list.decisions[0].op,'setAspectRatio');assert.equal(JSON.stringify(project),before);
 });
 test('compact fallback retains complete supported operation shapes and selected private style guidance',()=>{
  const {compactEditorFallback}=loader()('app/lib/server/editorFallbackPrompt');
  const result=compactEditorFallback({systemInstruction:'You are Kreovar\'s AI video editor. Extra explanation. {op:"changeClipProperty",clipId,changes:{fadeIn?,fadeOut?}}; More text. {op:"setAspectRatio",aspectRatio:"16:9"|"9:16"}',prompt:JSON.stringify({instruction:'PRIVATE_EXACT_REQUEST',styleReferences:[{id:'chosen',compositionGuide:'KEEP_SELECTED_STYLE'}],project:{id:'source-id'}})});
  assert.ok(result.systemInstruction.includes('{op:"changeClipProperty",clipId,changes:{fadeIn?,fadeOut?}}'));assert.ok(result.systemInstruction.includes('{op:"setAspectRatio",aspectRatio:"16:9"|"9:16"}'));assert.ok(result.systemInstruction.includes('locked/hidden'));assert.ok(result.prompt.includes('PRIVATE_EXACT_REQUEST'));assert.ok(result.prompt.includes('KEEP_SELECTED_STYLE'));assert.ok(result.prompt.includes('source-id'));
+});
+
+test('default primary calls Groq directly and never reads or requests Radox',async()=>{
+ const urls=[],keys=[],events=[];
+ const load=loader({'app/lib/server/providerRegistry.ts':{getProviderCredential:async key=>{keys.push(key);return 'PRIVATE_GROQ';},recordProviderUsage:async event=>events.push(event)}},{process:{env:{}},fetch:async(url,init)=>{urls.push(url);return reply(JSON.parse(init.body).model);}});
+ const result=await load('app/lib/server/editorProvider').generateEditPlanJson(opts);
+ assert.equal(result.provider,'groq');assert.equal(result.attempts,1);assert.equal(result.fallbackReason,undefined);assert.deepEqual(keys,['groq']);assert.equal(urls.length,1);assert.ok(urls[0].includes('api.groq.com'));assert.equal(events[0].providerKey,'groq');
+ assert.equal(load('app/lib/server/editorProvider').editorProviderSummary('A proposed edit',result),'A proposed edit');
+});
+test('primary Groq auth errors fail visibly without trying the retired provider',async()=>{
+ const urls=[];const load=loader({'app/lib/server/providerRegistry.ts':{getProviderCredential:async()=> 'PRIVATE_GROQ',recordProviderUsage:async()=>{}}},{process:{env:{}},fetch:async url=>{urls.push(url);return Response.json({error:{message:'PRIVATE_GROQ'}},{status:401});}});
+ await assert.rejects(load('app/lib/server/editorProvider').generateEditPlanJson(opts),error=>error.code==='GROQ_AUTH_FAILED'&&!error.message.includes('PRIVATE'));
+ assert.equal(urls.length,1);assert.ok(urls[0].includes('api.groq.com'));
+});
+
+test('default Groq primary drives real planner validation and a bounded correction without any Radox lookup',async()=>{
+ for(const repair of [false,true]){
+  const urls=[],keys=[];let calls=0;
+  const load=loader({'app/lib/server/providerRegistry.ts':{getProviderCredential:async key=>{keys.push(key);return 'PRIVATE_GROQ';},recordProviderUsage:async()=>{}},'app/lib/server/editorAiCatalog.ts':{loadAiCatalog:async()=>[]},'app/lib/server/editorStyleReferences.ts':{editorStyleReferenceContext:()=>({references:[],images:[],selectedIds:[]})}},{process:{env:{}},fetch:async(url,init)=>{
+   urls.push(url);calls++;const body=JSON.parse(init.body);
+   assert.equal(body.model,'openai/gpt-oss-120b');
+   if(calls===2)assert.match(body.messages[1].content,/Validation feedback:/);
+   return reply(body.model,JSON.stringify({summary:'Set portrait framing',decisions:repair&&calls===1?[{op:'removeClip',clipId:'missing'}]:[{op:'setAspectRatio',aspectRatio:'9:16'}],toolRequests:[]}));
+  }});
+  const project=load('app/lib/editor/model').createProject('groq-primary-plan'),before=JSON.stringify(project);
+  const result=await load('app/lib/server/editorAi').planAiEdit(project,'Set portrait framing',[],'owner',new AbortController().signal);
+  assert.equal(result.planner.provider,'groq');assert.equal(result.modelRequests,repair?2:1);assert.equal(result.list.decisions[0].aspectRatio,'9:16');assert.equal(result.summary,'Set portrait framing');
+  assert.equal(JSON.stringify(project),before);assert.ok(keys.every(key=>key==='groq'));assert.ok(urls.every(url=>url.startsWith('https://api.groq.com/')));
+ }
+});
+
+test('default Groq quota rejection bypasses plan correction and preserves the provider wait',async()=>{
+ let calls=0;const load=loader({'app/lib/server/providerRegistry.ts':{getProviderCredential:async()=> 'PRIVATE_GROQ',recordProviderUsage:async()=>{}},'app/lib/server/editorAiCatalog.ts':{loadAiCatalog:async()=>[]},'app/lib/server/editorStyleReferences.ts':{editorStyleReferenceContext:()=>({references:[],images:[],selectedIds:[]})}},{process:{env:{}},fetch:async()=>{calls++;return Response.json({error:{message:'PRIVATE'}},{status:429,headers:{'retry-after':'12'}});}});
+ const project=load('app/lib/editor/model').createProject('groq-primary-limit');
+ await assert.rejects(load('app/lib/server/editorAi').planAiEdit(project,'Set portrait framing',[],'owner',new AbortController().signal),error=>error.code==='GROQ_RATE_LIMIT'&&error.retryAfterSeconds===12);
+ assert.equal(calls,1);
 });

@@ -5,3 +5,32 @@ function source(load){const model=load('app/lib/editor/model'),op=load('app/lib/
 
 test('Prism review rejects caption-preset-only output without authoring a fallback edit',()=>{const load=loader(),op=load('app/lib/editor/operations'),p0=source(load);let p=p0;for(let i=0;i<3;i++)p=op.addCaption(p,'welcome to school',i*3,2.5,undefined,[{word:'welcome',start:0,end:.7},{word:'to',start:.7,end:1.2},{word:'school',start:1.2,end:2.5}]);const ids=Object.values(p.clips).filter(c=>c.contentId).map(c=>c.id),before=JSON.stringify(p),list={version:1,projectId:p.id,baseRevision:p.revision,decisions:[{op:'applyCaptionTemplate',clipIds:ids,templateId:'edit-prism'}]},review=load('app/lib/editor/styleCompositionReview').reviewPrismComposition;assert.throws(()=>review(p,list,[],'edit-prism'),/per-phrase/);assert.equal(JSON.stringify(p),before);const full={...list,decisions:[...list.decisions,...ids.map((id,i)=>({op:'composeCaption',clipId:id,presentation:{yPercent:i===0?20:84,fontWeight:300,emphasisWeight:900,emphasisItalic:true,emphasizedWords:[2],build:'accumulate'}}))]};assert.doesNotThrow(()=>review(p,full,[],'edit-prism'));assert.throws(()=>review(p,full,[],'edit-blueprint'),/explicit Prism/);assert.throws(()=>review(p,{...full,decisions:full.decisions.map(d=>d.op==='composeCaption'?{...d,presentation:{...d.presentation,yPercent:84}}:d)},[],'edit-prism'),/region changes/);assert.throws(()=>review(p,{...full,decisions:full.decisions.map(d=>d.op==='composeCaption'?{...d,presentation:{...d.presentation,emphasisItalic:false}}:d)},[],'edit-prism'),/hierarchy/);assert.equal(JSON.stringify(p),before);});
 test('provider maintenance is explicit, accounted once and never rotates to a different model',async()=>{let calls=0,record;const load=loader({'app/lib/server/providerRegistry.ts':{getProviderCredential:async()=> 'private',recordProviderUsage:async value=>{record=value;}}},{fetch:async()=>{calls++;return new Response(JSON.stringify({error:{code:'service_upgrading'}}),{status:503});}});await assert.rejects(load('app/lib/server/radoxService').generateEditorJson({prompt:'test',systemInstruction:'test'}),e=>e.code==='RADOX_MAINTENANCE'&&e.status===503&&/temporarily upgrading/.test(e.message));assert.equal(calls,1);assert.equal(record.status,'error');assert.match(record.errorMessage,/http=503/);});
+
+test('reference composition rejects a preset-only Prime edit and accepts a real drawn accent',()=>{
+ const load=loader(),op=load('app/lib/editor/operations');const p=op.addCaption(source(load),'A fresh idea matters',0,3);const id=Object.values(p.clips).find(c=>c.contentId).id;
+ const list={version:1,projectId:p.id,baseRevision:p.revision,decisions:[{op:'applyCaptionTemplate',clipIds:[id],templateId:'edit-prime'}]},before=JSON.stringify(p),review=load('app/lib/editor/styleCompositionReview').reviewReferenceComposition;
+ assert.throws(()=>review(p,list,[],'prime','edit-prime',[],{graphics:true,media:false}),/drawn stroke/);
+ const full={...list,decisions:[...list.decisions,{op:'addShape',kind:'rectangle',startTime:0,duration:3,style:{width:.7,height:.5,stroke:'#85ece4',strokeWidth:4,strokePath:{kind:'box',revealStart:0,revealDuration:.6},outlineOnly:true,glow:12}}]};
+ assert.doesNotThrow(()=>review(p,full,[],'prime','edit-prime',[],{graphics:true,media:false}));assert.equal(JSON.stringify(p),before);
+});
+test('Sketch requires a real small circular media inset and Paper preserves cumulative word states',()=>{
+ const load=loader(),op=load('app/lib/editor/operations'),review=load('app/lib/editor/styleCompositionReview').reviewReferenceComposition;const p=op.addCaption(source(load),'An original topic',0,3);const id=Object.values(p.clips).find(c=>c.contentId).id;
+ const sketch={version:1,projectId:p.id,baseRevision:p.revision,decisions:[{op:'applyCaptionTemplate',clipIds:[id],templateId:'edit-sketch'}]};
+ assert.throws(()=>review(p,sketch,[],'sketch','edit-sketch',[],{graphics:false,media:true}),/circular/);
+ const inset={...sketch,decisions:[...sketch.decisions,{op:'addClip',assetId:'raw',trackId:'track-overlay',startTime:1,duration:2,visualTreatment:{card:{width:.3,height:.16875},mask:{kind:'circle'}},volume:0}]};
+ assert.doesNotThrow(()=>review(p,inset,[],'sketch','edit-sketch',[],{graphics:false,media:true}));
+ const paper={...sketch,decisions:[{op:'applyCaptionTemplate',clipIds:[id],templateId:'edit-paper'}]};
+ assert.doesNotThrow(()=>review(p,paper,[],'paper-ii','edit-paper',[],{graphics:false,media:false}));
+ assert.throws(()=>review(p,{...paper,decisions:[...paper.decisions,{op:'composeCaption',clipId:id,presentation:{highlightingMode:'current-word'}}]},[],'paper-ii','edit-paper',[],{graphics:false,media:false}),/cumulative/);
+ assert.throws(()=>review(p,paper,[],'paper-ii','edit-vista',[],{graphics:false,media:false}),/matching/);
+});
+test('Vista and Impact require animated masks and bounded RGB beats when full graphics are enabled',()=>{
+ const load=loader(),op=load('app/lib/editor/operations'),review=load('app/lib/editor/styleCompositionReview').reviewReferenceComposition;const p=op.addCaption(source(load),'New shapes tell stories',0,3);const id=Object.values(p.clips).find(c=>c.contentId).id;
+ const base=templateId=>({version:1,projectId:p.id,baseRevision:p.revision,decisions:[{op:'applyCaptionTemplate',clipIds:[id],templateId}]});
+ assert.throws(()=>review(p,base('edit-vista'),[],'vista','edit-vista',[],{graphics:false,media:true}),/animated/);
+ const vista={...base('edit-vista'),decisions:[...base('edit-vista').decisions,{op:'setVisualTreatment',clipId:'main',treatment:{mask:{kind:'stepped',keyframes:[{sourceTime:0,progress:0},{sourceTime:.5,progress:1}],steps:6}}}]};
+ assert.doesNotThrow(()=>review(p,vista,[],'vista','edit-vista',[],{graphics:false,media:true}));
+ assert.throws(()=>review(p,base('edit-impact'),[],'impact-ii','edit-impact',[],{graphics:true,media:false}),/RGB/);
+ const impact={...base('edit-impact'),decisions:[...base('edit-impact').decisions,{op:'setVisualTreatment',clipId:'main',treatment:{effects:[{sourceStart:0,sourceEnd:.4,rgbOffset:{x:6,y:0},rampIn:.1,rampOut:.1}]}}]};
+ assert.doesNotThrow(()=>review(p,impact,[],'impact-ii','edit-impact',[],{graphics:true,media:false}));
+});

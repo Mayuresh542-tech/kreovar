@@ -27,7 +27,8 @@ export type HighlightingMode =
   | "current-word"
   | "keyword"
   | "alternating"
-  | "full-line";
+  | "full-line"
+  | "cumulative";
 
 export type CaptionPosition = "top" | "center" | "bottom" | "custom";
 

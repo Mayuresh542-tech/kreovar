@@ -57,7 +57,7 @@ export default function StudioShell({
   const pathname = usePathname();
   const userName = userEmail
     ? userEmail.split("@")[0].charAt(0).toUpperCase() + userEmail.split("@")[0].slice(1)
-    : "Alex Carter";
+    : "Your account";
 
   return (
     <div className="vx-shell vx-glass-shell flex h-dvh bg-[#FAFAFA] text-[#0F172A] font-sans overflow-hidden">

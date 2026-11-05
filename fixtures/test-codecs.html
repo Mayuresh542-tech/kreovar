@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head><title>Codec Test</title></head>
+<body>
+<div id="result">Testing...</div>
+<script>
+  const hasVideoEncoder = typeof VideoEncoder !== 'undefined';
+  const hasAudioEncoder = typeof AudioEncoder !== 'undefined';
+  document.getElementById('result').textContent = 'VideoEncoder=' + hasVideoEncoder + ', AudioEncoder=' + hasAudioEncoder;
+  console.log('Result:', document.getElementById('result').textContent);
+</script>
+</body>
+</html>

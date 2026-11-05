@@ -1,5 +1,5 @@
 import {composeCaption,type CaptionComposition} from './captionComposition';
-import {setVisualTreatment,type VisualTreatment} from './visualTreatment';
+import {setVisualTreatment,assertInsertedVisualTreatment,type VisualTreatment} from './visualTreatment';
 import {preserveCaptionAnchors} from './captionAnchors';
 import {addShape,type ShapeKind,type ShapeStyle} from "./shapes";
 import {addZoom,clearZooms} from "./zoom";
@@ -65,7 +65,7 @@ export function applyEditDecisionList(p:EditorProject,list:EditDecisionList):Edi
       case"appendSequence":return appendSequence(project,d.assetIds,d.trackId).project;
       case"applyCaptionTemplate":{const template=DEFAULT_CAPTION_TEMPLATES.find(t=>t.id===d.templateId);if(!template)throw new Error("Unknown caption template.");const next=applyCaptionTemplate(project,d.clipIds,template);return preserveCaptionAnchors(project,next,d.clipIds);}
       case"setAudioDucking":return {...project,settings:{...project.settings,audioDucking:d.enabled}};
-      case"addClip":{const asset=project.assets[d.assetId];if(d.duration!==undefined&&asset&&asset.kind!=="image"&&d.duration>asset.duration+.01)throw new Error("AI clip exceeds its original media.");let next=edit.addClip(project,d.assetId,d.trackId,d.startTime,{...(d.duration===undefined?{}:{duration:d.duration,sourceEnd:d.duration}),...(d.audioRole===undefined?{}:{audioRole:d.audioRole}),...(d.volume===undefined?{}:{volume:d.volume})});const added=Object.keys(next.clips).find(id=>!project.clips[id])!;if(d.transform)next=edit.changeClipProperty(next,added,{transform:d.transform});if(d.visualTreatment)next=setVisualTreatment(next,added,d.visualTreatment);if(d.keyframes){const c=next.clips[added];if(d.keyframes.some(f=>f.sourceTime<c.sourceStart||f.sourceTime>c.sourceEnd))throw Error('Inserted media keyframes must fit its source interval.');next=setTransformKeyframes(next,added,d.keyframes);}return next;}
+      case"addClip":{const asset=project.assets[d.assetId];if(d.duration!==undefined&&asset&&asset.kind!=="image"&&d.duration>asset.duration+.01)throw new Error("AI clip exceeds its original media.");let next=edit.addClip(project,d.assetId,d.trackId,d.startTime,{...(d.duration===undefined?{}:{duration:d.duration,sourceEnd:d.duration}),...(d.audioRole===undefined?{}:{audioRole:d.audioRole}),...(d.volume===undefined?{}:{volume:d.volume})});const added=Object.keys(next.clips).find(id=>!project.clips[id])!;if(d.transform)next=edit.changeClipProperty(next,added,{transform:d.transform});if(d.visualTreatment){assertInsertedVisualTreatment(d.visualTreatment,next.clips[added].sourceEnd);next=setVisualTreatment(next,added,d.visualTreatment);}if(d.keyframes){const c=next.clips[added];if(d.keyframes.some(f=>f.sourceTime<c.sourceStart||f.sourceTime>c.sourceEnd))throw Error('Inserted media keyframes must fit its source interval.');next=setTransformKeyframes(next,added,d.keyframes);}return next;}
       case"duplicateClip":return edit.duplicateClip(project,d.clipId,d.startTime);
       case"changeText":return edit.changeText(project,d.clipId,d.text,d.style);
       case"mergeCaptions":return edit.mergeCaptions(project,d.clipIds);

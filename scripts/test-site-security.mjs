@@ -150,3 +150,29 @@ test('suspended account cannot reach APIs even with a still-valid verified acces
  assert.equal(response.status,403);assert.equal((await response.json()).code,'ACCOUNT_SUSPENDED');assert.equal(calls,0);
 });
 
+
+test('development upload and voice writes accept their exact loopback origin despite a production SITE_URL',async()=>{
+ const env={NODE_ENV:'development',SITE_URL:'https://kreovar.online',NEXT_PUBLIC_SITE_URL:'https://kreovar.online'};
+ const load=loader({}, {process:{env}}),security=load('app/lib/server/requestSecurity');
+ for(const host of ['127.0.0.1','localhost','[::1]'])for(const path of ['/api/assets/upload','/api/voice/generate']){
+  const origin='http://'+host+':3110',request=new NextRequest(origin+path,{method:'POST',headers:{Origin:origin,'Sec-Fetch-Site':'same-origin'}});
+  assert.equal(security.isSafeMutation(request),true,origin+path);
+ }
+ const proxy=loader({'app/lib/server/adminAuth.ts':{getAuthenticatedUser:async()=>null}},{crypto:{randomUUID:()=> 'random'},process:{env}})('proxy');
+ for(const path of ['/api/assets/upload','/api/voice/generate']){
+  const response=await proxy.proxy(new NextRequest('http://127.0.0.1:3110'+path,{method:'POST',headers:{Origin:'http://127.0.0.1:3110','Sec-Fetch-Site':'same-origin'}}));
+  assert.notEqual(response.status,403,'Local requests must reach auth, not origin rejection');
+ }
+});
+
+test('loopback allowance is development-only and never trusts different ports, remote hosts or forwarded hosts',()=>{
+ const check=mode=>loader({}, {process:{env:{NODE_ENV:mode,SITE_URL:'https://kreovar.online'}}})('app/lib/server/requestSecurity');
+ for(const mode of ['production','test'])assert.equal(check(mode).isSafeMutation(new NextRequest('http://127.0.0.1:3110/api/assets/upload',{method:'POST',headers:{Origin:'http://127.0.0.1:3110'}})),false);
+ const security=check('development');
+ assert.equal(security.isSafeMutation(new NextRequest('http://localhost:3110/api/assets/upload',{method:'POST',headers:{Origin:'http://127.0.0.1:3110','Sec-Fetch-Site':'same-origin'}})),true,'Next normalizes the loopback request URL');
+ for(const origin of ['http://evil.test','http://127.0.0.1:9999','https://127.0.0.1:3110','http://127.0.0.1.evil.test:3110','null'])assert.equal(security.isSafeMutation(new NextRequest('http://127.0.0.1:3110/api/assets/upload',{method:'POST',headers:{Origin:origin,'X-Forwarded-Host':'127.0.0.1:3110',Authorization:'Bearer token'}})),false,origin);
+ assert.equal(security.isSafeMutation(new NextRequest('http://127.0.0.1:3110/api/voice/generate',{method:'POST',headers:{Origin:'http://127.0.0.1:3110','Sec-Fetch-Site':'cross-site'}})),false);
+ assert.equal(security.isSafeMutation(new NextRequest('https://kreovar.netlify.app/api/assets/upload',{method:'POST',headers:{Origin:'http://127.0.0.1:3110','X-Forwarded-Host':'127.0.0.1:3110',Host:'127.0.0.1:3110'}})),false);
+});
+
+test('www deployment requests redirect to the fixed HTTPS canonical host with path and query preserved',async()=>{const load=loader({'app/lib/server/adminAuth.ts':{getAccessToken:()=>null,getAuthenticatedUser:async()=>{throw Error('No auth lookup for canonical redirect');},getAdminClient:()=>{throw Error('No database lookup for canonical redirect');},requireAdmin:async()=>{throw Error('No admin lookup for canonical redirect');}}},{crypto:{randomUUID:()=> 'nonce'},process:{env:{NODE_ENV:'production'}}});const proxy=load('proxy.ts').proxy;for(const suffix of ['/pricing?plan=pro&ref=social','//foreign.invalid/test?q=1','/admin?next=%2Fprojects']){const result=await proxy(new NextRequest('https://www.kreovar.online'+suffix));assert.equal(result.status,308);const target=new URL(result.headers.get('location'));assert.equal(target.origin,'https://kreovar.online');assert.equal(target.pathname,new URL('https://www.kreovar.online'+suffix).pathname);assert.equal(target.search,new URL('https://www.kreovar.online'+suffix).search);assert.ok(result.headers.get('content-security-policy'));}const ordinary=await proxy(new NextRequest('https://kreovar.kreovarstudio.workers.dev/pricing'));assert.equal(ordinary.status,200);});

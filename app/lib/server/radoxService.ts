@@ -1,3 +1,4 @@
+import {publicErrorMessage} from '../serviceMessages';
 import {reserveEditorTokens,settleEditorTokens,worstCaseTokens,type EditingBudget} from './editorTokenBudget';
 import {getProviderCredential,recordProviderUsage} from './providerRegistry';
 import type {FootageFrame} from '../editor/footageContext';
@@ -18,7 +19,7 @@ const messages:Record<RadoxCode,string>={
  RADOX_UNAVAILABLE:'The AI provider could not complete this request. Your timeline is unchanged; please retry later.',
 };
 export class RadoxEditorError extends Error {
- constructor(readonly code:RadoxCode,readonly status=503,readonly retryAfterSeconds?:number){super(messages[code]);this.name='RadoxEditorError';}
+ constructor(readonly code:RadoxCode,readonly status=503,readonly retryAfterSeconds?:number){super(publicErrorMessage(messages[code]));this.name='RadoxEditorError';}
 }
 export interface EditorJsonOptions {observer?:{before:(body:unknown,maxOutput:number)=>Promise<void>;after:(usage:{total:number|null;input:number|null;output:number|null})=>Promise<void>};editingBudget?:EditingBudget;prompt:string;systemInstruction:string;userId?:string|null;signal?:AbortSignal;referenceImages?:EditorReferenceImage[];maxTokens?:number;footageFrames?:FootageFrame[];candidateImages?:{candidateId:string;data:string}[];operation?:'editor_ai_edit'|'editor_broll_pick'}
 

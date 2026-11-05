@@ -524,7 +524,7 @@ export default function EditorAssetsPanel({
                             >
                               <div className="min-w-0 flex-1">
                                 <div className="text-[11px] font-semibold text-slate-900 truncate">{vo.title || vo.voiceName || "Voiceover"}</div>
-                                <div className="text-[9px] font-mono text-slate-500">{vo.voice_id || vo.voiceId || "Voice.ai"}</div>
+                                <div className="text-[9px] font-mono text-slate-500">{vo.voice_id || vo.voiceId || "Voice service"}</div>
                               </div>
                               <button
                                 type="button"

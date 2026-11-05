@@ -23,7 +23,7 @@ export function drawCaptions(ctx:CanvasRenderingContext2D,segments:CaptionSegmen
   const row=lines[li],rowWidth=row.reduce((sum,word)=>sum+measure(word)+spacing,0)+gap*(row.length-1);let x=style.alignment==="left"?width*.07:style.alignment==="right"?width*.93-rowWidth:(width-rowWidth)/2;const y=center+(li-(lines.length-1)/2)*lineHeight;
   if(style.containerBg&&style.containerBg!=="transparent"){ctx.fillStyle=style.containerBg;ctx.fillRect(x-10*scale,y-lineHeight/2,rowWidth+20*scale,lineHeight);}
   const rtl=textDirection(segment.text)==='rtl';if(rtl)x+=rowWidth;
-  for(const word of row){const text=transform(word.word),wordWidth=measure(word),current=time>=word.start&&time<word.end,future=time<word.start,index=words.indexOf(word),highlight=wordHighlight(style.highlightingMode,word.word,index,current,style.highlightWords);
+  for(const word of row){const text=transform(word.word),wordWidth=measure(word),current=time>=word.start&&time<word.end,future=time<word.start,index=words.indexOf(word),highlight=wordHighlight(style.highlightingMode,word.word,index,current,style.highlightWords,!future);
    ctx.save();setFont(index);ctx.direction=textDirection(word.word);const elapsed=Math.max(0,time-word.start),p=Math.min(1,elapsed/Math.max(.01,style.animationSpeed));let zoom=1,dy=0;
    if(current){if(style.animation==="pop")zoom=1+.2*Math.sin(p*Math.PI);if(style.animation==="scale")zoom=1.15;if(style.animation==="bounce")dy=-size*.2*Math.sin(p*Math.PI);}
    if(style.animation==="slide-up"||style.animation==="slide-down")dy=(style.animation==="slide-up"?1:-1)*size*.25*(1-Math.min(1,(time-segment.start)/Math.max(.01,style.animationSpeed)));

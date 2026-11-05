@@ -42,6 +42,10 @@ next-env.d.ts
 
 # local secrets and scratch
 *.txt
+!public/*.txt
+!public/robots.txt
+!public/llms.txt
+!public/llms-full.txt
 scratch/
 .netlify/
 .claude/
@@ -73,3 +77,8 @@ scratch/
 *.bak
 __pycache__/
 *.pyc
+/dist/
+.vinext/
+.cloudflare/
+
+!/docs/CLOUDFLARE_DEPLOY.md

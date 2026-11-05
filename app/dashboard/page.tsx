@@ -165,16 +165,10 @@ export default function Dashboard() {
 
   return (
     <StudioShell active="dashboard">
-      <div className="vx-dashboard space-y-10 pb-16 max-w-6xl mx-auto w-full">
+      <div className="vx-dashboard space-y-8 pb-8 max-w-6xl mx-auto w-full">
         {/* Section 25: Primary Video Creation Modes */}
         <section className="space-y-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-600" />
-              <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-semibold">
-                START CREATING
-              </span>
-            </div>
             <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900">
               What are you creating?
             </h1>
@@ -257,9 +251,9 @@ export default function Dashboard() {
                       <h3 className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">
                         {action.title}
                       </h3>
-                      <span className="vx-tool-badge">
-                        {action.badge}
-                      </span>
+                      {action.badge === "Coming soon" && (
+                        <span className="vx-tool-badge">Coming soon</span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-600 mt-2 leading-relaxed">
                       {action.description}
@@ -273,7 +267,7 @@ export default function Dashboard() {
 
         {/* Recent Projects Hub */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-slate-900">
                 Recent Projects

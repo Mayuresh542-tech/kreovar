@@ -1,3 +1,4 @@
+import {publicServiceText} from '../serviceMessages';
 import {generateEditorJson,RadoxEditorError} from './radoxService';
 import type {EditorFallbackOptions} from './editorFallbackOptions';
 import type {EditorVisualContext} from './editorVisualObservations';
@@ -9,13 +10,13 @@ export interface EditorProviderChoice {provider:'radox'|'groq';fallbackReason?:s
 export interface EditorProviderResult<T> extends EditorProviderChoice {value:T;model:string;attempts:number;imageCount:number;visionModel?:string;visualObservationCount?:number}
 const fallbackCodes=new Set(['RADOX_MAINTENANCE','RADOX_UNAVAILABLE','RADOX_MODEL_UNAVAILABLE','RADOX_NOT_CONFIGURED','RADOX_RATE_LIMIT']);
 
-/** One outage fallback, never a validation/auth/billing/budget bypass. Passing
+/** Groq is the default primary. Radox is legacy opt-in only; never an automatic retry target. Passing
  * the successful choice keeps a validation correction on that provider.
  */
 export async function generateEditPlanJson<T>(options:EditorFallbackOptions,preferred?:EditorProviderChoice):Promise<EditorProviderResult<T>>{
  options.signal?.throwIfAborted();
  let attempts=0,reason=preferred?.fallbackReason;
- if(preferred?.provider!=='groq'){
+ if(process.env.EDITOR_AI_PRIMARY_PROVIDER==='radox'&&preferred?.provider!=='groq'){
   try{
    attempts++;
    const signal=options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(25000)]):AbortSignal.timeout(25000);
@@ -34,8 +35,7 @@ export async function generateEditPlanJson<T>(options:EditorFallbackOptions,pref
  return {...result,provider:'groq',fallbackReason:reason,attempts:attempts+result.attempts};
 }
 
-export function editorProviderSummary(summary:string,choice:EditorProviderChoice&{model:string;visionModel?:string}){
- if(choice.provider!=='groq')return summary;
- const model=choice.model==='openai/gpt-oss-120b'?'GPT-OSS 120B':choice.model==='qwen/qwen3.8-27b'?'Qwen 3.8 27B':choice.model;
- return `Groq fallback · ${choice.visionModel?"Qwen vision → ":""}${model}. ${summary}`.slice(0,2000);
+export function editorProviderSummary(summary:string,_choice:EditorProviderChoice&{model:string;visionModel?:string}){
+ void _choice; // Retain adapter-call compatibility without exposing its identity.
+ return publicServiceText(summary).slice(0,2000);
 }

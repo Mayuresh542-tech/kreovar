@@ -65,7 +65,7 @@ export default function CommandPalette({
       id: "competitors",
       category: "AI Tools",
       title: "Competitor Intel",
-      description: "YouTube Data API competitor channel analysis with Gemini insights",
+      description: "Channel analysis with AI-assisted insights",
       icon: "🎯",
       action: () => router.push("/competitors"),
     },

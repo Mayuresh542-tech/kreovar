@@ -158,7 +158,6 @@ export default function Sidebar({
   const currentNav=["trends","ideas","script"].includes(currentNavRaw)?"workflow":currentNavRaw;
 
   const mainNavItems: NavItemDef[] = [
-    {id:"assets",label:"Asset Library",href:"/assets",icon:FolderKanban},
     {
       id: "dashboard",
       label: "Dashboard",
@@ -184,6 +183,8 @@ export default function Sidebar({
       icon: Film,
     },
   ];
+
+  mainNavItems.push({id:"assets",label:"Asset Library",href:"/assets",icon:FolderKanban});
 
   if (process.env.NEXT_PUBLIC_REFERENCE_PRESETS_ENABLED === "true") mainNavItems.push({id:"preset-editor",label:"Reference Presets",href:"/preset-editor",icon:Sparkles});
   const creationTools: NavItemDef[] = [
@@ -237,7 +238,7 @@ export default function Sidebar({
 
   const displayName = userEmail
     ? userEmail.split("@")[0].charAt(0).toUpperCase() + userEmail.split("@")[0].slice(1)
-    : "Alex Carter";
+    : "Your account";
 
   const sidebarContent = (
     <aside data-vx-motion="left" className="vx-studio-sidebar w-60 shrink-0 h-full bg-white border-r border-slate-200 flex flex-col justify-between p-3.5 select-none z-30">
@@ -289,7 +290,7 @@ export default function Sidebar({
 
         {/* Modular Creation Tools Section */}
         <div className="space-y-1">
-          <div className="px-2.5 text-[10px] font-mono uppercase tracking-wider text-slate-500 font-semibold">
+          <div className="px-2.5 vx-nav-section-label text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
             Create Tools
           </div>
           <nav aria-label="Creation tools" className="space-y-0.5">

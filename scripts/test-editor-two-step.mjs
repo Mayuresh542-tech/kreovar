@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import fs from 'node:fs';import path from 'node:path';import vm from 'node:vm';import {createRequire} from 'node:module';import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),require=createRequire(path.join(root,'package.json')),ts=require('typescript');
 function loader(mocks={},extra={}){
- const cache=new Map(),context=vm.createContext({console,URL,Headers,Response,Buffer,Error,AbortSignal,AbortController,Uint8Array,crypto:globalThis.crypto,setTimeout,clearTimeout,fetch:globalThis.fetch,process:{env:{}},...extra});
+ const cache=new Map(),context=vm.createContext({console,URL,Headers,Response,Buffer,Error,AbortSignal,AbortController,Uint8Array,crypto:globalThis.crypto,setTimeout,clearTimeout,fetch:globalThis.fetch,process:{env:{EDITOR_AI_PRIMARY_PROVIDER:'radox'}},...extra});
  function load(relative){let filename=path.resolve(root,relative);if(!path.extname(filename))filename+='.ts';const key=path.relative(root,filename).replaceAll('\\','/');if(key in mocks)return mocks[key];if(cache.has(filename))return cache.get(filename);const exports={};cache.set(filename,exports);const code=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;new vm.Script(`(function(require,module,exports){${code}\n})`,{filename}).runInContext(context)(s=>s.startsWith('@/')?load(s.slice(2)):s.startsWith('.')?load(path.relative(root,path.resolve(path.dirname(filename),s))):require(s),{exports},exports);return exports;}return load;
 }
 const TEXT='openai/gpt-oss-120b',VISION='qwen/qwen3.8-27b',PRIMARY='claude-opus-5.5';
@@ -46,8 +46,24 @@ test('budget denial after visual observation stops before a GPT request',async()
 });
 test('validation correction reuses observations and only reruns GPT, with four total calls',async()=>{
  const data=await image(),models=[];let plans=0;const s=setup(async(url,init)=>{const model=JSON.parse(init.body).model;models.push(model);if(url.includes('radox'))return down();if(model===VISION)return reply(VISION,observations);plans++;return reply(TEXT,{summary:'Set portrait framing',decisions:plans===1?[{op:'removeClip',clipId:'missing'}]:[{op:'setAspectRatio',aspectRatio:'9:16'}],toolRequests:[]});},{'app/lib/server/editorAiCatalog.ts':{loadAiCatalog:async()=>[]},'app/lib/server/editorStyleReferences.ts':{editorStyleReferenceContext:()=>({references:[],images:[{styleId:'prime',timeSecondsApprox:1,mediaType:'image/jpeg',data}],selectedIds:['prime']})}});
- const project=s.load('app/lib/editor/model').createProject('two-step-project'),before=JSON.stringify(project),result=await s.load('app/lib/server/editorAi').planAiEdit(project,'Set portrait framing',[],'owner',new AbortController().signal);assert.deepEqual(models,[PRIMARY,VISION,TEXT,TEXT]);assert.equal(result.modelRequests,4);assert.equal(result.planner.model,TEXT);assert.equal(result.planner.visionModel,VISION);assert.match(result.summary,/Qwen.*GPT-OSS/);assert.equal(JSON.stringify(project),before);
+ const project=s.load('app/lib/editor/model').createProject('two-step-project'),before=JSON.stringify(project),result=await s.load('app/lib/server/editorAi').planAiEdit(project,'Set portrait framing',[],'owner',new AbortController().signal);assert.deepEqual(models,[PRIMARY,VISION,TEXT,TEXT]);assert.equal(result.modelRequests,4);assert.equal(result.planner.model,TEXT);assert.equal(result.planner.visionModel,VISION);assert.equal(result.summary,'Set portrait framing');assert.equal(JSON.stringify(project),before);
 });
 test('final planner failure does not return Qwen observations as an edit or rotate models again',async()=>{
  const models=[],s=setup(async(url,init)=>{const model=JSON.parse(init.body).model;models.push(model);if(url.includes('radox'))return down();if(model===VISION)return reply(VISION,observations);return Response.json({error:{message:'PRIVATE_KEY'}},{status:429});});await assert.rejects(s.service().generateEditPlanJson({...opts,candidateImages:[{candidateId:'a',data:await image()}]}),e=>e.code==='GROQ_RATE_LIMIT');assert.deepEqual(models,[PRIMARY,VISION,TEXT]);
+});
+
+test('vision schema-generation rejection gets one same-model JSON-mode retry with identical image evidence',async()=>{
+ const seen=[],data=await image();const load=loader({'app/lib/server/providerRegistry.ts':{getProviderCredential:async()=> 'PRIVATE_KEY',recordProviderUsage:async()=>{}}},{process:{env:{}},fetch:async(_url,init)=>{
+  const body=JSON.parse(init.body);seen.push(body);
+  if(seen.length===1)return Response.json({error:{code:'json_validate_failed',type:'invalid_request_error',message:'PRIVATE',failed_generation:'{\u200b'}},{status:400});
+  return body.model===VISION?reply(VISION,observations):reply(TEXT,{ok:true});
+ }});
+ const result=await load('app/lib/server/editorProvider').generateEditPlanJson({...opts,footageFrames:[{clipId:'main',sourceTime:1,timelineTime:1,width:48,height:32,data}]});
+ assert.equal(result.value.ok,true);assert.equal(result.attempts,3);assert.deepEqual(seen.map(b=>b.model),[VISION,VISION,TEXT]);assert.equal(seen[0].response_format.type,'json_schema');assert.equal(seen[1].response_format.type,'json_object');assert.deepEqual(seen[0].messages[1].content.filter(c=>c.type==='image_url'),seen[1].messages[1].content.filter(c=>c.type==='image_url'));assert.ok(JSON.stringify(seen[1].messages).includes('panel1'));
+});
+test('vision format recovery never retries auth, quotas, unrelated rejection or a second schema failure',async()=>{
+ for(const [status,code,expected] of [[401,'bad_key',1],[429,'rate_limit_exceeded',1],[400,'bad_request',1],[400,'json_validate_failed',2]]){
+  let calls=0;const data=await image(),load=loader({'app/lib/server/providerRegistry.ts':{getProviderCredential:async()=> 'PRIVATE_KEY',recordProviderUsage:async()=>{}}},{process:{env:{}},fetch:async()=>{calls++;return Response.json({error:{code,message:'PRIVATE'}},{status});}});
+  await assert.rejects(load('app/lib/server/editorProvider').generateEditPlanJson({...opts,footageFrames:[{clipId:'main',sourceTime:1,timelineTime:1,width:48,height:32,data}]}));assert.equal(calls,expected);
+ }
 });

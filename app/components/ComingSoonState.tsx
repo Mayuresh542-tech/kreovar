@@ -42,7 +42,7 @@ export default function ComingSoonState({
     },
     {
       title: "2. Neural Voiceover Synthesis",
-      description: "Cinema-grade narration with word-level alignment powered by ElevenLabs.",
+      description: "Natural narration with word-level alignment.",
       badge: "IN DEVELOPMENT",
       icon: "🎙️",
     },
@@ -121,7 +121,7 @@ export default function ComingSoonState({
               <span>{title} Roadmap &amp; Pipeline</span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Kreovar is launching with focused Trend Intelligence &amp; Gemini Content Kits while video production engine finishes testing.
+              Kreovar is launching with focused Trend Intelligence &amp; AI Content Kits while video production engine finishes testing.
             </p>
           </div>
           <span className="hidden sm:inline-block px-2.5 py-1 rounded bg-[#161A26] border border-[#202534] text-[11px] font-mono text-slate-400">
@@ -164,7 +164,7 @@ export default function ComingSoonState({
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="text-slate-300 font-medium">Currently Active:</span>
-            <span>Trend Finder • Trend Radar • Competitor Analysis • Gemini Content Kits</span>
+            <span>Trend Finder • Trend Radar • Competitor Analysis • AI Content Kits</span>
           </div>
           <Link href="/competitors" className="text-sky-400 hover:underline font-semibold">
             View Competitor Intelligence →

@@ -15,6 +15,13 @@ export async function proxy(req: NextRequest) {
     if (path.startsWith("/api/") || path === "/admin" || path.startsWith("/admin/")) response.headers.set("Cache-Control", "private, no-store");
     return response;
   };
+  // Keep public URLs, sign-in cookies and mutation origins on one canonical host.
+  if(req.nextUrl.hostname === "www.kreovar.online"){
+    const canonical = new URL("https://kreovar.online");
+    canonical.pathname = req.nextUrl.pathname;
+    canonical.search = req.nextUrl.search;
+    return finish(NextResponse.redirect(canonical, 308));
+  }
   const requestHeaders = new Headers(req.headers);
   // Never trust a nonce or verified identity header supplied by a client.
   requestHeaders.delete("x-verified-user-id");

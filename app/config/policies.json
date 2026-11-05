@@ -97,8 +97,8 @@
         {
           "title": "4. Service providers and AI processing",
           "paragraphs": [
-            "Supabase provides account authentication, database and cloud asset storage. Our hosting provider processes requests and operational logs; the service may run locally during testing and on Netlify when deployed.",
-            "Requested AI features can send relevant prompts, script text, speech audio, transcripts, timeline details or selected content to configured providers: Groq for content assistance, editing planning and transcription; Voice.ai for voice generation; and Google/Gemini for enabled AI features. A local transcription engine may be used when configured. Some operations process only extracted audio or project context rather than the full original video. Provider handling and retention follow their applicable terms and settings; we do not promise that every provider has zero retention. We do not train our own general-purpose AI model on your uploaded content.",
+            "Our account and storage service provides authentication, database and cloud asset storage. Our hosting provider processes requests and operational logs; the service may run locally during testing and on our hosting platform when deployed.",
+            "Requested AI features can send relevant prompts, script text, speech audio, transcripts, timeline details or selected content to configured AI services for content assistance, editing planning, transcription, voice generation and other enabled AI features. A local transcription engine may be used when configured. Some operations process only extracted audio or project context rather than the full original video. Provider handling and retention follow their applicable terms and settings; we do not promise that every provider has zero retention. We do not train our own general-purpose AI model on your uploaded content.",
             "Whop processes purchases and membership/payment verification and provides the data needed to connect a purchase to the payment email. Stock searches, previews and downloads can connect to Pexels, Pixabay or their media hosts. Google Fonts delivers site fonts and can receive ordinary connection information. Providers may process data in countries different from your own. We use available contractual and technical safeguards where applicable; no particular data residency is promised."
           ]
         },
@@ -202,7 +202,7 @@
         {
           "title": "2. Sign-in cookies",
           "paragraphs": [
-            "Purpose: keep your authenticated session available so you can use account tools and saved projects. Kreovar uses Supabase Auth with a custom cookie storage adapter. The cookie name starts with fretrend-auth and can be split into numbered parts such as fretrend-auth.0 and fretrend-auth.1. These cookies contain authentication information and must not be shared.",
+            "Purpose: keep your authenticated session available so you can use account tools and saved projects. Kreovar uses a secure authentication service with a custom cookie storage adapter. The cookie name starts with fretrend-auth and can be split into numbered parts such as fretrend-auth.0 and fretrend-auth.1. These cookies contain authentication information and must not be shared.",
             "Duration: each cookie write or session refresh sets a browser lifetime of up to 30 days. An actively refreshed session can therefore last longer than 30 days overall. Signing out removes the current authentication cookie parts. Cookie lifetime does not guarantee that a session remains valid: account security settings, expiry or revocation can require you to sign in again.",
             "The application sets these cookies for the current host with Path=/ and SameSite=Lax, and adds Secure over HTTPS. Blocking them can prevent sign-in from persisting or account tools from working. You can read public information pages without signing in."
           ]
@@ -238,7 +238,7 @@
         {
           "title": "7. Hosting, sign-in, payment and external services",
           "paragraphs": [
-            "Netlify and Cloudflare provide hosting, delivery or security services and may use storage needed for routing or security checks when those services are active. Exact provider cookie names and lifetimes can vary with their configuration and the checks shown to you. Their privacy information explains their own processing.",
+            "Our hosting, delivery and security services may use storage needed for routing or security checks when those services are active. Exact provider cookie names and lifetimes can vary with their configuration and the checks shown to you. Their privacy information explains their own processing.",
             "If you choose Google sign-in or follow a Whop checkout link, the external service may use its own cookies on its own domains. Those services control their cookie settings and policies. A normal link to our Instagram profile does not embed an Instagram feed in this website; visiting Instagram brings you under that service's own settings and policies."
           ]
         },

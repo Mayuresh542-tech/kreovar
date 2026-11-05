@@ -1,19 +1,6 @@
 import sharp from 'sharp';
-import type {EditorFallbackOptions} from './editorFallbackOptions';
-
-interface InputImage {data:string;label:Record<string,unknown>}
-export function fallbackInputImages(options:EditorFallbackOptions):InputImage[]{
- const references=options.referenceImages||[],footage=options.fallbackFootageFrames?.length?options.fallbackFootageFrames:options.footageFrames||[],candidates=options.candidateImages||[];
- if(references.length>6||footage.length>6||candidates.length>6)throw Error('Too many editor images.');
- if(references.some(i=>i.mediaType!=='image/jpeg'))throw Error('Invalid reference image.');
- const images:InputImage[]=[
-  ...references.map(i=>({data:i.data,label:{kind:'reference',styleId:i.styleId,timeSecondsApprox:i.timeSecondsApprox}})),
-  ...footage.map(i=>({data:i.data,label:{kind:'footage',clipId:i.clipId,timelineTime:i.timelineTime,sourceTime:i.sourceTime}})),
-  ...candidates.map(i=>({data:i.data,label:{kind:'candidate',candidateId:i.candidateId}})),
- ];
- if(images.some(i=>i.data.length>50000||!i.data.length||!/^[A-Za-z0-9+/]*={0,2}$/.test(i.data)))throw Error('Invalid editor image.');
- return images;
-}
+import type {InputImage,VisionBatch} from './editorFallbackInputs';
+export {fallbackInputImages} from './editorFallbackInputs';
 
 /** Groq accepts three images. Contact sheets preserve every bounded input, with
  * stable numbered panels; no frame is silently discarded or fetched from a URL.
@@ -40,4 +27,9 @@ export async function fallbackContactSheets(images:InputImage[],signal?:AbortSig
   sheets.push((await sharp({create:{width,height,channels:3,background:'#161b26'}}).composite(tiles.flat()).jpeg({quality:85}).toBuffer()).toString('base64'));
  }
  return {sheets,panels:panels.sort((a,b)=>Number(a.panel)-Number(b.panel))};
+}
+
+/** Native hosts retain one numbered contact sheet and one observation request. */
+export async function fallbackVisionBatches(images:InputImage[],signal?:AbortSignal):Promise<VisionBatch[]>{
+ return images.length?[{...await fallbackContactSheets(images,signal),offset:0,mode:'sheet' as const}]:[];
 }

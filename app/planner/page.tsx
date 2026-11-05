@@ -40,7 +40,7 @@ export default function PlannerPage() {
           title="Content Calendar &amp; Publishing Schedule"
           badge="COMING SOON • IN ACTIVE PIPELINE"
           headline="Content calendar &amp; auto-scheduling is coming soon."
-          description="Organize your multi-platform distribution and schedule drops when trend momentum is highest. In this MVP release, use the Trend Finder and Gemini Content Kit to generate high-performing hooks and scripts."
+          description="Organize your multi-platform distribution and schedule drops when trend momentum is highest. In this MVP release, use the Trend Finder and AI Content Kit to generate high-performing hooks and scripts."
           features={plannerFeatures}
           primaryActionLabel="🔥 Explore Trending Topics"
           primaryActionHref="/trends"

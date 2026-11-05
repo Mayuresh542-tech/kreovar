@@ -1,3 +1,4 @@
+import {publicErrorMessage} from "@/app/lib/serviceMessages";
 import { withSafeResponse } from "@/app/lib/server/safeResponse";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "../../../lib/server/adminAuth";
@@ -77,7 +78,7 @@ async function getHandler(req: NextRequest) {
     if (authError) {
       checks.push({
         id: "auth",
-        name: "Supabase Authentication",
+        name: "Account authentication",
         category: "infrastructure",
         status: "error",
         latencyMs: authLatency,
@@ -87,7 +88,7 @@ async function getHandler(req: NextRequest) {
     } else {
       checks.push({
         id: "auth",
-        name: "Supabase Authentication",
+        name: "Account authentication",
         category: "infrastructure",
         status: authLatency > 600 ? "degraded" : "healthy",
         latencyMs: authLatency,
@@ -98,7 +99,7 @@ async function getHandler(req: NextRequest) {
   } catch (err: any) {
     checks.push({
       id: "auth",
-      name: "Supabase Authentication",
+      name: "Account authentication",
       category: "infrastructure",
       status: "error",
       latencyMs: Date.now() - authStart,
@@ -112,7 +113,7 @@ async function getHandler(req: NextRequest) {
   if (!elevenKey) {
     checks.push({
       id: "elevenlabs",
-      name: "ElevenLabs Voice Engine",
+      name: "Voice generation service",
       category: "ai",
       status: "unconfigured",
       latencyMs: 0,
@@ -123,11 +124,11 @@ async function getHandler(req: NextRequest) {
     const testRes = await testProviderConnection("elevenlabs", elevenKey);
     checks.push({
       id: "elevenlabs",
-      name: "ElevenLabs Voice Engine",
+      name: "Voice generation service",
       category: "ai",
       status: testRes.success ? (testRes.latencyMs > 1200 ? "degraded" : "healthy") : "error",
       latencyMs: testRes.latencyMs,
-      message: testRes.message,
+      message: publicErrorMessage(testRes.message,testRes.success?"Connection verified.":"Connection failed."),
       lastChecked: now,
     });
   }
@@ -137,22 +138,22 @@ async function getHandler(req: NextRequest) {
   if (!geminiKey) {
     checks.push({
       id: "gemini",
-      name: "Google Gemini 2.0 AI Brain",
+      name: "Content generation service",
       category: "ai",
       status: "unconfigured",
       latencyMs: 0,
-      message: "GEMINI_API_KEY not configured. Add via env or Admin Provider Registry.",
+      message: "Content generation is not configured.",
       lastChecked: now,
     });
   } else {
     const testRes = await testProviderConnection("gemini", geminiKey);
     checks.push({
       id: "gemini",
-      name: "Google Gemini 2.0 AI Brain",
+      name: "Content generation service",
       category: "ai",
       status: testRes.success ? (testRes.latencyMs > 1500 ? "degraded" : "healthy") : "error",
       latencyMs: testRes.latencyMs,
-      message: testRes.message,
+      message: publicErrorMessage(testRes.message,testRes.success?"Connection verified.":"Connection failed."),
       lastChecked: now,
     });
   }
@@ -162,22 +163,22 @@ async function getHandler(req: NextRequest) {
   if (!openRouterKey) {
     checks.push({
       id: "openrouter",
-      name: "OpenRouter (Nemotron 3 Ultra)",
+      name: "Development AI service",
       category: "ai",
       status: "unconfigured",
       latencyMs: 0,
-      message: "OPENROUTER_API_KEY not configured. Add via env or Admin Provider Registry.",
+      message: "Development AI is not configured.",
       lastChecked: now,
     });
   } else {
     const testRes = await testProviderConnection("openrouter", openRouterKey);
     checks.push({
       id: "openrouter",
-      name: "OpenRouter (Nemotron 3 Ultra)",
+      name: "Development AI service",
       category: "ai",
       status: testRes.success ? (testRes.latencyMs > 2500 ? "degraded" : "healthy") : "error",
       latencyMs: testRes.latencyMs,
-      message: testRes.message,
+      message: publicErrorMessage(testRes.message,testRes.success?"Connection verified.":"Connection failed."),
       lastChecked: now,
     });
   }
@@ -187,7 +188,7 @@ async function getHandler(req: NextRequest) {
   if (!groqKey) {
     checks.push({
       id: "groq",
-      name: "Groq LLM Engine",
+      name: "Editing and content service",
       category: "ai",
       status: "unconfigured",
       latencyMs: 0,
@@ -198,11 +199,11 @@ async function getHandler(req: NextRequest) {
     const testRes = await testProviderConnection("groq", groqKey);
     checks.push({
       id: "groq",
-      name: "Groq LLM Engine",
+      name: "Editing and content service",
       category: "ai",
       status: testRes.success ? (testRes.latencyMs > 1200 ? "degraded" : "healthy") : "error",
       latencyMs: testRes.latencyMs,
-      message: testRes.message,
+      message: publicErrorMessage(testRes.message,testRes.success?"Connection verified.":"Connection failed."),
       lastChecked: now,
     });
   }
@@ -211,18 +212,18 @@ async function getHandler(req: NextRequest) {
   const visualRes = await testProviderConnection("pollinations");
   checks.push({
     id: "pollinations",
-    name: "Pollinations Image Engine",
+    name: "Image generation service",
     category: "ai",
     status: visualRes.success ? "healthy" : "degraded",
     latencyMs: visualRes.latencyMs,
-    message: visualRes.message,
+    message: publicErrorMessage(visualRes.message,"Connection check completed."),
     lastChecked: now,
   });
 
   // 6. Remotion Render Pipeline
   checks.push({
     id: "remotion",
-    name: "Remotion Composition Engine",
+    name: "Video composition engine",
     category: "render",
     status: "healthy",
     latencyMs: 5,

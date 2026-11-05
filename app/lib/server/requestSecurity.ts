@@ -10,6 +10,11 @@ export function isSafeMutation(req: NextRequest): boolean {
   try {
     const supplied = new URL(origin);
     if (origin === "null" || supplied.origin !== origin) return false;
+    // Next normalizes loopback request hostnames to localhost. During local
+    // development only, accept known loopback names on the same protocol/port.
+    // Never derive trust from forwarded hosts or allow this on a remote request.
+    const local = new URL(req.url),loopback = (url:URL) => ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if (process.env.NODE_ENV === "development" && loopback(local) && loopback(supplied) && supplied.protocol === local.protocol && supplied.port === local.port) return true;
     const expected = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL;
     // The hosting adapter can expose its Netlify URL instead of the public custom domain.
     // Trust our fixed canonical origin as well; never derive trust from forwarded host headers.

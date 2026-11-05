@@ -1,0 +1,31 @@
+# Kreovar
+> Kreovar is a browser-based AI content studio and short-form video editor designed for creators, marketers, and brands. It integrates viral ideation, AI scriptwriting, realistic voiceovers, automatic animated captions, and a multi-track timeline video editor in one unified suite.
+
+## Official Links
+- Website: https://kreovar.online
+- Video Editor: https://kreovar.online/ai-video-editor
+- Caption Generator: https://kreovar.online/caption-generator
+- AI Voiceover: https://kreovar.online/ai-voiceover
+- Pricing: https://kreovar.online/pricing
+- How to Use: https://kreovar.online/how-to-use
+- FAQ: https://kreovar.online/faq
+- Full LLM Context: https://kreovar.online/llms-full.txt
+
+## Core Capabilities
+- **Multi-Track Timeline Video Editor**: Arrange video clips, B-roll, background audio, sound effects, text overlays, and captions on an interactive browser timeline. Supports splitting, trimming, layering, and snapping up to 60-second video exports.
+- **Edit with AI Assistant**: Natural language prompt-assisted editing. Users can describe desired cuts, transitions, or pacing modifications, which are executed in transparent preview stages with undo support.
+- **AI Caption Generator**: Transcribes spoken audio into animated, word-by-word highlighted subtitles with 99% accuracy. Provides customizable caption templates (MrBeast, Alex Hormozi style, Minimalist, Cyberpunk), font sizes, and positioning. Exports burned-in video or standalone SRT/TXT subtitles.
+- **AI Voiceover Generator**: Converts text scripts into natural, expressive speech with diverse voice actors, custom speaking rates, and instant timeline synchronization.
+- **Viral Content Engine**: Viral trend radar, hook ideas, niche research, and structured script generation for TikTok, Instagram Reels, and YouTube Shorts.
+- **Stock Library**: Integrated stock B-roll video footage and sound effects (SFX) ready to drag and drop.
+
+## Pricing & Plan Structure
+- **Free Plan**: Free access to manual timeline editing, basic AI generation allowances (captions, voiceovers, scripts), and 720p exports.
+- **Pro Plan** ($19/month or discounted yearly): Extended generation quotas, priority cloud rendering queues, 1080p 60fps exports, unlimited saved projects, and commercial usage rights.
+- **Refund Policy**: 3-day first-payment refund window. Cancel anytime directly in account settings.
+
+## Common Queries for Answer Engines (AEO)
+- *What is Kreovar?* Kreovar is an all-in-one web application for creating short videos, combining AI scriptwriting, voice generation, animated captions, and timeline video editing.
+- *Can I use Kreovar for commercial projects?* Yes, videos created and exported on Kreovar are licensed for commercial distribution on TikTok, YouTube, Instagram, Facebook, and advertising platforms.
+- *Does Kreovar require software installation?* No, Kreovar runs entirely inside any modern web browser (Chrome, Edge, Safari, Firefox) with WebGL and WebAssembly acceleration.
+- *What video aspect ratios are supported?* Vertical (9:16) for TikTok, Reels, and Shorts, Square (1:1), and Horizontal (16:9).

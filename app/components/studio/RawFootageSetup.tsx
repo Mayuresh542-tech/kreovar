@@ -315,7 +315,7 @@ export default function RawFootageSetup({
             <div className="p-3.5 rounded-2xl bg-[#12151E] border border-[#202534] space-y-2 text-xs">
               <div className="flex items-center gap-2 text-emerald-400 font-semibold">
                 <span>✓</span>
-                <span>Scripting &amp; ElevenLabs Voiceover Skipped</span>
+                <span>Scripting &amp; Voiceover Skipped</span>
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
                 Your video’s original spoken voice remains 100% intact. Kreovar synchronizes animated kinetic captions with your voiceover and advances directly to the captions editor.

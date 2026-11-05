@@ -37,7 +37,7 @@ const STEPS: StepMeta[] = [
   {
     emoji: "⚡",
     tag: "AI BRAIN PRE-CONFIGURED",
-    title: "Google Gemini 2.0 Engine",
+    title: "AI content tools",
     desc: "Kreovar automatically handles AI generation server-side. No API keys needed.",
   },
   {
@@ -271,11 +271,11 @@ export default function OnboardingFlow({ userId }: { userId: string }) {
                 <span className="font-bold text-sky-300">Kreovar AI Engine</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Google Gemini 2.0 Active
+                  AI content tools
                 </span>
               </div>
               <p className="text-[11px] text-white/70 leading-relaxed">
-                Kreovar connects server-side to Google Gemini 2.0 to synthesize trend data into viral hooks, high-CTR titles, thumbnail concepts, and complete scripts.
+                Kreovar processes trend data securely to help create hooks, titles, thumbnail concepts and complete scripts.
               </p>
               <div className="pt-2 border-t border-white/[0.08] grid grid-cols-2 gap-2 text-[10px] font-mono text-white/60">
                 <div>✓ Zero Key Setup Required</div>

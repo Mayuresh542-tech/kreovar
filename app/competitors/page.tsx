@@ -654,7 +654,7 @@ export default function Competitors() {
                 <div className="p-4 rounded-xl bg-[#12151E] border border-[#202534] text-center space-y-2">
                   <div className="w-5 h-5 rounded-full border-2 border-sky-500/30 border-t-sky-400 animate-spin mx-auto" />
                   <p className="text-xs font-mono text-sky-300 animate-pulse">
-                    Synthesizing intelligence with Gemini AI…
+                    Preparing your analysis…
                   </p>
                 </div>
               )}

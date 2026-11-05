@@ -1,0 +1,81 @@
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /pricing
+Allow: /how-to-use
+Allow: /faq
+Allow: /contact
+Allow: /trust
+Allow: /terms
+Allow: /privacy
+Allow: /cookies
+Allow: /refund
+Allow: /ai-video-editor
+Allow: /caption-generator
+Allow: /ai-voiceover
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /admin-unlock
+Disallow: /dashboard
+Disallow: /projects
+Disallow: /projects/
+Disallow: /editor
+Disallow: /editor/
+Disallow: /settings
+Disallow: /settings/
+Disallow: /checkout
+Disallow: /checkout/
+Disallow: /auth/
+Disallow: /confirm-email
+Disallow: /forgot-password
+Disallow: /reset-password
+
+User-agent: GPTBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /checkout
+
+User-agent: ChatGPT-User
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+Disallow: /admin/
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+Disallow: /admin/
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+Disallow: /admin/
+
+User-agent: Google-Extended
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+Disallow: /admin/
+
+User-agent: Applebot-Extended
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+Disallow: /admin/
+
+Sitemap: https://kreovar.online/sitemap.xml
+Host: https://kreovar.online

@@ -2,19 +2,20 @@ import {getProviderCredential,recordProviderUsage} from './providerRegistry';
 import {reserveEditorTokens,settleEditorTokens,worstCaseTokens} from './editorTokenBudget';
 import type {EditorJsonOptions} from './radoxService';
 
-type GroqCode='GROQ_NOT_CONFIGURED'|'GROQ_AUTH_FAILED'|'GROQ_MODEL_BLOCKED'|'GROQ_ALLOWANCE_REACHED'|'GROQ_RATE_LIMIT'|'GROQ_REQUEST_REJECTED'|'GROQ_REQUEST_CAPACITY'|'GROQ_INVALID_RESPONSE'|'GROQ_INVALID_OBSERVATIONS'|'GROQ_MODEL_MISMATCH'|'GROQ_UNAVAILABLE';
+type GroqCode='GROQ_SCHEMA_REJECTED'|'GROQ_NOT_CONFIGURED'|'GROQ_AUTH_FAILED'|'GROQ_MODEL_BLOCKED'|'GROQ_ALLOWANCE_REACHED'|'GROQ_RATE_LIMIT'|'GROQ_REQUEST_REJECTED'|'GROQ_REQUEST_CAPACITY'|'GROQ_INVALID_RESPONSE'|'GROQ_INVALID_OBSERVATIONS'|'GROQ_MODEL_MISMATCH'|'GROQ_UNAVAILABLE';
 const messages:Record<GroqCode,string>={
- GROQ_NOT_CONFIGURED:'The primary AI service is unavailable and Groq fallback is disabled or not configured. Check Admin → API Providers.',
- GROQ_AUTH_FAILED:'Groq fallback rejected its configured key. Check the Groq connection in Admin → API Providers.',
- GROQ_MODEL_BLOCKED:'Groq fallback is blocked by model permissions. Enable the requested model in Groq Console → Settings → Project → Limits, then retry this edit.',
- GROQ_ALLOWANCE_REACHED:'Groq fallback requires available provider allowance. Check the configured Groq account.',
- GROQ_RATE_LIMIT:'The primary AI service is unavailable and Groq fallback reached its request limit. Retry after the indicated wait.',
- GROQ_REQUEST_REJECTED:'Groq fallback rejected this planning request. Retry later or ask the owner to check provider compatibility.',
- GROQ_REQUEST_CAPACITY:'Groq fallback could not accept this edit request size or its visual inputs. Try fewer source clips.',
- GROQ_INVALID_RESPONSE:'Groq fallback returned incomplete or invalid editing data. Your timeline is unchanged.',
- GROQ_INVALID_OBSERVATIONS:'Groq vision could not provide valid observations for every supplied image. Final editing was not started.',
- GROQ_MODEL_MISMATCH:'Groq fallback returned an unexpected model. The edit was rejected.',
- GROQ_UNAVAILABLE:'The primary AI service and Groq fallback could not complete this edit. Retry later.',
+ GROQ_NOT_CONFIGURED:'AI editing is temporarily unavailable. Please contact support.',
+ GROQ_AUTH_FAILED:'AI editing could not connect. Please contact support.',
+ GROQ_MODEL_BLOCKED:'AI editing is temporarily unavailable. Please contact support.',
+ GROQ_ALLOWANCE_REACHED:'AI editing has reached its service allowance. Please try again later.',
+ GROQ_RATE_LIMIT:'AI editing is busy. Retry after the indicated wait.',
+ GROQ_SCHEMA_REJECTED:'Frame analysis could not be completed. Please retry this stage.',
+ GROQ_REQUEST_REJECTED:'AI editing could not process this request. Please retry this stage.',
+ GROQ_REQUEST_CAPACITY:'This edit is too large to process at once. Try fewer source clips.',
+ GROQ_INVALID_RESPONSE:'AI editing returned incomplete data. Saved changes are preserved; retry this stage.',
+ GROQ_INVALID_OBSERVATIONS:'The footage could not be analyzed reliably. Please retry this stage.',
+ GROQ_MODEL_MISMATCH:'AI editing could not validate its response. Please retry this stage.',
+ GROQ_UNAVAILABLE:'AI editing could not complete this request. Please retry later.',
 };
 export class GroqEditorError extends Error {
  constructor(readonly code:GroqCode,readonly status=503,readonly retryAfterSeconds?:number){super(messages[code]);this.name='GroqEditorError';}
@@ -51,6 +52,7 @@ export async function requestGroqEditorJson<T>(options:EditorJsonOptions,body:Re
   if(response.status===401||response.status===403)return fail('GROQ_AUTH_FAILED');
   if(response.status===402)return fail('GROQ_ALLOWANCE_REACHED');
   if(response.status===429){const retry=response.headers.get('retry-after'),seconds=retry&&/^\d+(?:\.\d+)?$/.test(retry)?Math.ceil(Number(retry)):undefined;return fail('GROQ_RATE_LIMIT',429,seconds&&seconds<=86400?seconds:undefined);}
+  if(response.status===400&&errorCode==='json_validate_failed')return fail('GROQ_SCHEMA_REJECTED',502);
   if(response.status===400)return fail('GROQ_REQUEST_REJECTED',502);
   if(response.status===413)return fail('GROQ_REQUEST_CAPACITY',413);
   return fail('GROQ_UNAVAILABLE');

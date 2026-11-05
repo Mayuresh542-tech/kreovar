@@ -1,4 +1,5 @@
 "use client";
+import {serviceLabel,publicErrorMessage} from "@/app/lib/serviceMessages";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -203,7 +204,7 @@ export default function AdminProvidersPage() {
   async function handleRemoveKey() {
     if (!selectedProvider) return;
     const confirm = window.confirm(
-      `Are you sure you want to remove credentials for ${selectedProvider.name}? This will disable the provider until a new key is added.`
+      `Are you sure you want to remove credentials for ${serviceLabel(selectedProvider.provider_key)}? This will disable the provider until a new key is added.`
     );
     if (!confirm) return;
 
@@ -350,23 +351,23 @@ export default function AdminProvidersPage() {
                       {/* Provider Title */}
                       <div className="flex items-center justify-between mb-4">
                         <div>
-                          <h3 className="text-lg font-bold text-white tracking-tight">{prov.name}</h3>
+                          <h3 className="text-lg font-bold text-white tracking-tight">{serviceLabel(prov.provider_key)}</h3>
                           <p className="text-xs text-slate-400 mt-0.5">
                             {prov.provider_key === "elevenlabs"
                               ? "Primary production voiceover engine with word timestamps"
                               : prov.provider_key === "voiceai"
-                              ? "Voice synthesis with Voice.ai"
+                              ? "Voice synthesis"
                               : prov.provider_key === "gemini"
                               ? "Primary AI brain for Trend Radar, Competitor Intel & Content Kits"
                               : prov.provider_key === "openrouter"
-                              ? "Development AI engine powered by NVIDIA Nemotron 3 Ultra"
+                              ? "Development AI service"
                               : prov.provider_key === "radox"
-                              ? "Claude Opus 5.5 for AI edit plans and editable motion graphics"
+                              ? "Legacy edit planning and motion graphics"
                               : prov.provider_key === "groq"
                               ? "Ultra-low latency LLM inference for ideas and scripting"
                               : prov.provider_key === "pollinations"
                               ? "AI visual asset synthesis & style rendering"
-                              : "Remotion video compilation and MP4 export pipeline"}
+                              : "Video compilation and MP4 export"}
                           </p>
                         </div>
                       </div>
@@ -395,7 +396,7 @@ export default function AdminProvidersPage() {
                           <div className="flex items-center justify-between">
                             <span className="text-slate-500">Model:</span>
                             <span className="font-mono text-slate-300">
-                              {prov.config?.modelId || "gemini-3.6-flash"}
+                              Configured model
                             </span>
                           </div>
                         )}
@@ -404,17 +405,17 @@ export default function AdminProvidersPage() {
                           <div className="flex items-center justify-between">
                             <span className="text-slate-500">Model:</span>
                             <span className="font-mono text-slate-300">
-                              {prov.config?.modelId || "nvidia/nemotron-3-ultra-550b-a55b:free"}
+                              Configured model
                             </span>
                           </div>
                         )}
 
-                        {prov.provider_key === "radox" && <div className="flex items-center justify-between"><span className="text-slate-500">Editing model:</span><span className="font-mono text-slate-300">claude-opus-5.5</span></div>}
+                        {prov.provider_key === "radox" && <div className="flex items-center justify-between"><span className="text-slate-500">Editing model:</span><span className="font-mono text-slate-300">Configured model</span></div>}
                         {prov.provider_key === "groq" && (
                           <div className="flex items-center justify-between">
                             <span className="text-slate-500">Model:</span>
                             <span className="font-mono text-slate-300">
-                              {prov.config?.modelId || "llama-3.3-70b-versatile"}
+                              Configured model
                             </span>
                           </div>
                         )}
@@ -436,7 +437,7 @@ export default function AdminProvidersPage() {
                               : "bg-rose-500/10 border border-rose-500/30 text-rose-300"
                           }`}
                         >
-                          <span className="truncate">{activeTest.message}</span>
+                          <span className="truncate">{publicErrorMessage(activeTest.message,activeTest.success?"Connection verified.":"Connection could not be verified.")}</span>
                           {activeTest.latency && (
                             <span className="font-mono text-[10px] ml-2 shrink-0">{activeTest.latency}ms</span>
                           )}
@@ -490,7 +491,7 @@ export default function AdminProvidersPage() {
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#161A26] text-sky-400 border border-sky-500/30">
                   {selectedProvider.category}
                 </span>
-                <h3 className="text-xl font-bold text-white mt-1">{selectedProvider.name} Configuration</h3>
+                <h3 className="text-xl font-bold text-white mt-1">{serviceLabel(selectedProvider.provider_key)} Configuration</h3>
               </div>
               <button
                 onClick={() => setDrawerOpen(false)}
@@ -631,7 +632,7 @@ export default function AdminProvidersPage() {
 
             {selectedProvider.provider_key === "gemini" && (
               <div className="space-y-4">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Gemini Model Settings</h4>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Content Model Settings</h4>
 
                 <div className="space-y-1.5">
                   <label className="text-xs text-slate-300 font-medium">Model ID</label>
@@ -640,9 +641,9 @@ export default function AdminProvidersPage() {
                     onChange={(e) => setEditableConfig({ ...editableConfig, modelId: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg bg-[#12151E] border border-[#202534] text-white text-xs outline-none focus:border-sky-500"
                   >
-                    <option value="gemini-3.6-flash">gemini-3.6-flash (Recommended • Lightning Fast)</option>
-                    <option value="gemini-3.5-flash">gemini-3.5-flash (High Availability)</option>
-                    <option value="gemini-2.5-pro">gemini-2.5-pro (Deep Reasoning &amp; Analysis)</option>
+                    <option value="gemini-3.6-flash">Fast content model (Recommended)</option>
+                    <option value="gemini-3.5-flash">Standard content model</option>
+                    <option value="gemini-2.5-pro">Advanced content model</option>
                   </select>
                 </div>
               </div>
@@ -650,7 +651,7 @@ export default function AdminProvidersPage() {
 
             {selectedProvider.provider_key === "openrouter" && (
               <div className="space-y-4">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">OpenRouter Nemotron Settings</h4>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Development Model Settings</h4>
 
                 <div className="space-y-1.5">
                   <label className="text-xs text-slate-300 font-medium">Model ID</label>
@@ -659,10 +660,10 @@ export default function AdminProvidersPage() {
                     onChange={(e) => setEditableConfig({ ...editableConfig, modelId: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg bg-[#12151E] border border-[#202534] text-white text-xs outline-none focus:border-sky-500"
                   >
-                    <option value="nvidia/nemotron-3-ultra-550b-a55b:free">nvidia/nemotron-3-ultra-550b-a55b:free (Recommended • Free Tier)</option>
-                    <option value="nvidia/nemotron-3-ultra-550b-a55b">nvidia/nemotron-3-ultra-550b-a55b (Nemotron 3 Ultra • Standard)</option>
-                    <option value="nvidia/nemotron-3.5-lightning:free">nvidia/nemotron-3.5-lightning:free (High Speed • Free Tier)</option>
-                    <option value="nvidia/nemotron-3.5-lightning">nvidia/nemotron-3.5-lightning (Lightning Inference)</option>
+                    <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Development model (Recommended)</option>
+                    <option value="nvidia/nemotron-3-ultra-550b-a55b">Standard development model</option>
+                    <option value="nvidia/nemotron-3.5-lightning:free">Fast development model</option>
+                    <option value="nvidia/nemotron-3.5-lightning">High-speed development model</option>
                   </select>
                 </div>
               </div>
@@ -679,9 +680,9 @@ export default function AdminProvidersPage() {
                     onChange={(e) => setEditableConfig({ ...editableConfig, modelId: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg bg-[#12151E] border border-[#202534] text-white text-xs outline-none focus:border-sky-500"
                   >
-                    <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (Fast &amp; Creative)</option>
-                    <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (Ultra Fast)</option>
-                    <option value="mixtral-8x7b-32768">mixtral-8x7b-32768 (32k Context)</option>
+                    <option value="llama-3.3-70b-versatile">Creative content model</option>
+                    <option value="llama-3.1-8b-instant">Fast content model</option>
+                    <option value="mixtral-8x7b-32768">Extended-context content model</option>
                   </select>
                 </div>
               </div>

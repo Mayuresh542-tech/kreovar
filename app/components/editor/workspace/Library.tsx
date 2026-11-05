@@ -1,6 +1,8 @@
 "use client";
+import {removeProjectMedia} from '@/app/lib/editor/projectMedia';
+import {publicErrorMessage} from '@/app/lib/serviceMessages';
 import { useEffect, useRef, useState } from "react";
-import { Film, Upload, Search, Plus, Music, Image as ImageIcon, Link2, Play } from "lucide-react";
+import { Film, Upload, Search, Plus, Music, Image as ImageIcon, Link2, Play, Trash2 } from "lucide-react";
 import { useProject } from "@/app/lib/editor/store";
 import { MediaAsset, canPlace } from "@/app/lib/editor/model";
 import { importMedia } from "@/app/lib/editor/media";
@@ -29,6 +31,15 @@ export default function Library({tab}:{tab:LibraryTab}){
   const [query,setQuery]=useState(""),[progress,setProgress]=useState<{name:string;value:number}>(),[drag,setDrag]=useState(false),[relink,setRelink]=useState<string>();
   const [preview,setPreview]=useState<MediaAsset>(),[mediaKind,setMediaKind]=useState("all");
   useEffect(()=>{setPreview(undefined);setMediaKind("all");},[tab]);
+  const [removing,setRemoving]=useState<MediaAsset>();
+  const removeDialog=useRef<HTMLDialogElement>(null),mediaSearch=useRef<HTMLInputElement>(null);
+  useEffect(()=>{const dialog=removeDialog.current;if(removing)dialog?.showModal();return()=>dialog?.close();},[removing]);
+  function removeMedia(asset:MediaAsset,confirmed=false){
+    const current=store.getSnapshot(),used=Object.values(current.clips).filter(c=>c.assetId===asset.id);
+    if(used.length&&!confirmed){setRemoving(asset);return;}
+    try{store.execute(p=>removeProjectMedia(p,asset.id,confirmed));select(selection.filter(id=>!!store.getSnapshot().clips[id]));if(preview?.id===asset.id)setPreview(undefined);setRemoving(undefined);notify('Removed from this project. Undo to restore. The original file has not been deleted.');setTimeout(()=>mediaSearch.current?.focus(),0);}catch(error){notify(publicErrorMessage(error instanceof Error?error.message:undefined));}
+  }
+  const removalClips=removing?Object.values(project.clips).filter(c=>c.assetId===removing.id):[],removalLocked=removalClips.some(c=>project.tracks[c.trackId].locked);
   const importing=useRef(false);
   const fileInput=useRef<HTMLInputElement>(null),subtitleInput=useRef<HTMLInputElement>(null);
   async function upload(files:FileList|File[]){
@@ -76,13 +87,14 @@ export default function Library({tab}:{tab:LibraryTab}){
 
         {tab==="audio"&&<><VoiceTools/></>}
         <p className="vx-hint">Video, audio or PNG · up to 100 MB each</p>
-        <label className="vx-search"><Search size={14}/><input aria-label="Search media" placeholder="Search your media" value={query} onChange={e=>setQuery(e.target.value)}/></label>
+        <label className="vx-search"><Search size={14}/><input ref={mediaSearch} aria-label="Search media" placeholder="Search your media" value={query} onChange={e=>setQuery(e.target.value)}/></label>
         {!media.length&&<div className="vx-empty"><Film size={28}/><strong>{query?"No matching media":"Your library starts here"}</strong><p>Import footage, music or images. Preview an asset, then add it or drag it onto a compatible track.</p></div>}
         <div className="vx-library-switch" aria-label="Filter media">{["all","video","audio","image"].map(kind=><button key={kind} aria-pressed={mediaKind===kind} onClick={()=>setMediaKind(kind)}>{kind==="all"?"All":kind[0].toUpperCase()+kind.slice(1)}</button>)}</div>
         {preview&&<MediaPreview asset={preview} close={()=>setPreview(undefined)}/>}
         <div className="vx-media-grid">{media.map(asset=><div key={asset.id} className="vx-media-card" draggable onDragStart={e=>{e.dataTransfer.setData("application/veelox-asset",asset.id);e.dataTransfer.effectAllowed="copy";}}>
           <button className="vx-media-thumb" title={`Preview ${asset.name}`} aria-label={`Preview ${asset.name}`} onClick={()=>{playback.set(playback.getSnapshot().time,false);setPreview(asset);}}>{asset.thumbnail?<img alt="" src={asset.thumbnail}/>:asset.kind==="audio"?<Music size={24}/>:asset.kind==="image"?<ImageIcon size={24}/>:<Film size={24}/>}<span>{asset.kind==="image"?"IMAGE":`${asset.duration.toFixed(1)}s`}</span><Play size={16} className="vx-add-overlay"/></button>
           <strong title={asset.name}>{asset.name}</strong><button className="vx-secondary vx-wide" onClick={()=>place(asset)} aria-label={`Add ${asset.name} to timeline`}><Plus size={13}/> Add to timeline</button><div className="vx-media-meta"><span>{asset.width?`${asset.width}×${asset.height}`:asset.kind.toUpperCase()}{asset.size?` · ${(asset.size/1048576).toFixed(1)} MB`:""}</span><button aria-label={`Relink ${asset.name}`} title="Relink original" onClick={()=>{setRelink(asset.id);fileInput.current?.click();}}><Link2 size={12}/></button></div>
+          <button className="vx-remove-media" title="Remove from this project" aria-label={`Remove ${asset.name} from project`} onClick={()=>removeMedia(asset)}><Trash2 size={12}/> Remove</button>
           {asset.kind==="video"&&asset.url?<BRollDownloadButton url={asset.url} name={asset.name} className="vx-ai-entry"/>:<AssetDownload asset={asset}/>}
         </div>)}</div>
         {tab==="media"&&<details className="vx-library-advanced"><summary>Project tools &amp; recovery</summary><SequenceBuilder/><RecoveryPanel/><SharedAssetTools/></details>}
@@ -98,6 +110,11 @@ export default function Library({tab}:{tab:LibraryTab}){
       {tab==="filters"&&<><p className="vx-hint">Select a visual clip. Adjustments remain editable in the inspector.</p>{[{name:"Original",brightness:0,contrast:0,saturation:0},{name:"Studio contrast",brightness:2,contrast:18,saturation:-8},{name:"Monochrome",brightness:0,contrast:12,saturation:-100},{name:"Soft light",brightness:10,contrast:-12,saturation:-12}].map(filter=><button key={filter.name} className="vx-preset" disabled={!selected||!selected.assetId||project.assets[selected.assetId]?.kind==="audio"} onClick={()=>run(p=>changeClipProperty(p,selected.id,{effects:{...selected.effects,brightness:filter.brightness,contrast:filter.contrast,saturation:filter.saturation}}))}><span className="vx-preset-preview">{filter.name}</span><span>Apply filter <Plus size={14}/></span></button>)}</>}
       {tab==="ai"&&<SharedImageTools/>}
     </div>
+    {removing&&<dialog ref={removeDialog} className="vx-dialog" aria-labelledby="remove-media-title" onCancel={()=>setRemoving(undefined)}>
+      <h2 id="remove-media-title">Remove from this project?</h2><p className="vx-hint">{removing.name} is used by {removalClips.length} timeline clip(s). Removing it also removes those clips and their transitions. The original file is not deleted. You can undo this change.</p>
+      {removalLocked&&<p className="vx-error">Unlock the tracks using this file before removing it.</p>}
+      <div className="vx-remove-media-actions"><button className="vx-secondary" onClick={()=>setRemoving(undefined)}>Keep media</button><button className="vx-primary" disabled={removalLocked} onClick={()=>removeMedia(removing,true)}>Remove media and clips</button></div>
+    </dialog>}
   </aside>;
 }
 

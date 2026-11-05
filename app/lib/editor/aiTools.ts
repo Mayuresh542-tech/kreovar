@@ -1,6 +1,6 @@
 import {textPlacementId,type TextPlacementId} from "./textPlacement";
 import {MOTION_PRESETS,readKeyframes,type MotionPreset,type TransformKeyframe} from './keyframes';
-import {readVisualTreatment,type VisualTreatment} from './visualTreatment';
+import {readVisualTreatment,assertInsertedVisualTreatment,type VisualTreatment} from './visualTreatment';
 import {ALL_CAPTION_TEMPLATES as DEFAULT_CAPTION_TEMPLATES} from "../captions/referenceTemplates";
 import {checkCaptionSources} from "./captionBatch";
 import {BUILTIN_SFX} from "../assets/builtinSfx";
@@ -22,8 +22,9 @@ export function readToolMediaPresentation(value:unknown,kind:MediaAsset['kind'],
  const visualTreatment=r.visualTreatment===undefined?undefined:readVisualTreatment(r.visualTreatment),keyframes=r.keyframes===undefined?undefined:readKeyframes(r.keyframes);
  let transform:Transform|undefined;
  if(r.transform!==undefined){if(!r.transform||typeof r.transform!=='object'||Array.isArray(r.transform))throw Error('Invalid media transform.');const t=r.transform as Record<string,unknown>;transform={x:num(t.x,-2,2),y:num(t.y,-2,2),scale:num(t.scale,.05,10),rotation:num(t.rotation,-3600,3600),opacity:num(t.opacity,0,1)};}
- if(keyframes!==undefined||visualTreatment?.effects?.length||visualTreatment?.entrance||visualTreatment?.exit){
+ if(keyframes!==undefined||visualTreatment?.mask?.keyframes?.length||visualTreatment?.effects?.length||visualTreatment?.entrance||visualTreatment?.exit){
   if(duration===undefined)throw Error('Animated inserted media requires an explicit duration.');
+  assertInsertedVisualTreatment(visualTreatment,duration);
   if(keyframes?.some(f=>f.sourceTime>duration+1e-7)||visualTreatment?.effects?.some(e=>e.sourceEnd>duration+1e-7)||(visualTreatment?.entrance?.sourceDuration||0)>duration||(visualTreatment?.exit?.sourceDuration||0)>duration)throw Error('Inserted-media animation must stay inside its source duration.');
  }
  if(r.orientation!==undefined&&r.orientation!=='portrait'&&r.orientation!=='landscape')throw Error('Choose a portrait or landscape stock search.');

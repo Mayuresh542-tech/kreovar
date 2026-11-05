@@ -382,7 +382,7 @@ export default function AdminAnalyticsPage() {
               <div className="text-2xl font-black text-sky-400 font-mono">
                 {loading ? "…" : data?.productAnalytics.aiGenerations}
               </div>
-              <span className="text-[10px] text-slate-500">Gemini model calls</span>
+              <span className="text-[10px] text-slate-500">Content generation calls</span>
             </div>
 
             <div className="p-4 rounded-2xl bg-[#0D0F15] border border-[#202534] space-y-1">

@@ -24,3 +24,42 @@ test('Unregistered or unconfirmed payment emails stay pending without granting P
 test('Unpaid, refunded, foreign-account and unrelated-membership receipts cannot grant Pro',async()=>{for(const paymentOverride of [{status:'pending'},{auto_refunded:true},{account_id:'biz_foreign'},{membership_id:'mem_other'}]){const f=emailFixture({paymentOverride});await assert.rejects(f.service.processWhopWebhook({type:'payment.succeeded',data:{id:'pay_test',membership_id:'mem_test'}},'msg_bad'),/verified successful payment/);assert.equal(f.calls.length,1);}});
 test('Later confirmed signup reconciles only that payment email and re-verifies the receipt',async()=>{const f=emailFixture();await f.service.reconcileWhopPurchases('PAID@example.invalid');assert.ok(f.queries.some(([key,value])=>key==='metadata->>pending_email'&&value==='paid@example.invalid'));assert.equal(f.calls[1].args.p_user_id,uuid);});
 test('Lifecycle updates retain the receipt-linked owner and use current provider state',async()=>{const f=emailFixture({existing:uuid});await f.service.processWhopWebhook({type:'membership.updated',data:{id:'mem_test',status:'canceled'}},'msg_lifecycle');assert.equal(f.calls[1].args.p_status,'active');assert.equal(f.calls[1].args.p_user_id,uuid);});
+
+function renderHostedCheckout({cycle='monthly',status='authed',plan='pro'}={}) {
+  const element=(type,props)=>({type,props:props||{}}),exports={};
+  const stubs={
+    react:{Suspense:'suspense',useState:value=>[value,()=>{}]},
+    'react/jsx-runtime':{jsx:element,jsxs:element},
+    'next/navigation':{useParams:()=>({plan}),useSearchParams:()=>({get:key=>key==='cycle'?cycle:null}),useRouter:()=>({replace:()=>{}})},
+    'next/link':{default:'a',__esModule:true},
+    '@/app/lib/useAuthGate':{useAuthGate:()=>({status,session:status==='authed'?{access_token:'test-token',user:{email:'owner@example.invalid'}}:null})},
+    '@/app/config/plans':loader()('app/config/plans.ts'),
+    '@/app/components/StudioShell':{default:'shell',__esModule:true},
+  };
+  const source=fs.readFileSync(path.join(root,'app/checkout/[plan]/page.tsx'),'utf8');
+  const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+  new vm.Script(`(function(require,module,exports){${code}\n})`).runInNewContext({URL,console})(name=>{
+    assert.ok(name in stubs,`Unexpected checkout dependency: ${name}`);return stubs[name];
+  },{exports},exports);
+  const page=exports.default(),content=page.props.children.type();
+  const nodes=[];
+  function visit(node){if(Array.isArray(node))return node.forEach(visit);if(!node||typeof node!=='object')return;nodes.push(node);visit(node.props.children);}
+  visit(content);return nodes;
+}
+function checkoutText(node){if(Array.isArray(node))return node.map(checkoutText).join('');if(node&&typeof node==='object')return checkoutText(node.props?.children);return typeof node==='string'?node:'';}
+test('Paid checkout links straight to the selected Whop hosted plan without creating an API checkout',()=>{
+  for(const [cycle,url] of [['monthly','https://whop.com/veelox-studio-0b8d/kreovar/'],['yearly','https://whop.com/veelox-studio-0b8d/kreovar-yearly/']]){
+    const nodes=renderHostedCheckout({cycle}),cta=nodes.find(n=>checkoutText(n)==='Continue to Payment');
+    assert.ok(cta,'Payment action must be present');
+    assert.equal(cta.type,'a','Payment action should be a direct hosted link');
+    assert.equal(cta.props.href,url);
+    assert.equal(cta.props.target,undefined,'Checkout should open in the current tab');
+    assert.equal(cta.props.onClick,undefined,'Hosted checkout should not depend on a client API request');
+  }
+});
+test('Hosted checkout preserves account gating and excludes free or invalid plans',()=>{
+  for(const options of [{status:'loading'},{status:'unauthed'},{plan:'free'},{plan:'missing'}]){
+    assert.equal(renderHostedCheckout(options).some(n=>n.type==='a'&&checkoutText(n)==='Continue to Payment'),false);
+  }
+  assert.ok(renderHostedCheckout({status:'unauthed'}).some(n=>n.props.href==='/login'));
+});

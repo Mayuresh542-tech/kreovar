@@ -1,3 +1,4 @@
+import {applyVisualMask} from './visualMasks';
 import {mediaAnimationFrame} from './mediaAnimation';
 import {visualTreatmentAt,drawVisualMedia} from './visualTreatment';
 import {studioSegment,loadEditorStudioFonts,studioCaptionBounds} from './editorCaptionStudio';
@@ -137,14 +138,14 @@ export class Compositor {
     for(const layer of visibleLayers(p,time)){
       const c=layer.clip,base=zoomTransform({...c,transform:keyframeTransform(c,time)},time),animation=mediaAnimationFrame(c,layer.hold?c.startTime+c.duration-1/p.settings.fps:time),t={...base,x:base.x+animation.x,y:base.y+animation.y,scale:base.scale*animation.scale,rotation:base.rotation+animation.rotation,opacity:base.opacity*animation.opacity},element=this.entries.get(c.id)?.element,frame=this.frames.get(c.id),text=textForClip(p,c);
       if(!c.shape&&!text&&!frame&&(!element||!this.entries.get(c.id)?.ready))continue;
-      const treatment=visualTreatmentAt(c,time);
+      const sourceTime=c.sourceStart+Math.max(0,(layer.hold?c.startTime+c.duration-1/p.settings.fps:time)-c.startTime)*c.speed,treatment=visualTreatmentAt(c,layer.hold?c.startTime+c.duration-1/p.settings.fps:time);
       const local=time-c.startTime,fade=layer.hold?1:Math.min(c.fadeIn?clamp(local/c.fadeIn,0,1):1,c.fadeOut?clamp((c.duration-local)/c.fadeOut,0,1):1);
       ctx.save();ctx.globalAlpha=t.opacity*layer.opacity*fade*treatment.opacity;ctx.translate(width*(.5+t.x+layer.x),height*(.5+t.y));ctx.rotate(t.rotation*Math.PI/180);ctx.scale(t.scale*layer.scale*treatment.scale*animation.scaleX,t.scale*layer.scale*treatment.scale*animation.scaleY);
       const fx=c.effects;ctx.filter=`brightness(${1+fx.brightness/100}) contrast(${1+fx.contrast/100}) saturate(${1+fx.saturation/100}) blur(${Math.min(50,fx.blur+treatment.blur+animation.blur)}px)`;
       let bw=width,bh=height;
       const rich=c.contentId?p.captions[c.contentId]:undefined;
       if(rich?.studioStyle){const segment=studioSegment(p,c);ctx.translate(-width/2,-height/2);drawCaptions(ctx,[segment],rich.studioStyle,time,width,height);const b=studioCaptionBounds(rich.studioStyle,width,height);if(!layer.hold)bounds.push({id:c.id,x:b.x+width*t.x,y:b.y+height*t.y,width:b.width*t.scale,height:b.height*t.scale,rotation:t.rotation});ctx.restore();continue;}
-      if(c.shape){const size=shapeDimensions(c.shape,p.settings.aspectRatio);bw=size.width;bh=size.height;drawShape(ctx,c.shape,bw,bh);}
+      if(c.shape){const size=shapeDimensions(c.shape,p.settings.aspectRatio);bw=size.width;bh=size.height;drawShape(ctx,c.shape,bw,bh,{sourceTime});}
       else if(text){const caption=c.contentId?p.captions[c.contentId]:undefined,motion=caption?captionMotionFrame(caption,c,time):undefined;
         const rendered=motion?{...text,text:motion.text}:text;
         if(motion)ctx.scale(motion.scale,motion.scale);
@@ -156,7 +157,7 @@ export class Compositor {
         let wordIndex=0;
         metrics.lines.forEach((line,i)=>{const y=(i-(metrics.lines.length-1)/2)*s.size*s.lineHeight;
           if(metrics.mixed){const row=metrics.mixed.rows[i],rowWidth=row.reduce((n,r)=>n+r.width,0)+Math.max(0,row.length-1)*metrics.mixed.gap;let offset=s.align==='left'?x:s.align==='right'?x-rowWidth:x-rowWidth/2;
-            const rtl=textDirection(text.text)==='rtl';if(rtl)offset+=rowWidth;ctx.save();ctx.textAlign='left';for(const run of row){const at=rtl?offset-run.width:offset;ctx.font=run.font;ctx.direction=textDirection(run.text);if(s.strokeWidth)ctx.strokeText(run.text,at,y);ctx.fillText(run.text,at,y);if(caption&&wordHighlight(caption.highlightMode||'current-word',run.text,run.index,!!motion&&motion.active===run.index,caption.highlightWords)){ctx.save();ctx.fillStyle=caption.highlightMode==='full-line'?(caption.highlightColor||s.color):distinctHighlight(s.color,caption.highlightColor||'#d9ff43');ctx.fillText(run.text,at,y);ctx.restore();}offset+=(rtl?-1:1)*(run.width+metrics.mixed.gap);}ctx.restore();return;
+            const rtl=textDirection(text.text)==='rtl';if(rtl)offset+=rowWidth;ctx.save();ctx.textAlign='left';for(const run of row){const at=rtl?offset-run.width:offset;ctx.font=run.font;ctx.direction=textDirection(run.text);if(s.strokeWidth)ctx.strokeText(run.text,at,y);ctx.fillText(run.text,at,y);if(caption&&wordHighlight(caption.highlightMode||'current-word',run.text,run.index,!!motion&&motion.active===run.index,caption.highlightWords,!!motion&&motion.active>=run.index)){ctx.save();ctx.fillStyle=caption.highlightMode==='full-line'?(caption.highlightColor||s.color):distinctHighlight(s.color,caption.highlightColor||'#d9ff43');ctx.fillText(run.text,at,y);ctx.restore();}offset+=(rtl?-1:1)*(run.width+metrics.mixed.gap);}ctx.restore();return;
           }
           if(s.strokeWidth)ctx.strokeText(line,x,y);ctx.fillText(line,x,y);
           if(motion&&motion.active>=0){const words=line.split(/\s+/).filter(Boolean),lineWidth=ctx.measureText(line).width;
@@ -166,7 +167,7 @@ export class Compositor {
         });
       }else if(frame||element instanceof HTMLVideoElement||element instanceof HTMLImageElement){
         const ew=frame?frame.width:element instanceof HTMLVideoElement?element.videoWidth:(element as HTMLImageElement).naturalWidth,eh=frame?frame.height:element instanceof HTMLVideoElement?element.videoHeight:(element as HTMLImageElement).naturalHeight;
-        if(!ew||!eh){ctx.restore();continue;}const mediaBounds=drawVisualMedia(ctx,frame?.image||element as HTMLVideoElement|HTMLImageElement,ew,eh,width,height,c.visualTreatment);bw=mediaBounds.width;bh=mediaBounds.height;if(c.surface&&c.surface!=="none")drawStyleSurface(ctx,bw,bh,local,c.surface);
+        if(!ew||!eh){ctx.restore();continue;}const mediaBounds=drawVisualMedia(ctx,frame?.image||element as HTMLVideoElement|HTMLImageElement,ew,eh,width,height,c.visualTreatment,sourceTime,treatment.rgbOffset);bw=mediaBounds.width;bh=mediaBounds.height;if(c.surface&&c.surface!=="none"){ctx.save();if(c.visualTreatment?.mask)applyVisualMask(ctx,c.visualTreatment.mask,bw,bh,sourceTime);drawStyleSurface(ctx,bw,bh,local,c.surface);ctx.restore();}
       }
       if(!layer.hold)bounds.push({id:c.id,x:width*(.5+t.x),y:height*(.5+t.y),width:bw*t.scale*treatment.scale*Math.abs(animation.scaleX),height:bh*t.scale*treatment.scale*Math.abs(animation.scaleY),rotation:t.rotation});ctx.restore();
     }ctx.setTransform(1,0,0,1,0,0);return bounds;

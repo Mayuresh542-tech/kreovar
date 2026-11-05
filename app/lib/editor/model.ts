@@ -48,6 +48,8 @@ export interface Track { id: string; name: string; kind: TrackKind; clipIds: str
 export type TransitionKind = "fade" | "dissolve" | "slide" | "zoom";
 export interface Transition { id: string; fromClipId: string; toClipId: string; kind: TransitionKind; duration: number }
 export interface EditorProject {
+  /** Editor-only removals remain excluded when legacy project sources are merged. */
+  removedProjectAssetIds?:string[];
   editingHistory?:{jobId:string;instructions:string;status:string;summary:string}[];
   editingJob?:import("./sequentialEdit").EditingJob;
   importedProjectCaptionIds?: string[];

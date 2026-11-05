@@ -150,7 +150,7 @@ export default function RightSidebar({
         </div>
         <div className="flex items-center justify-between text-xs text-slate-400 pt-2">
           <span>AI Engine</span>
-          <span className="text-emerald-400 font-mono text-[11px]">Gemini 2.0 Ready</span>
+          <span className="text-emerald-400 font-mono text-[11px]">Content tools</span>
         </div>
       </motion.div>
     </motion.aside>

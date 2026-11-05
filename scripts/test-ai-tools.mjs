@@ -24,7 +24,9 @@ function loader(mocks = {}) {
     const loadedModule = { exports: {} }; cache.set(filename, loadedModule);
     const source = ts.transpileModule(fs.readFileSync(filename, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText.replaceAll("import.meta.url",JSON.stringify(pathToFileURL(filename).href));
     const localRequire = specifier => specifier.startsWith("@/") ? load(specifier.slice(2)) : specifier.startsWith(".") ? load(path.relative(root, path.resolve(path.dirname(filename), specifier))) : require(specifier);
-    new vm.Script(`(function(require,module,exports){${source}\n})`, { filename }).runInThisContext()(localRequire, loadedModule, loadedModule.exports);
+    // Existing Radox mocks explicitly exercise the legacy adapter; default Groq routing has dedicated real-boundary tests.
+    const moduleProcess=key==="app/lib/server/editorProvider.ts"&&mocks["app/lib/server/radoxService.ts"]?{env:{...process.env,EDITOR_AI_PRIMARY_PROVIDER:"radox"}}:process;
+    new vm.Script(`(function(require,module,exports,process){${source}\n})`, { filename }).runInThisContext()(localRequire, loadedModule, loadedModule.exports,moduleProcess);
     return loadedModule.exports;
   }
   return load;
@@ -136,9 +138,9 @@ test('temporary authentication transport errors retry once and never masquerade 
  const {NextRequest}=require('next/server');let calls=0;
  const filename=path.join(root,'app/lib/server/adminAuth.ts'),source=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  const client={auth:{getUser:async()=>{calls++;return calls===1?{data:{user:null},error:{name:'AuthRetryableFetchError',status:0}}:{data:{user:{id:'owner'}},error:null};}}};
- const module={exports:{}},fakeRequire=name=>name==='@supabase/supabase-js'?{createClient:()=>client}:name==='../admin'?{isAdminEmail:()=>false}:require(name);
+ const authModule={exports:{}},fakeRequire=name=>name==='@supabase/supabase-js'?{createClient:()=>client}:name==='../admin'?{isAdminEmail:()=>false}:require(name);
  const beforeUrl=process.env.NEXT_PUBLIC_SUPABASE_URL,beforeKey=process.env.SUPABASE_SERVICE_ROLE_KEY;process.env.NEXT_PUBLIC_SUPABASE_URL='https://example.supabase.co';process.env.SUPABASE_SERVICE_ROLE_KEY='test';
- try{new vm.Script('(function(require,module,exports){'+source+'})').runInThisContext()(fakeRequire,module,module.exports);const req=new NextRequest('http://localhost/api/editor/ai-edit',{headers:{Authorization:'Bearer test'}});assert.equal((await module.exports.getAuthenticatedUser(req)).id,'owner');assert.equal(calls,2);client.auth.getUser=async()=>{calls++;return {data:{user:null},error:{name:'AuthApiError',status:401}};};assert.equal(await module.exports.getAuthenticatedUser(req),null);assert.equal(calls,3);client.auth.getUser=async()=>{calls++;return {data:{user:null},error:{name:'AuthRetryableFetchError',status:0}};};await assert.rejects(module.exports.getAuthenticatedUser(req),/AUTH_SERVICE_UNAVAILABLE/);assert.equal(calls,5);}finally{if(beforeUrl===undefined)delete process.env.NEXT_PUBLIC_SUPABASE_URL;else process.env.NEXT_PUBLIC_SUPABASE_URL=beforeUrl;if(beforeKey===undefined)delete process.env.SUPABASE_SERVICE_ROLE_KEY;else process.env.SUPABASE_SERVICE_ROLE_KEY=beforeKey;}
+ try{new vm.Script('(function(require,module,exports){'+source+'})').runInThisContext()(fakeRequire,authModule,authModule.exports);const req=new NextRequest('http://localhost/api/editor/ai-edit',{headers:{Authorization:'Bearer test'}});assert.equal((await authModule.exports.getAuthenticatedUser(req)).id,'owner');assert.equal(calls,2);client.auth.getUser=async()=>{calls++;return {data:{user:null},error:{name:'AuthApiError',status:401}};};assert.equal(await authModule.exports.getAuthenticatedUser(req),null);assert.equal(calls,3);client.auth.getUser=async()=>{calls++;return {data:{user:null},error:{name:'AuthRetryableFetchError',status:0}};};await assert.rejects(authModule.exports.getAuthenticatedUser(req),/AUTH_SERVICE_UNAVAILABLE/);assert.equal(calls,5);}finally{if(beforeUrl===undefined)delete process.env.NEXT_PUBLIC_SUPABASE_URL;else process.env.NEXT_PUBLIC_SUPABASE_URL=beforeUrl;if(beforeKey===undefined)delete process.env.SUPABASE_SERVICE_ROLE_KEY;else process.env.SUPABASE_SERVICE_ROLE_KEY=beforeKey;}
 });
 
 test('zero-duration speech tokens join an adjacent measured phrase without losing words or inventing timestamps',()=>{

@@ -107,7 +107,7 @@ export default function HeroBanner({
           <div className="space-y-1.5 py-1 text-xs">
             <div className="flex items-center justify-between text-slate-400">
               <span>Script Engine</span>
-              <span className="text-slate-200 font-mono text-[11px]">Gemini 2.0</span>
+              <span className="text-slate-200 font-mono text-[11px]">AI assistance</span>
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Voice Synthesis</span>

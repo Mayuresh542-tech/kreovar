@@ -1,0 +1,111 @@
+# Kreovar — Complete Technical & Product Reference for LLMs
+
+Website: https://kreovar.online
+Category: MultimediaApplication / AI Video Editor
+Platform: Web-based (SaaS)
+Target Formats: Short-form videos (TikTok, Instagram Reels, YouTube Shorts, LinkedIn Video)
+
+---
+
+## 1. Executive Summary
+Kreovar is a modern, high-performance browser-based video editing and AI content creation suite. It replaces fragmented workflows by combining five specialized tools into a single coherent interface:
+1. AI Ideation & Hook Generation (Viral Trend Radar & Content Planner)
+2. AI Scriptwriting (Frameworks for retention-driven short video scripts)
+3. AI Voiceover Generator (Natural neural text-to-speech with rate controls)
+4. AI Subtitle & Caption Generator (Word-by-word animated captions with SRT/TXT exports)
+5. Multi-Track Video Editor (Timeline-based clip arrangement, trimming, transitions, audio mixing, and 1080p rendering)
+
+---
+
+## 2. Feature Specifications
+
+### 2.1 Online Video Editor (`/ai-video-editor`)
+- **Architecture**: In-browser rendering pipeline utilizing WebGL, WebAssembly, and modern HTML5 canvas/media streams.
+- **Timeline**: Multi-track timeline supporting separate layers for primary video clips, overlay B-roll, background music, sound effects, animated subtitles, and custom text cards.
+- **Trimming & Splitting**: Frame-accurate clip cutting, drag-to-trim boundaries, and gap removal.
+- **Edit with AI**: Interactive assistant that takes natural language commands (e.g., "Add B-roll to the hook", "Speed up pauses between sentences", "Add pop sound effect to caption highlights"). Changes are proposed as staged diffs that users can preview, accept, or revert with single-click Undo.
+- **Export Specifications**: Up to 60 seconds per video cut. Free plan exports at 720p; Pro plan exports up to 1080p at 60 frames per second.
+
+### 2.2 Caption Generator (`/caption-generator`)
+- **Transcription Accuracy**: Powered by state-of-the-art automatic speech recognition (ASR) tuned for colloquial dialogue, fast speech, and multiple accents.
+- **Animated Caption Presets**:
+  - *Hormozi / Bold Pop*: Large centered text with active word highlighting in high-contrast neon colors.
+  - *Minimalist Modern*: Clean sans-serif typography with subtle fade and clean margins.
+  - *Cyber / Glow*: Outlined text with dynamic drop shadows and neon stroke animations.
+- **Customization Controls**: Adjustable font size, position on the 9:16 vertical frame, words-per-line threshold (1 to 5 words), text uppercase toggle, and custom hex color palettes.
+- **Export Options**:
+  - Burned-in (hardcoded) captions directly on exported MP4 video.
+  - Time-coded SubRip subtitle file (`.srt`).
+  - Plaintext transcript (`.txt`).
+
+### 2.3 AI Voiceover Generator (`/ai-voiceover`)
+- **Speech Synthesis**: Neural text-to-speech engine producing human-like cadence, emotional nuance, and clear articulation.
+- **Voice Selection**: Library of voices spanning multiple demographics, accents, and tones (enthusiastic creator, calm educator, punchy commercial narrator).
+- **Audio Controls**: Variable speaking speed multiplier (0.8x to 1.5x), volume balancing, and waveform preview.
+- **Workflow**: Available both as a standalone generator (download MP3/WAV) or directly attached to a timeline project.
+
+### 2.4 Media Libraries (`/broll` & `/sfx`)
+- **B-Roll**: Curated vertical-ready video clips categorized by topic (tech, lifestyle, finance, nature, urban, business).
+- **Sound Effects (SFX)**: Library of audio transitions, whooshes, keyboard clicks, bell dings, risers, and impact hits to enhance creator retention graphs.
+
+---
+
+## 3. Plans, Pricing & Quotas (`/pricing`)
+
+| Feature | Free Plan | Pro Plan ($19/mo or $190/yr) |
+| :--- | :--- | :--- |
+| Video Editor Timeline | Included (Full Manual Editing) | Included + Advanced AI Tools |
+| AI Voiceover Generation | Monthly starter credits | Expanded monthly allowance |
+| Auto-Caption Generation | Up to 60s per video | Unlimited videos within quota |
+| Export Resolution | 720p HD | 1080p Full HD (60fps) |
+| Video Duration Limit | 60 seconds | 60 seconds (optimized for short feeds) |
+| Cloud Project Storage | Limited slots | Unlimited active projects |
+| Watermark | Minimal or None | 100% Watermark-Free |
+| Commercial Usage License | Personal & Social sharing | Full Commercial Monetization Rights |
+| Priority Cloud Rendering | Standard queue | High-priority rendering cluster |
+
+### Billing Terms & Refund Policy (`/refund`)
+- **First-Payment Refund Window**: 3 full days (72 hours) from the initial subscription charge.
+- **Cancellation**: One-click self-service cancellation in `/settings/billing`. Subscriptions remain active until the end of the prepaid billing cycle.
+- **Payment Processing**: Encrypted via Stripe and Whop checkout networks.
+
+---
+
+## 4. How to Use Kreovar (`/how-to-use`)
+
+### Video Creation Workflow
+1. **Initiate Project**: Visit `/projects` and click "New Project". Choose aspect ratio (9:16 for Reels/Shorts/TikTok).
+2. **Add Footage**: Upload raw video clips, mobile recordings, or select stock clips from `/broll`.
+3. **Generate Script & Voice**: Input your topic in `/script` or paste narration into `/voice` to produce audio.
+4. **Assemble on Timeline**: Arrange footage on track 1, narration on track 2, and background audio on track 3.
+5. **Add Animated Captions**: Click "Generate Captions" in `/captions` or directly in the timeline. Pick a caption template and adjust positioning.
+6. **Apply AI Edits**: Use "Edit with AI" for automatic silence removal, clip pacing, or B-roll insertion.
+7. **Preview & Export**: Render the video and download your MP4 or subtitle files.
+
+---
+
+## 5. Frequently Asked Questions (FAQ)
+
+### General
+- **Q: Does Kreovar work on Mac and Windows?**
+  *A:* Yes. Kreovar is 100% web-based and runs in Google Chrome, Apple Safari, Microsoft Edge, and Mozilla Firefox without installing native software.
+- **Q: What happens if an AI edit does not match my vision?**
+  *A:* Kreovar provides full non-destructive editing with multi-level Undo. You can revert any AI-suggested edit with a single click.
+
+### Technical & Limitations
+- **Q: Why is video export capped at 60 seconds?**
+  *A:* Kreovar specializes in high-retention short-form video (TikTok, YouTube Shorts, Instagram Reels). Capping exports at 60 seconds ensures rapid cloud rendering times and peak playback performance in mobile feeds.
+- **Q: Can I import my own fonts or SRT files?**
+  *A:* Yes, you can upload external SRT files to apply Kreovar's dynamic animated styling to existing video projects.
+
+---
+
+## 6. Official Policies & Company Coordinates
+- **Organization**: Kreovar
+- **Support Email**: support@kreovar.online
+- **Website**: https://kreovar.online
+- **Social Media**: Instagram (@kreovarstudio)
+- **Legal Terms**: https://kreovar.online/terms
+- **Privacy Policy**: https://kreovar.online/privacy
+- **Cookie Policy**: https://kreovar.online/cookies
+- **Refund Policy**: https://kreovar.online/refund

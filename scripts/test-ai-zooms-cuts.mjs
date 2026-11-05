@@ -22,7 +22,9 @@ function loader(mocks = {}) {
     const loadedModule = { exports: {} }; cache.set(filename, loadedModule);
     const source = ts.transpileModule(fs.readFileSync(filename, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText.replaceAll("import.meta.url",JSON.stringify(pathToFileURL(filename).href));
     const localRequire = specifier => Object.hasOwn(mocks,specifier)?mocks[specifier]:specifier.startsWith("@/") ? load(specifier.slice(2)) : specifier.startsWith(".") ? load(path.relative(root, path.resolve(path.dirname(filename), specifier))) : require(specifier);
-    new vm.Script(`(function(require,module,exports){${source}\n})`, { filename }).runInThisContext()(localRequire, loadedModule, loadedModule.exports);
+    // Existing Radox mocks explicitly exercise the legacy adapter; default Groq routing has dedicated real-boundary tests.
+    const moduleProcess=key==="app/lib/server/editorProvider.ts"&&mocks["app/lib/server/radoxService.ts"]?{env:{...process.env,EDITOR_AI_PRIMARY_PROVIDER:"radox"}}:process;
+    new vm.Script(`(function(require,module,exports,process){${source}\n})`, { filename }).runInThisContext()(localRequire, loadedModule, loadedModule.exports,moduleProcess);
     return loadedModule.exports;
   }
   return load;
