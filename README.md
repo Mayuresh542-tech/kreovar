@@ -132,6 +132,6 @@ Environment secrets, hosting metadata, generated builds, dependency folders, bac
 
 Please report a sensitive security issue privately to [info@kreovar.online](mailto:info@kreovar.online), without posting credentials or user data in a public issue.
 
-## License
+## Proprietary Source
 
-The existing source license is [MIT](LICENSE). Third-party packages and media remain subject to their respective terms. The included starter sound effects are synthesized assets; see [their notes](public/sfx/README.md).
+All rights reserved. Third-party packages and media remain subject to their respective terms. The included starter sound effects are synthesized assets; see [their notes](public/sfx/README.md).
