@@ -294,18 +294,27 @@ export default function Dashboard() {
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {displayProjects.map((project) => {
-              const statusColor =
+              const statusConfig =
                 project.status === "Completed"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : project.status === "In Progress"
-                  ? "bg-blue-50 text-blue-700 border-blue-200"
-                  : "bg-slate-100 text-slate-600 border-slate-200";
+                  ? {
+                      badge: "bg-emerald-50 text-emerald-700 border-emerald-200/90",
+                      dot: "bg-emerald-500",
+                    }
+                : project.status === "In Progress"
+                  ? {
+                      badge: "bg-blue-50 text-blue-700 border-blue-200/90",
+                      dot: "bg-blue-500",
+                    }
+                : {
+                    badge: "bg-slate-100 text-slate-600 border-slate-200/90",
+                    dot: "bg-slate-400",
+                  };
 
               return (
                 <div
                   key={project.id}
                   onClick={() => router.push(`/projects/${project.id}`)}
-                  className="vx-project-card bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 hover:shadow-xs transition-all cursor-pointer group flex flex-col justify-between"
+                  className="vx-project-card bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 overflow-hidden hover:border-slate-300 hover:shadow-xs transition-all cursor-pointer group flex flex-col justify-between"
                 >
                   {/* Thumbnail Banner */}
                   <div className="relative aspect-video w-full bg-slate-900 overflow-hidden">
@@ -320,31 +329,33 @@ export default function Dashboard() {
                       </div>
                     </div>
                     {project.duration && (
-                      <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/70 text-[10px] font-mono text-white">
+                      <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-xs text-[10px] font-mono font-medium text-white shadow-xs leading-none">
                         {project.duration}
                       </span>
                     )}
                   </div>
 
                   {/* Project Details */}
-                  <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                  <div className="p-3.5 sm:p-4 space-y-3 flex-1 flex flex-col justify-between">
                     <div>
-                      <h4 className="text-sm font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
+                      <h4 className="text-sm sm:text-base font-semibold text-slate-900 leading-snug line-clamp-1 group-hover:text-blue-600 transition-colors">
                         {project.title}
                       </h4>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusColor}`}>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-xs text-slate-500">
+                        <span className={`inline-flex items-center gap-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusConfig.badge}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
                           {project.status}
                         </span>
-                        <span className="flex items-center gap-1 font-mono text-[11px] text-slate-500">
-                          <Layers className="w-3 h-3 text-slate-400" />
-                          {project.assetCount} {project.assetCount === 1 ? "asset" : "assets"}
+                        <span className="text-slate-300 select-none">·</span>
+                        <span className="inline-flex items-center gap-1 font-mono text-[11px] text-slate-500 shrink-0">
+                          <Layers className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{project.assetCount} {project.assetCount === 1 ? "asset" : "assets"}</span>
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-400">
-                      <span>{project.timeAgo}</span>
+                    <div className="flex items-center justify-between pt-2.5 mt-1 border-t border-slate-100 text-xs text-slate-400">
+                      <span className="text-[11px] text-slate-400 font-medium">{project.timeAgo}</span>
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
@@ -352,7 +363,7 @@ export default function Dashboard() {
                             e.stopPropagation();
                             router.push(`/editor?projectId=${project.id}`);
                           }}
-                          className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-medium transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-medium transition-colors cursor-pointer"
                         >
                           Open Editor
                         </button>

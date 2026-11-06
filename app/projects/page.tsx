@@ -162,64 +162,84 @@ function ProjectsContent() {
         <div className="space-y-3">
           {filteredProjects.length === 0 && <p className="text-sm text-slate-500">No projects match this view. Create a project to get started.</p>}
           {filteredProjects.map((project) => {
-            const statusColor =
+            const statusConfig =
               project.status === "Completed"
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                ? {
+                    badge: "bg-emerald-50 text-emerald-700 border-emerald-200/90",
+                    dot: "bg-emerald-500",
+                  }
                 : project.status === "In Progress"
-                ? "bg-blue-50 text-blue-700 border-blue-200"
-                : "bg-slate-100 text-slate-600 border-slate-200";
+                ? {
+                    badge: "bg-blue-50 text-blue-700 border-blue-200/90",
+                    dot: "bg-blue-500",
+                  }
+                : {
+                    badge: "bg-slate-100 text-slate-600 border-slate-200/90",
+                    dot: "bg-slate-400",
+                  };
 
             return (
               <div
                 key={project.id}
                 onClick={() => router.push(`/projects/${project.id}`)}
-                className="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 hover:border-slate-300 hover:shadow-xs transition-all flex items-center justify-between gap-4 cursor-pointer group"
+                className="bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 p-3 sm:p-4 hover:border-slate-300 hover:shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 cursor-pointer group"
               >
                 {/* Left: Thumbnail & Details */}
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="relative w-16 h-12 sm:w-20 sm:h-14 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
+                <div className="flex items-start sm:items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
+                  <div className="relative w-20 h-14 sm:w-24 sm:h-16 rounded-lg sm:rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200/90 shadow-2xs">
                     <img
                       src={project.thumbnail}
                       alt={project.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     />
-                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                      <Play className="w-3.5 h-3.5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute inset-0 bg-black/15 group-hover:bg-black/25 transition-colors flex items-center justify-center">
+                      <Play className="w-3.5 h-3.5 text-white opacity-0 group-hover:opacity-100 transition-opacity fill-white" />
                     </div>
+                    {project.duration && (
+                      <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/75 backdrop-blur-xs text-[10px] font-mono font-medium text-white shadow-xs leading-none">
+                        {project.duration}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="space-y-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
+                  <div className="space-y-1 sm:space-y-1.5 min-w-0 flex-1">
+                    <h3 className="text-sm sm:text-base font-semibold text-slate-900 leading-snug line-clamp-1 group-hover:text-blue-600 transition-colors">
                       {project.title}
                     </h3>
-                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusColor}`}>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                      <span className={`inline-flex items-center gap-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full border ${statusConfig.badge}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
                         {project.status}
                       </span>
-                      <span>·</span>
-                      <span className="flex items-center gap-1 font-mono text-[11px] text-slate-500">
-                        <Layers className="w-3 h-3 text-slate-400" />
-                        {project.assetCount} {project.assetCount === 1 ? "asset" : "assets"}
+                      <span className="text-slate-300 select-none">·</span>
+                      <span className="inline-flex items-center gap-1 font-mono text-[11px] text-slate-500 shrink-0">
+                        <Layers className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span>{project.assetCount} {project.assetCount === 1 ? "asset" : "assets"}</span>
                       </span>
-                      <span>·</span>
-                      <span>{project.timeAgo}</span>
+                      <span className="text-slate-300 select-none">·</span>
+                      <span className="text-[11px] text-slate-400 shrink-0">{project.timeAgo}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Right: Actions Menu & Open in Editor */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/editor?projectId=${project.id}`);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition-colors"
-                  >
-                    <Film className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Open in Editor</span>
-                  </button>
+                <div className="flex items-center justify-between sm:justify-end gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
+                  <span className="sm:hidden text-[11px] text-slate-400">
+                    Tap card to view project
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/editor?projectId=${project.id}`);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition-colors"
+                    >
+                      <Film className="w-3.5 h-3.5" />
+                      <span>Open in Editor</span>
+                    </button>
 
                   <div className="relative">
                     <button
@@ -266,7 +286,8 @@ function ProjectsContent() {
                   </div>
                 </div>
               </div>
-            );
+            </div>
+          );
           })}
         </div>
       </div>

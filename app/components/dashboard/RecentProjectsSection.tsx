@@ -181,11 +181,11 @@ export default function RecentProjectsSection({
                 <div className="min-w-0 flex-1">
                   <div
                     onClick={() => router.push(project.isUserProject ? `/editor/${project.id}` : "/projects")}
-                    className="text-xs sm:text-sm font-semibold text-white truncate hover:text-sky-300 transition-colors cursor-pointer"
+                    className="text-xs sm:text-sm font-semibold text-white leading-snug line-clamp-1 hover:text-sky-300 transition-colors cursor-pointer"
                   >
                     {project.title}
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
                     {project.tags.map((tag) => (
                       <span key={tag} className="text-[10px] text-slate-500 font-medium">
                         {tag}
