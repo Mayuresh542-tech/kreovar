@@ -1,6 +1,6 @@
 # Cloudflare Workers Free deployment
 
-The source supports an additional Cloudflare Workers build through vinext. The existing Next.js local/Netlify workflow remains available. Use Node.js 24.22 or later for the Cloudflare tooling.
+Cloudflare Workers is the exclusive deployment and hosting platform for Kreovar, built through vinext. Use Node.js 24.22 or later for the Cloudflare tooling.
 
 ## Build and verify
 
@@ -32,10 +32,8 @@ Deploy the prebuilt package with an approved JSON secrets file outside the repos
 - Experimental reference-presets remain disabled. No database migration or data move is performed.
 - Bundled branding and SFX read from Workers Static Assets. The Worker social preview uses a static rendering of the existing public image.
 
-## Release gate and rollback
+## Release gate
 
-A successful build or local emulator is not proof that live Workers Free CPU/memory limits support the workload. Verify the real preview before switching DNS: pages and hydration, authenticated uploads and editing/transcription, browser export, bundled sounds, account access, checkout URLs, unsigned-webhook rejection and ownership/usage boundaries.
+A successful build or local emulator is not proof that live Workers CPU/memory limits support the workload. Verify the preview before DNS verification: pages and hydration, authenticated uploads and editing/transcription, browser export, bundled sounds, account access, checkout URLs, unsigned-webhook rejection and ownership/usage boundaries.
 
-Keep current Netlify hosting and record existing DNS before domain cutover. Do not change mail MX/TXT records. Restore the recorded web-routing records if the Cloudflare release fails. A repository publication does not itself deploy the application.
-
-The production release uses fetch routes for `kreovar.online/*` and `www.kreovar.online/*` on the already-proxied zone. `www` redirects to the HTTPS apex. Existing Netlify A/CNAME records remain as rollback origins; matched requests are handled by the Worker without fetching Netlify. Mail records are unchanged.
+The production release uses fetch routes for `kreovar.online/*` and `www.kreovar.online/*` on the proxied Cloudflare zone. `www` redirects to the HTTPS apex. Matched requests are handled directly by the Worker. Mail records are unchanged.

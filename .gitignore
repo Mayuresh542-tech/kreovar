@@ -47,7 +47,6 @@ next-env.d.ts
 !public/llms.txt
 !public/llms-full.txt
 scratch/
-.netlify/
 .claude/
 *.log
 *.zip
@@ -59,7 +58,6 @@ scratch/
 /backups/
 /work/
 /docs/**
-!/docs/NETLIFY_DEPLOY.md
 !/docs/reference-presets.md
 !/docs/video-editor.md
 !/docs/google-sign-in.md

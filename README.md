@@ -37,7 +37,7 @@ The short-video editing workflow is bounded to 60 seconds. Export format, resolu
 - Groq is the default AI editor provider: Qwen handles bounded visual observations and GPT-OSS 120B plans edits. Radox is an explicit legacy opt-in (`EDITOR_AI_PRIMARY_PROVIDER=radox`), not an automatic retry target. Content/transcription paths retain their configured adapters.
 - Voice.ai and other source-configured provider adapters; stock-media integrations require their own keys and applicable usage rights.
 - Whop subscriptions and signed webhook processing. Dodo integration is sandbox-only.
-- Cloudflare Workers Free build support, plus the existing Netlify build configuration for rollback.
+- Cloudflare Workers is the exclusive production deployment and hosting platform.
 
 Provider/model identifiers describe the current source configuration, not an independent certification of provider availability or capabilities. Some internal package names, auth keys, tests, and historical documents still use Fretrend/VeeloX names to preserve compatibility.
 
@@ -100,9 +100,9 @@ config/                 Additional shared configuration
 supabase/migrations/    Database schema/policy/function migration history
 scripts/                Regression checks and media/development utilities
 public/                 Branding, public policy PDFs, images, and starter SFX
-netlify/plugins/        Windows build adapter correction
+cloudflare/             Cloudflare Workers configuration and entry point
 proxy.ts                Request boundary and security handling
-netlify.toml            Netlify build/plugin configuration
+wrangler.jsonc          Cloudflare Workers deployment configuration
 ```
 
 ## Checks and production build
@@ -115,7 +115,7 @@ npm run build
 
 Focused suites include `test:security`, `test:chat-routing`, `test:geo-aeo`, `test:reference-presets`, and `test:dodo`. `npm run lint` runs repository-wide ESLint. Tests include deterministic/static regression checks; they do not by themselves prove successful live AI, payment, OAuth, or cloud rendering behavior. External-service probe scripts can make real requests and should only be run deliberately with your own credentials.
 
-For a local production server, run `npm run build` followed by `npm start`. See [Cloudflare deployment notes](docs/CLOUDFLARE_DEPLOY.md) for Workers builds and their runtime boundaries. [Netlify deployment notes](docs/NETLIFY_DEPLOY.md) remain available for the earlier host.
+For a local production server, run `npm run build` followed by `npm start`. See [Cloudflare deployment notes](docs/CLOUDFLARE_DEPLOY.md) for Workers builds, preview, and deployment.
 
 ## Current boundaries
 

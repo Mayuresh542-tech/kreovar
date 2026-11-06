@@ -25,6 +25,9 @@
     "build:vinext": "node scripts/build-cloudflare.mjs",
     "start:vinext": "vite preview",
     "deploy:vinext": "vinext-cloudflare deploy",
+    "preview": "vite preview",
+    "deploy": "node scripts/build-cloudflare.mjs && cf deploy --prebuilt",
+    "cf-typegen": "tsc -p cloudflare/tsconfig.json",
     "test:cloudflare": "node --test scripts/test-cloudflare-host.mjs",
     "deploy:cloudflare": "cf deploy --prebuilt",
     "build:cloudflare": "node scripts/build-cloudflare.mjs"
@@ -49,7 +52,6 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^2.0.0-beta.v.11",
-    "@netlify/plugin-nextjs": "^5.16.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "8.0.2",

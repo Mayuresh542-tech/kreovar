@@ -82,9 +82,9 @@ test('unsupported webhook types never grant subscriptions',async()=>{
 
 
 test('custom-domain caption writes pass the hosting-origin boundary without trusting forged forwarded hosts',()=>{
- for(const env of [{},{SITE_URL:'https://kreovar.netlify.app'},{NEXT_PUBLIC_SITE_URL:'https://kreovar.netlify.app'}]){
+ for(const env of [{},{SITE_URL:'https://kreovar.kreovarstudio.workers.dev'},{NEXT_PUBLIC_SITE_URL:'https://kreovar.kreovarstudio.workers.dev'}]){
   const security=loader({}, {process:{env}})('app/lib/server/requestSecurity.ts');
-  const request=headers=>new NextRequest('https://kreovar.netlify.app/api/transcribe',{method:'POST',headers});
+  const request=headers=>new NextRequest('https://kreovar.kreovarstudio.workers.dev/api/transcribe',{method:'POST',headers});
   assert.equal(security.isSafeMutation(request({Origin:'https://kreovar.online','Sec-Fetch-Site':'same-origin'})),true);
   assert.equal(security.isSafeMutation(request({Origin:'https://kreovar.online','Sec-Fetch-Site':'cross-site',Authorization:'Bearer token'})),false);
   for(const origin of ['https://kreovar.online.evil.test','http://kreovar.online','https://kreovar.online:444','https://evil.test','null'])assert.equal(security.isSafeMutation(request({Origin:origin,'X-Forwarded-Host':'evil.test',Host:'evil.test',Authorization:'Bearer token'})),false);
@@ -92,9 +92,9 @@ test('custom-domain caption writes pass the hosting-origin boundary without trus
 });
 test('custom-domain caption requests reach authentication while foreign origins remain blocked',async()=>{
  let authCalls=0;
- const p=loader({'app/lib/server/adminAuth.ts':{getAuthenticatedUser:async()=>{authCalls++;return null;}}},{Headers,crypto:{randomUUID:()=> 'random'},process:{env:{SITE_URL:'https://kreovar.netlify.app'}}})('proxy.ts');
+ const p=loader({'app/lib/server/adminAuth.ts':{getAuthenticatedUser:async()=>{authCalls++;return null;}}},{Headers,crypto:{randomUUID:()=> 'random'},process:{env:{SITE_URL:'https://kreovar.kreovarstudio.workers.dev'}}})('proxy.ts');
  for(const [origin,status] of [['https://kreovar.online',401],['https://evil.test',403]]){
-  const response=await p.proxy(new NextRequest('https://kreovar.netlify.app/api/transcribe',{method:'POST',headers:{Origin:origin,'Sec-Fetch-Site':'same-origin'}}));assert.equal(response.status,status);
+  const response=await p.proxy(new NextRequest('https://kreovar.kreovarstudio.workers.dev/api/transcribe',{method:'POST',headers:{Origin:origin,'Sec-Fetch-Site':'same-origin'}}));assert.equal(response.status,status);
  }
  assert.equal(authCalls,1);
 });
@@ -172,7 +172,7 @@ test('loopback allowance is development-only and never trusts different ports, r
  assert.equal(security.isSafeMutation(new NextRequest('http://localhost:3110/api/assets/upload',{method:'POST',headers:{Origin:'http://127.0.0.1:3110','Sec-Fetch-Site':'same-origin'}})),true,'Next normalizes the loopback request URL');
  for(const origin of ['http://evil.test','http://127.0.0.1:9999','https://127.0.0.1:3110','http://127.0.0.1.evil.test:3110','null'])assert.equal(security.isSafeMutation(new NextRequest('http://127.0.0.1:3110/api/assets/upload',{method:'POST',headers:{Origin:origin,'X-Forwarded-Host':'127.0.0.1:3110',Authorization:'Bearer token'}})),false,origin);
  assert.equal(security.isSafeMutation(new NextRequest('http://127.0.0.1:3110/api/voice/generate',{method:'POST',headers:{Origin:'http://127.0.0.1:3110','Sec-Fetch-Site':'cross-site'}})),false);
- assert.equal(security.isSafeMutation(new NextRequest('https://kreovar.netlify.app/api/assets/upload',{method:'POST',headers:{Origin:'http://127.0.0.1:3110','X-Forwarded-Host':'127.0.0.1:3110',Host:'127.0.0.1:3110'}})),false);
+ assert.equal(security.isSafeMutation(new NextRequest('https://kreovar.kreovarstudio.workers.dev/api/assets/upload',{method:'POST',headers:{Origin:'http://127.0.0.1:3110','X-Forwarded-Host':'127.0.0.1:3110',Host:'127.0.0.1:3110'}})),false);
 });
 
 test('www deployment requests redirect to the fixed HTTPS canonical host with path and query preserved',async()=>{const load=loader({'app/lib/server/adminAuth.ts':{getAccessToken:()=>null,getAuthenticatedUser:async()=>{throw Error('No auth lookup for canonical redirect');},getAdminClient:()=>{throw Error('No database lookup for canonical redirect');},requireAdmin:async()=>{throw Error('No admin lookup for canonical redirect');}}},{crypto:{randomUUID:()=> 'nonce'},process:{env:{NODE_ENV:'production'}}});const proxy=load('proxy.ts').proxy;for(const suffix of ['/pricing?plan=pro&ref=social','//foreign.invalid/test?q=1','/admin?next=%2Fprojects']){const result=await proxy(new NextRequest('https://www.kreovar.online'+suffix));assert.equal(result.status,308);const target=new URL(result.headers.get('location'));assert.equal(target.origin,'https://kreovar.online');assert.equal(target.pathname,new URL('https://www.kreovar.online'+suffix).pathname);assert.equal(target.search,new URL('https://www.kreovar.online'+suffix).search);assert.ok(result.headers.get('content-security-policy'));}const ordinary=await proxy(new NextRequest('https://kreovar.kreovarstudio.workers.dev/pricing'));assert.equal(ordinary.status,200);});

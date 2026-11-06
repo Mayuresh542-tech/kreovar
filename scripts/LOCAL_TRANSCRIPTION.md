@@ -15,4 +15,4 @@ Editor transcription extracts mono 16 kHz PCM for the requested source range in 
 
 One local inference runs at a time. Busy/unavailable engines return explicit errors; cancellation terminates the child process and cleans up its temporary input. No API key is used by local speech recognition.
 
-This setup is for localhost or a server with the Python runtime/model installed. It does not provision Python/model execution on Netlify. AI planning still uses the configured Groq model and editing metadata; local speech recognition does not replace that planning service.
+This setup is for localhost or a server with the Python runtime/model installed. It does not provision Python/model execution on Cloudflare Workers. AI planning still uses the configured Groq model and editing metadata; local speech recognition does not replace that planning service.

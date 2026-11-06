@@ -16,7 +16,7 @@ export function isSafeMutation(req: NextRequest): boolean {
     const local = new URL(req.url),loopback = (url:URL) => ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
     if (process.env.NODE_ENV === "development" && loopback(local) && loopback(supplied) && supplied.protocol === local.protocol && supplied.port === local.port) return true;
     const expected = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL;
-    // The hosting adapter can expose its Netlify URL instead of the public custom domain.
+    // The hosting adapter can expose its deployment worker URL instead of the public custom domain.
     // Trust our fixed canonical origin as well; never derive trust from forwarded host headers.
     return supplied.origin === new URL(SITE_URL).origin || supplied.origin === new URL(expected || req.url).origin;
   } catch { return false; }

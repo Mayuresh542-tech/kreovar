@@ -7,20 +7,11 @@ export const SITE_DESCRIPTION = "Create content and edit short videos with Kreov
 export const PRIVATE_ROBOTS = {
   index: false,
   follow: false,
-  noarchive: true,
-  nosnippet: true,
 } as const;
 
 export const PUBLIC_ROBOTS = {
   index: true,
   follow: true,
-  googleBot: {
-    index: true,
-    follow: true,
-    "max-video-preview": -1,
-    "max-image-preview": "large",
-    "max-snippet": -1,
-  },
 } as const;
 
 export interface PageMetadataConfig {
@@ -405,10 +396,11 @@ export const GEO_METADATA = {
 
 /** Generates canonical, indexable metadata for public landing, feature, and legal pages */
 export function publicMetadata(path: string): Metadata {
-  const cfg = ALL_PAGES_METADATA[path] || {
-    title: "Kreovar | AI Content Studio & Online Video Editor",
-    description: SITE_DESCRIPTION,
-  };
+  const page = PUBLIC_PAGES.find((p) => p.path === path);
+  if (!page) {
+    throw new Error("Only public pages may request indexable metadata.");
+  }
+  const cfg = ALL_PAGES_METADATA[path] || page;
 
   const title = path === "/" ? { absolute: cfg.title } : cfg.title;
   const shareTitle = path === "/" ? cfg.title : `${cfg.title} | Kreovar`;
@@ -470,16 +462,12 @@ export function privateMetadata(
   return {
     title: rawTitle,
     description,
-    alternates: {
-      canonical: canonicalUrl,
-    },
     robots: PRIVATE_ROBOTS,
     openGraph: {
       type: "website",
       siteName: "Kreovar",
       title: `${rawTitle} | Kreovar`,
       description,
-      url: canonicalUrl,
     },
     twitter: {
       card: "summary",

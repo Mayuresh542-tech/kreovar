@@ -24,7 +24,8 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
-    ".netlify/**",
+    ".cloudflare/**",
+    ".vinext/**",
     "next-env.d.ts",
   ]),
 ]);
