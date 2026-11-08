@@ -226,7 +226,23 @@ export async function runEditingJob(runtime:PipelineRuntime,initial:EditingJob,s
    stage=job.stages[index];stage.status='executing';await save(runtime.getProject());
    const stageSignal=AbortSignal.any([signal,AbortSignal.timeout(180000)]);
    const checkpoint=async(output:StageOutput)=>{stageSignal.throwIfAborted();job.stages[index].output=output;await save(runtime.getProject());};
-   const output=await abortable(runtime.execute(stage.id,runtime.getProject(),job,stageSignal,checkpoint),stageSignal);
+   let output:StageOutput;
+   try{
+    output=await abortable(runtime.execute(stage.id,runtime.getProject(),job,stageSignal,checkpoint),stageSignal);
+   }catch(err){
+    if(signal.aborted)throw err;
+    const isPreset=!!(job.presetId||before.editingJob?.presetId);
+    const isSupportingStage=['applyCaptions','planMotionGraphics','applyMotionGraphics','findBroll','applyBroll','applyZooms','applySoundEffects','applyEffects'].includes(stage.id);
+    if(isPreset&&isSupportingStage){
+     output={
+      summary:`${STAGE_LABELS[stage.id]} was unavailable or skipped for this footage; moving to next step.`,
+      decisions:stage.id==='applyEffects'?[{op:'setAudioDucking',enabled:true}]:[],
+      skipRationale:`${STAGE_LABELS[stage.id]} skipped: `+(err instanceof Error?err.message:'stage execution failed')
+     };
+    }else{
+     throw err;
+    }
+   }
    if(output.tokenBudget)job.tokenBudget=output.tokenBudget;
    signal.throwIfAborted();stage=job.stages[index];stage.status='validating';stage.output=output;await save(runtime.getProject());
    const base=runtime.getProject();if(base.revision!==job.timelineRevision||runtime.interacting())throw Error('Timeline changed during this stage. Start a fresh edit.');

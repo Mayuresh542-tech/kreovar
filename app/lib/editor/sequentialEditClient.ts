@@ -85,36 +85,54 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
      return await prepare(saved||{summary:'Apply timed speech captions with '+job.captionTemplate,animateCaptions:/animat|engaging|punchy/i.test(job.instructions)||['engaging','punchy'].includes(job.presetId||''),decisions:existing.length?[{op:'applyCaptionTemplate',clipIds:existing.map(c=>c.id),templateId:job.captionTemplate}]:[],requests},project,checkpoint,signal);
     }catch(err){
      const isPreset=!!(job.presetId||project.editingJob?.presetId);
-     const noSpeechErr=err instanceof Error&&/no timed speech|no speech/i.test(err.message);
-     if(isPreset&&noSpeechErr){
-      return {summary:'No timed speech was found in footage; skipped captions.',decisions:[],skipRationale:'No speech detected in clip'};
+     if(isPreset){
+      return {summary:'Timed speech captions could not be generated; skipped captions and preserved original audio.',decisions:[],skipRationale:'Captions skipped: '+(err instanceof Error?err.message:'transcription failed')};
      }
      throw err;
     }
    }
    case 'planMotionGraphics':{
-    const output=saved||await plan(stage,project,job,signal);
-    if(!output.decisions?.length&&!canSkipSupportingStage(stage,project,output,job))throw Error('AI did not plan any requested motion graphics.');
-    return output;
+    const isPreset=!!(job.presetId||project.editingJob?.presetId);
+    try{
+     const output=saved||await plan(stage,project,job,signal);
+     if(!output.decisions?.length&&!canSkipSupportingStage(stage,project,output,job))throw Error('AI did not plan any requested motion graphics.');
+     return {...output,summary:output.summary||'No motion graphics planned; moving to next step.',decisions:output.decisions||[],skipRationale:output.skipRationale||(isPreset&&!output.decisions?.length?'No motion graphics planned':undefined)};
+    }catch(err){
+     if(isPreset)return {summary:'Motion graphics skipped; moving to next step.',decisions:[],skipRationale:'Motion graphics skipped: '+(err instanceof Error?err.message:'plan failed')};
+     throw err;
+    }
    }
    case 'applyMotionGraphics':{
     const output=job.stages.find(s=>s.id==='planMotionGraphics')?.output;
-    if(!output?.decisions?.length&&!canSkipSupportingStage(stage,project,output,job))throw Error('Motion graphics plan is missing.');
-    return {...output,summary:output?.summary||'Apply planned motion graphics',decisions:output?.decisions||[]};
+    if(!output?.decisions?.length){
+     if(!canSkipSupportingStage(stage,project,output,job))throw Error('Motion graphics plan is missing.');
+     return {...output,summary:output?.summary||'Motion graphics skipped; preserved original visuals.',decisions:[],skipRationale:output?.skipRationale||'Motion graphics skipped'};
+    }
+    return {...output,summary:'Apply planned motion graphics',decisions:output?.decisions||[]};
    }
    case 'findBroll':{
-    const output=saved||await plan(stage,project,job,signal);await checkpoint(output);
-    if(!output.decisions?.length&&!output.requests?.length){
-     if(!canSkipSupportingStage(stage,project,output,job))throw Error('No relevant B-roll candidates were found.');
-     return output;
+    const isPreset=!!(job.presetId||project.editingJob?.presetId);
+    try{
+     const output=saved||await plan(stage,project,job,signal);await checkpoint(output);
+     if(!output.decisions?.length&&!output.requests?.length){
+      if(!canSkipSupportingStage(stage,project,output,job))throw Error('No relevant B-roll candidates were found.');
+      return {...output,summary:output.summary||'No B-roll needed for this footage.',decisions:[],skipRationale:output.skipRationale||'No B-roll requested or candidates found'};
+     }
+     const ready=await prepare(output,project,checkpoint,signal);
+     if(!ready.decisions?.length&&isPreset){
+      return {...ready,summary:'No matching B-roll footage was found; moving to next step.',decisions:[],skipRationale:'No matching B-roll candidates available'};
+     }
+     return ready;
+    }catch(err){
+     if(isPreset)return {summary:'B-roll was unavailable or skipped for this footage; moving to next step.',decisions:[],skipRationale:'B-roll unavailable: '+(err instanceof Error?err.message:'tool failed')};
+     throw err;
     }
-    return prepare(output,project,checkpoint,signal);
    }
    case 'applyBroll':{
     const output=job.stages.find(s=>s.id==='findBroll')?.output;
     if(!output?.decisions?.length){
      if(!canSkipSupportingStage(stage,project,output,job))throw Error('No selected B-roll is available.');
-     return {...output,summary:output?.summary||'B-roll skipped',decisions:[]};
+     return {...output,summary:output?.summary||'B-roll skipped; preserved original footage.',decisions:[],skipRationale:output?.skipRationale||'B-roll skipped'};
     }
     return {...output,summary:'Insert selected B-roll with original dialogue preserved',decisions:output.decisions.map(d=>d.op==='addClip'?{...d,volume:0,audioRole:'background' as const}:d)};
    }
@@ -126,7 +144,17 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
     const toolProject=output.preparedApplied?project:buildStageProject(project,{summary:output.summary,decisions:(output.decisions||[]).slice(0,output.sourceDecisionCount)});
     return prepare(output,toolProject,checkpoint,signal);
    }
-   case 'applyZooms':return saved||plan(stage,project,job,signal);
+   case 'applyZooms':{
+    const isPreset=!!(job.presetId||project.editingJob?.presetId);
+    try{
+     const output=saved||await plan(stage,project,job,signal);
+     if(!output.decisions?.length&&!canSkipSupportingStage(stage,project,output,job))throw Error('No zoom keyframes planned.');
+     return {...output,summary:output.summary||'No zooms needed; preserved framing.',decisions:output.decisions||[],skipRationale:output.skipRationale||(isPreset&&!output.decisions?.length?'No zooms planned':undefined)};
+    }catch(err){
+     if(isPreset)return {summary:'Zooms skipped; preserved framing and moving to next step.',decisions:[],skipRationale:'Zooms skipped: '+(err instanceof Error?err.message:'plan failed')};
+     throw err;
+    }
+   }
    case 'applyEffects':{
     const output=saved||await plan(stage,project,job,signal);
     const footageClips=analysisFootage(project,job.selection);
@@ -142,8 +170,23 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
     return output;
    }
    case 'applySoundEffects':{
-    const output=saved||await plan(stage,project,job,signal);await checkpoint(output);const ready=await prepare(output,project,checkpoint,signal);
-    ready.decisions=ready.decisions?.map(d=>d.op==='addClip'?{...d,audioRole:'sfx',volume:Math.min(.25,d.volume??.15)}:d);return ready;
+    const isPreset=!!(job.presetId||project.editingJob?.presetId);
+    try{
+     const output=saved||await plan(stage,project,job,signal);await checkpoint(output);
+     if(!output.decisions?.length&&!output.requests?.length){
+      if(!canSkipSupportingStage(stage,project,output,job))throw Error('No sound effects planned.');
+      return {...output,summary:output.summary||'No sound effects needed; preserved original audio.',decisions:[],skipRationale:output.skipRationale||'No SFX planned'};
+     }
+     const ready=await prepare(output,project,checkpoint,signal);
+     ready.decisions=ready.decisions?.map(d=>d.op==='addClip'?{...d,audioRole:'sfx',volume:Math.min(.25,d.volume??.15)}:d);
+     if(!ready.decisions?.length&&isPreset){
+      return {...ready,summary:'No sound effects found; preserved original audio.',decisions:[],skipRationale:'No SFX prepared'};
+     }
+     return ready;
+    }catch(err){
+     if(isPreset)return {summary:'Sound effects were unavailable or skipped; preserved original audio and moving to next step.',decisions:[],skipRationale:'SFX unavailable: '+(err instanceof Error?err.message:'tool failed')};
+     throw err;
+    }
    }
    case 'validateEdit':{
     const result=validateCompletedJob(project,job);
