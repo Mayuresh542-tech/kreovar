@@ -5,9 +5,14 @@ export function captionsForClip(clip:Clip,words:unknown):TimedCaption[]{
  if(!Array.isArray(words)||words.length>30000)throw new Error("Invalid transcription response.");
  const result:TimedCaption[]=[];let group:{word:string;start:number;end:number}[]=[];
  const flush=()=>{
-  if(!group.length)return;const start=clip.startTime+(group[0].start-clip.sourceStart)/clip.speed,end=clip.startTime+(group[group.length-1].end-clip.sourceStart)/clip.speed,text=group.map(w=>w.word).join(' ');
-  if(end-start<.002){const previous=result.at(-1);if(previous&&start<=previous.start+previous.duration+.001&&end>=previous.start){previous.text+=' '+text;previous.words=undefined;group=[];}return;}
-  result.push({text,start,duration:end-start,words:group.map(w=>({word:w.word,start:(w.start-group[0].start)/clip.speed,end:(w.end-group[0].start)/clip.speed}))});group=[];
+  if(!group.length)return;
+  for(let i=0;i<group.length;i++){
+   if(i>0&&group[i].start<group[i-1].start)group[i].start=group[i-1].start;
+   if(i<group.length-1&&group[i].end>group[i+1].start)group[i].end=Math.max(group[i].start,group[i+1].start);
+  }
+  const maxEnd=Math.max(...group.map(w=>w.end)),start=clip.startTime+(group[0].start-clip.sourceStart)/clip.speed,end=clip.startTime+(maxEnd-clip.sourceStart)/clip.speed,duration=Math.max(.01,end-start),text=group.map(w=>w.word).join(' ');
+  if(duration<.002){const previous=result.at(-1);if(previous&&start<=previous.start+previous.duration+.001&&end>=previous.start){previous.text+=' '+text;previous.words=undefined;group=[];}return;}
+  result.push({text,start,duration,words:group.map(w=>({word:w.word,start:(w.start-group[0].start)/clip.speed,end:Math.min(duration,Math.max((w.start-group[0].start)/clip.speed,(w.end-group[0].start)/clip.speed))}))});group=[];
  };
  for(const value of words){
   if(!value||typeof value!=='object')continue;const w=value as Record<string,unknown>;

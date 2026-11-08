@@ -49,15 +49,16 @@ export async function importMedia(file:File,scope:string,onProgress:(value:numbe
         asset.width=media.videoWidth;asset.height=media.videoHeight;
         const canvas=document.createElement("canvas");canvas.width=160;canvas.height=Math.max(1,Math.round(160*asset.height/asset.width));
         asset.thumbnails=[];
-        for(let i=0;i<6;i++){
-          const target=Math.max(0,Math.min(asset.duration-.001,asset.duration*(i+.1)/6));
-          if(Math.abs(media.currentTime-target)>.0001){const sought=waitMedia(media,"seeked");media.currentTime=target;await sought;}
-          canvas.getContext("2d")?.drawImage(media,0,0,canvas.width,canvas.height);asset.thumbnails.push(canvas.toDataURL("image/jpeg",0.6));onProgress(30+i*6);
+        const seekPoints=[Math.min(0.5,asset.duration*0.1),asset.duration*0.5];
+        for(let i=0;i<seekPoints.length;i++){
+          const target=Math.max(0,Math.min(asset.duration-.001,seekPoints[i]));
+          if(Math.abs(media.currentTime-target)>.0001){const sought=waitMedia(media,"seeked",3000);media.currentTime=target;await sought.catch(()=>{});}
+          canvas.getContext("2d")?.drawImage(media,0,0,canvas.width,canvas.height);asset.thumbnails.push(canvas.toDataURL("image/jpeg",0.6));onProgress(40+i*20);
         }
         asset.thumbnail=asset.thumbnails[0];
       }
       media.removeAttribute("src");media.load();
-      asset.waveform=await peaks(file);
+      asset.waveform=kind==="audio"?await peaks(file):undefined;
     }
     onProgress(85);await cacheWrite("media",asset.localKey!,file);onProgress(100);return asset;
   }finally{URL.revokeObjectURL(url);}

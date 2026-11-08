@@ -2,17 +2,31 @@ import Link from "next/link";
 import BrandMark from "./BrandMark";
 import LegalLinks from "./LegalLinks";
 import policies from "../config/policies.json";
+import { SITE_URL } from "../lib/seo";
 
 export default function PolicyPage({slug}:{slug:string}) {
   const policy=policies.policies.find(item=>item.slug===slug);
   if(!policy) throw new Error("Unknown policy.");
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "@id": `${SITE_URL}/${slug}#webpage`,
+    name: policy.title,
+    description: policy.description,
+    url: `${SITE_URL}/${slug}`,
+    isPartOf: { "@id": `${SITE_URL}/#website` },
+    about: { "@id": `${SITE_URL}/#organization` },
+  };
   return <div className="min-h-screen bg-[#FAFAFA] text-slate-900">
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }}
+    />
     <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8">
-      <Link href="/" aria-label="Kreovar home" className="inline-flex items-center gap-2 font-bold"><BrandMark size={28}/>Kreovar</Link><Link href="/projects" className="text-sm text-slate-600 hover:text-blue-600">Back to studio</Link>
+      <Link href="/" aria-label="Kreovar home" className="inline-flex items-center gap-2 font-bold"><BrandMark size={28}/>Kreovar</Link><Link href="/" className="text-sm text-slate-600 hover:text-blue-600">Home</Link>
     </div></header>
     <main className="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
-      <LegalLinks/>
-      <article className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 sm:p-10">
+      <article className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-10">
         <p className="text-xs font-semibold uppercase tracking-widest text-blue-600">Kreovar policies</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">{policy.title}</h1>
         <p className="mt-3 text-sm text-slate-500">Effective date: {policy.effectiveDate} · Version {policy.version}</p>

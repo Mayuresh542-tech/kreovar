@@ -24,6 +24,8 @@ Disallow: /projects
 Disallow: /projects/
 Disallow: /editor
 Disallow: /editor/
+Disallow: /templates
+Disallow: /templates/
 Disallow: /settings
 Disallow: /settings/
 Disallow: /checkout
@@ -32,6 +34,25 @@ Disallow: /auth/
 Disallow: /confirm-email
 Disallow: /forgot-password
 Disallow: /reset-password
+Disallow: /captions
+Disallow: /voice
+Disallow: /script
+Disallow: /assets
+Disallow: /broll
+Disallow: /images
+Disallow: /raw-footage
+Disallow: /sfx
+Disallow: /saved
+Disallow: /trends
+Disallow: /ideas
+Disallow: /planner
+Disallow: /competitors
+Disallow: /suggestions
+Disallow: /motion-graphics
+Disallow: /typography
+Disallow: /upgrade
+Disallow: /alerts
+Disallow: /analytics
 
 User-agent: GPTBot
 Allow: /

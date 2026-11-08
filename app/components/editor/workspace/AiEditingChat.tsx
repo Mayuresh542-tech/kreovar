@@ -30,7 +30,13 @@ export default function AiEditingChat({active,onManual}:{active:boolean;onManual
     <div><strong>{STAGE_LABELS[stage.id]}</strong><small>{stage.status==='completed'?'Saved':stage.status==='planning'?'Planning…':stage.status==='executing'?'Executing…':stage.status==='validating'?'Validating…':stage.status==='committing'?'Saving…':stage.status==='cancelled'?'Cancelled':stage.status==='failed'?'Failed': 'Waiting'}</small>
     {stage.status==='completed'&&stage.output?.summary&&<p>{publicServiceText(stage.output.summary)}</p>}{stage.error&&<p role="alert">{publicErrorMessage(stage.error)}</p>}</div>
    </li>)}</ol>
-   {job.status==='completed'&&<p className="vx-ai-complete">Editing completed. {job.appliedOperations.length} stages changed the timeline. Review the preview, then export your MP4.</p>}
+   {job.status==='completed'&&(
+    job.stages.find(s=>s.output?.questions?.length)?(
+     <p className="vx-ai-complete">{publicServiceText(job.stages.find(s=>s.output?.questions?.length)?.output?.questions?.[0]||job.stages.find(s=>s.output?.questions?.length)?.output?.summary||'Please clarify your request.')}</p>
+    ):(
+     <p className="vx-ai-complete">Editing completed. {job.appliedOperations.length} stages changed the timeline. Review the preview, then export your MP4.</p>
+    )
+   )}
    {resumable&&!busy&&<div className="vx-ai-resume"><p>{job.requiresNewJob?'The timeline changed manually. Review the saved changes and start a new AI edit.':job.status==='running'?'This job was interrupted. Resume from the first unfinished stage.':'Completed steps remain saved. Retry continues from the unfinished step.'}</p>{!job.requiresNewJob&&<button className="vx-secondary" onClick={()=>void run(job)}><RotateCcw size={14}/> {job.status==='failed'?'Retry stage':'Resume edit'}</button>}</div>}
    </>}
    {error&&<p className="vx-error" role="alert">{publicErrorMessage(error)}</p>}

@@ -4,6 +4,7 @@ import {isExistingSignup} from "../lib/auth/signupResult";
 import { useState, useEffect, useRef } from "react";
 import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import AuthShell, { authInputClass, authLabelClass, authSubmitClass } from "../components/AuthShell";
+import GoogleAuthButton from "../components/GoogleAuthButton";
 import { supabase } from "../lib/supabase";
 import { useAuthGate } from "../lib/useAuthGate";
 import Link from "next/link";
@@ -87,6 +88,12 @@ export default function Signup() {
       {error && <div id="auth-error" role="alert" className="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs leading-relaxed text-rose-700">{error}</div>}
       {info && <div role="status" className="mb-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs leading-relaxed text-blue-700">{info}{existingAccount?<><Link href="/login" className="mt-2 block font-semibold underline">Log in</Link><Link href="/forgot-password" className="mt-2 block underline">Forgot password?</Link></>:<Link href="/confirm-email" className="mt-2 block font-semibold underline">Resend confirmation email</Link>}</div>}
       <p className="mb-5 text-xs leading-6 text-slate-500">By selecting Create free account, you agree to our <Link href="/terms" className="text-blue-600 underline">Terms of Service</Link> and acknowledge our <Link href="/privacy" className="text-blue-600 underline">Privacy Policy</Link>.</p>
+      <GoogleAuthButton disabled={loading} onBusyChange={setLoading} onError={setError} />
+      <div className="relative mb-5 flex items-center justify-center">
+        <div className="w-full border-t border-slate-200" />
+        <span className="bg-white px-3 text-[11px] font-medium uppercase tracking-wider text-slate-400">or</span>
+      </div>
+
       <form onSubmit={e => { e.preventDefault(); void handleSignup(); }} aria-busy={loading} className="space-y-5">
           <div><label htmlFor="signup-name" className={authLabelClass}>Creator name <span className="font-normal text-slate-400">(optional)</span></label><input id="signup-name" name="name" type="text" autoComplete="name" maxLength={100} placeholder="Your name" value={name} onChange={e => setName(e.target.value)} disabled={loading} className={authInputClass} /></div>
         <div><label htmlFor="signup-email" className={authLabelClass}>Email address</label><input id="signup-email" name="email" type="email" autoComplete="email" maxLength={254} required placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} aria-describedby={error ? "auth-error" : undefined} className={authInputClass} /></div>

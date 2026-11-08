@@ -84,32 +84,57 @@ export default function Home() {
 
           {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-1 text-xs font-medium text-slate-600">
-            <Link
-              href="/dashboard"
-              className="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/70 transition-colors"
-            >
-              Studio
-            </Link>
-            <Link
-              href="/editor"
-              className="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/70 transition-colors flex items-center gap-1.5"
-            >
-              <span>Editor 3.0</span>
-              <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 text-[9px] font-bold rounded-full">
-                NEW
-              </span>
-            </Link>
-            <Link
-              href="/templates"
-              className="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/70 transition-colors"
-            >
-              Templates
-            </Link>
+            {isAuthed ? (
+              <>
+                <Link
+                  href="/dashboard"
+                  className="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/70 transition-colors"
+                >
+                  Studio
+                </Link>
+                <Link
+                  href="/editor"
+                  className="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/70 transition-colors flex items-center gap-1.5"
+                >
+                  <span>Editor 3.0</span>
+                  <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 text-[9px] font-bold rounded-full">
+                    NEW
+                  </span>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/ai-video-editor"
+                  className="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/70 transition-colors"
+                >
+                  Video Editor
+                </Link>
+                <Link
+                  href="/caption-generator"
+                  className="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/70 transition-colors"
+                >
+                  Captions
+                </Link>
+                <Link
+                  href="/how-to-use"
+                  className="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/70 transition-colors"
+                >
+                  How to Use
+                </Link>
+              </>
+            )}
             <Link
               href="/pricing"
               className="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/70 transition-colors"
             >
               Pricing
+            </Link>
+            <Link
+              href="/faq"
+              className="px-3 py-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100/70 transition-colors"
+            >
+              FAQ
             </Link>
           </nav>
 
@@ -386,17 +411,20 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-6 font-medium text-slate-600">
-            <Link href="/dashboard" className="hover:text-slate-900 transition-colors">
-              Dashboard
-            </Link>
-            <Link href="/editor" className="hover:text-slate-900 transition-colors">
-              Editor
-            </Link>
-            <Link href="/templates" className="hover:text-slate-900 transition-colors">
-              Templates
+            <Link href="/how-to-use" className="hover:text-slate-900 transition-colors">
+              How to Use
             </Link>
             <Link href="/pricing" className="hover:text-slate-900 transition-colors">
               Pricing
+            </Link>
+            <Link href="/faq" className="hover:text-slate-900 transition-colors">
+              FAQ
+            </Link>
+            <Link href="/about" className="hover:text-slate-900 transition-colors">
+              About
+            </Link>
+            <Link href="/contact" className="hover:text-slate-900 transition-colors">
+              Contact
             </Link>
           </div>
 

@@ -8,6 +8,7 @@ import {addAsset} from './operations';
 import {setCaptionMotion} from './captionMotion';
 import type {AssetRole} from '../assets/types';
 import type {AiToolRequest} from './aiTools';
+import {speechContext} from './speechContext';
 
 export const EDIT_OPERATIONS = ['captions','motionGraphics','broll','zooms','soundEffects','effects','requestedEdits'] as const;
 export type EditOperation = typeof EDIT_OPERATIONS[number];
@@ -19,8 +20,12 @@ export const STAGE_LABELS:Record<EditStage,string> = {
 };
 export interface PipelinePreset {id:string;name:string;instruction:string;operations:EditOperation[];captionTemplate:string}
 export const PIPELINE_PRESETS:PipelinePreset[] = [
+ {id:'hormozi',name:'Hormozi Viral',instruction:'Add bold high-energy pop captions, dynamic punch zooms, callout accents and restrained sound effects.',operations:['captions','motionGraphics','zooms','soundEffects'],captionTemplate:'study-hormozi-style'},
+ {id:'podcast-pro',name:'Smart Podcast',instruction:'Add clean spotlight captions, subtle conversation zooms, audio ducking and smooth transitions.',operations:['captions','zooms','effects'],captionTemplate:'study-ali-abdaal'},
+ {id:'mrbeast',name:'MrBeast Energy',instruction:'Add bouncy colorful captions, rapid B-roll cutaways, graphic stats and subtle zoom pulses.',operations:['captions','motionGraphics','broll','zooms'],captionTemplate:'study-mr-beast-style-2'},
+ {id:'documentary',name:'Cinematic Doc',instruction:'Add wide-spaced cinematic subtitles, archival B-roll overlays, slow zoom-in holds and smooth crossfades.',operations:['captions','broll','zooms','effects'],captionTemplate:'study-thora-cinematic'},
+ {id:'clean',name:'Clean Minimal',instruction:'Add readable animated subtitles. Preserve the original footage, dialogue and framing.',operations:['captions'],captionTemplate:'study-clean-motion'},
  {id:'engaging',name:'Engaging talking head',instruction:'Add animated captions, motion graphics, relevant B-roll and subtle zoom effects.',operations:['captions','motionGraphics','broll','zooms'],captionTemplate:'signature-poppins'},
- {id:'clean',name:'Clean captions',instruction:'Add readable animated captions. Preserve the original footage, dialogue and framing.',operations:['captions'],captionTemplate:'clean-sub'},
  {id:'punchy',name:'Caption emphasis',instruction:'Add animated captions, sparse motion graphic callouts, subtle zooms and restrained sound effects.',operations:['captions','motionGraphics','zooms','soundEffects'],captionTemplate:'signature-poppins'}
 ];
 export interface StageOutput {
@@ -30,7 +35,10 @@ export interface StageOutput {
  tokenBudget?:{usedTokens:number;reservedTokens:number;limit:number};
  animateCaptions?:boolean;
  preparedApplied?:boolean;
- summary:string; decisions?:EditDecision[]; assets?:MediaAsset[];
+ summary:string;
+ questions?:string[];
+ skipRationale?:string;
+ decisions?:EditDecision[]; assets?:MediaAsset[];
  prepared?:{assetId:string;role:AssetRole;decisions:EditDecision[];media?:MediaAsset;sourceLabel?:string;selection?:{candidateId:string;startTime:number;relevanceScore:number|null;reason:string}}[];
  requests?:AiToolRequest[]; operations?:EditOperation[];
  analysis?:{duration:number;footageIds:string[];speechSegments:number;sampledFrames:number;assetIds:string[]};
@@ -52,7 +60,7 @@ export function stagesFor(operations:EditOperation[]):EditStage[]{
 export function createEditingJob(project:EditorProject,instructions:string,selection:string[],preset?:PipelinePreset):EditingJob{
  if(!instructions.trim()||instructions.length>2000)throw Error('Describe your edit in 1–2000 characters.');
  const id=crypto.randomUUID();
- return {version:1,id,projectId:project.id,instructions:instructions.trim(),presetId:preset?.id,captionTemplate:preset?.captionTemplate||'signature-poppins',selection:[...selection],status:'ready',completedStages:[],failedStages:[],timelineRevision:project.revision,initialRevision:project.revision,appliedOperations:[],generatedAssets:[],errors:[],createdAt:new Date().toISOString(),stages:stagesFor(preset?.operations||[]).map(stage=>({id:stage,key:id+':'+stage,status:'pending',attempts:0}))};
+ return {version:1,id,projectId:project.id,instructions:instructions.trim(),presetId:preset?.id,captionTemplate:preset?.captionTemplate||'signature-poppins',selection:[...selection],status:'ready',completedStages:[],failedStages:[],timelineRevision:project.revision,initialRevision:project.revision,appliedOperations:[],generatedAssets:[],errors:[],createdAt:new Date().toISOString(),stages:stagesFor(preset?.operations||['requestedEdits']).map(stage=>({id:stage,key:id+':'+stage,status:'pending',attempts:0}))};
 }
 export function readRequestedOperations(value:unknown):EditOperation[]{
  if(!Array.isArray(value)||!value.length||value.some(x=>!EDIT_OPERATIONS.includes(x))||new Set(value).size!==value.length)throw Error('AI could not identify supported editing operations. Describe captions, motion graphics, B-roll, zooms, sound effects, transitions or custom timeline edits.');
@@ -95,6 +103,37 @@ export function stageInstruction(stage:EditStage,job:EditingJob){
  };
  return `Sequential editing stage: ${stage}. ${rule[stage]||''}\nUser instructions (apply ONLY the current stage): ${job.instructions}`;
 }
+export const SKIP_RATIONALE = /preserve|framing|no suitable|no (?:speech\s+)?emphasis|no (?:speech|dialogue)|no b-roll|no motion|no sound|no addition|skip|not appropriate|unnecessary/i;
+
+export function hasSkipRationale(output?: StageOutput): boolean {
+ if (!output) return false;
+ if (typeof output.skipRationale === 'string' && output.skipRationale.trim().length > 0) return true;
+ if (output.summary && SKIP_RATIONALE.test(output.summary)) return true;
+ return false;
+}
+
+export function permitsZeroAdditions(stage: EditStage, before: EditorProject, output: StageOutput, job?: EditingJob): boolean {
+ if (!['applyMotionGraphics', 'applyBroll', 'applyZooms', 'applySoundEffects', 'applyEffects'].includes(stage)) return false;
+ if (projectDuration(before) < 4.0) return true;
+ if (hasSkipRationale(output)) return true;
+ const isPreset = !!(job?.presetId || before.editingJob?.presetId);
+ if (isPreset) return true;
+ const initialSpeechSegments = job?.stages?.find(s => s.id === 'analyzeFootage')?.output?.analysis?.speechSegments ?? before.editingJob?.stages?.find(s => s.id === 'analyzeFootage')?.output?.analysis?.speechSegments;
+ const noSpeech = initialSpeechSegments === 0 || speechContext(before).length === 0;
+ if (noSpeech) {
+  const instructions = job?.instructions || before.editingJob?.instructions || '';
+  if (instructions) {
+   const explicitZooms = stage === 'applyZooms' && /\bzooms?\b/i.test(instructions);
+   const explicitGraphics = stage === 'applyMotionGraphics' && /\b(?:motion\s*graphics?|callouts?|shapes?)\b/i.test(instructions);
+   const explicitBroll = stage === 'applyBroll' && /\bb[ -]?roll\b/i.test(instructions);
+   const explicitSfx = stage === 'applySoundEffects' && /\b(?:sound\s*effects?|sfx)\b/i.test(instructions);
+   if (explicitZooms || explicitGraphics || explicitBroll || explicitSfx) return false;
+  }
+  return true;
+ }
+ return false;
+}
+
 export function buildStageProject(project:EditorProject,output:StageOutput){
  const augmented=(output.assets||[]).reduce((p,a)=>addAsset(p,a),project);
  const decisions=output.decisions||[],count=output.sourceDecisionCount;
@@ -102,24 +141,40 @@ export function buildStageProject(project:EditorProject,output:StageOutput){
  const direct=count===undefined?decisions:decisions.slice(0,count),validated=validateAiPlan({summary:output.summary,decisions:direct},augmented);
  let next=applyEditDecisionList(augmented,validated.list);
  if(count!==undefined&&count<decisions.length){const additions=validateAiPlan({summary:output.summary,decisions:decisions.slice(count)},next);next=applyEditDecisionList(next,additions.list);}
- if(output.animateCaptions){const ids=Object.values(next.clips).filter(c=>c.contentId&&next.captions[c.contentId]&&(!project.clips[c.id]||validated.list.decisions.some(d=>d.op==='applyCaptionTemplate'&&d.clipIds.includes(c.id)))).map(c=>c.id);if(ids.length)next=setCaptionMotion(next,ids,'pop');}
+ if(output.animateCaptions){const ids=Object.values(next.clips).filter(c=>c.contentId&&next.captions[c.contentId]&&(!project.clips[c.id]||(output.decisions||[]).some(d=>d.op==='applyCaptionTemplate'&&d.clipIds.includes(c.id)))).map(c=>c.id);if(ids.length)next=setCaptionMotion(next,ids,'pop');}
  return next;
 }
 function projectEvidence(p:EditorProject){return {tracks:JSON.stringify([p.tracks,p.trackOrder]),settings:JSON.stringify(p.settings),transitions:JSON.stringify(p.transitions)};}
 function clipSignature(p:EditorProject,id:string){const c=p.clips[id];return JSON.stringify([c,c?.contentId?p.captions[c.contentId]||p.textLayers[c.contentId]:undefined]);}
-export function validateStageChanges(stage:EditStage,before:EditorProject,after:EditorProject,output:StageOutput){
+export function validateStageChanges(stage:EditStage,before:EditorProject,after:EditorProject,output:StageOutput,job?:EditingJob){
  aiProjectSnapshot(after);
  const custom=stage==='applyRequestedEdits';
- if(custom&&JSON.stringify([before.clips,before.tracks,before.trackOrder,before.settings,before.transitions,before.textLayers,before.captions])===JSON.stringify([after.clips,after.tracks,after.trackOrder,after.settings,after.transitions,after.textLayers,after.captions]))throw Error('Requested edits did not change the timeline.');
+ if(custom&&!output.questions?.length&&JSON.stringify([before.clips,before.tracks,before.trackOrder,before.settings,before.transitions,before.textLayers,before.captions])===JSON.stringify([after.clips,after.tracks,after.trackOrder,after.settings,after.transitions,after.textLayers,after.captions]))throw Error('Requested edits did not change the timeline.');
  const changed=Object.values(after.clips).filter(c=>!before.clips[c.id]||clipSignature(before,c.id)!==clipSignature(after,c.id)||custom&&JSON.stringify(before.tracks[c.trackId])!==JSON.stringify(after.tracks[c.trackId]));
  const visible=changed.filter(c=>!after.tracks[c.trackId].hidden&&c.transform.opacity>0&&c.duration>=1/after.settings.fps&&c.startTime>=0&&c.startTime+c.duration<=projectDuration(before)+.04);
  if(['applyCaptions','applyMotionGraphics','applyBroll','applyZooms'].includes(stage)&&visible.length!==changed.length)throw Error('An edit is hidden or outside the footage duration.');
- if(stage==='applyCaptions'&&(!visible.some(c=>c.contentId&&after.captions[c.contentId])||visible.some(c=>c.contentId&&after.captions[c.contentId]&&!after.captions[c.contentId].text.trim())))throw Error('Captions were not applied visibly with valid timing.');
- if(stage==='applyMotionGraphics'&&!visible.some(c=>(c.graphic||c.shape)&&c.keyframes?.length))throw Error('No visible animated motion graphic was created.');
- if(stage==='applyBroll'&&!visible.some(c=>c.assetId&&after.assets[c.assetId]&&['image','overlay'].includes(after.tracks[c.trackId].kind)&&c.volume===0))throw Error('No valid muted B-roll was inserted.');
- if(stage==='applyZooms'&&!visible.some(c=>c.zooms?.length&&JSON.stringify(c.zooms)!==JSON.stringify(before.clips[c.id]?.zooms)))throw Error('No zoom keyframes were applied.');
- if(stage==='applySoundEffects'&&!changed.some(c=>c.assetId&&after.assets[c.assetId]?.kind==='audio'&&c.audioRole==='sfx'&&c.volume>0&&c.volume<=.35&&!after.tracks[c.trackId].muted&&!after.tracks[c.trackId].hidden&&c.startTime+c.duration<=projectDuration(before)+.04))throw Error('No audible, synchronized sound effect was inserted.');
- if(stage==='applyEffects'&&JSON.stringify(before.clips)===JSON.stringify(after.clips)&&JSON.stringify(before.transitions)===JSON.stringify(after.transitions)&&JSON.stringify(before.settings)===JSON.stringify(after.settings))throw Error('Requested effects did not change the timeline.');
+ if(stage==='applyCaptions'){
+  const hasValidVisibleCaption=visible.some(c=>c.contentId&&after.captions[c.contentId])||(output.decisions?.some(d=>d.op==='applyCaptionTemplate')&&Object.values(after.clips).some(c=>c.contentId&&after.captions[c.contentId]));
+  const isPreset=!!(job?.presetId||before.editingJob?.presetId);
+  const speechSegments=job?.stages?.find(s=>s.id==='analyzeFootage')?.output?.analysis?.speechSegments??before.editingJob?.stages?.find(s=>s.id==='analyzeFootage')?.output?.analysis?.speechSegments;
+  const noSpeech=speechSegments===0||speechContext(before).length===0;
+  const permitsZeroCaptions=(isPreset&&noSpeech)||projectDuration(before)<4.0||speechSegments===0||hasSkipRationale(output);
+  if(!hasValidVisibleCaption&&!permitsZeroCaptions)throw Error('Captions were not applied visibly with valid timing.');
+  if(visible.some(c=>c.contentId&&after.captions[c.contentId]&&!after.captions[c.contentId].text.trim()))throw Error('Captions were not applied visibly with valid timing.');
+ }
+ if(stage==='applyMotionGraphics'&&!visible.some(c=>(c.graphic||c.shape)&&c.keyframes?.length)){
+  if(!permitsZeroAdditions(stage,before,output,job))throw Error('No visible animated motion graphic was created.');
+ }
+ if(stage==='applyBroll'&&!visible.some(c=>c.assetId&&after.assets[c.assetId]&&['image','overlay'].includes(after.tracks[c.trackId].kind)&&c.volume===0)){
+  if(!permitsZeroAdditions(stage,before,output,job))throw Error('No valid muted B-roll was inserted.');
+ }
+ if(stage==='applyZooms'&&!visible.some(c=>c.zooms?.length&&JSON.stringify(c.zooms)!==JSON.stringify(before.clips[c.id]?.zooms))){
+  if(!permitsZeroAdditions(stage,before,output,job))throw Error('No zoom keyframes were applied.');
+ }
+ if(stage==='applySoundEffects'&&!changed.some(c=>c.assetId&&after.assets[c.assetId]?.kind==='audio'&&c.audioRole==='sfx'&&c.volume>0&&c.volume<=.35&&!after.tracks[c.trackId].muted&&!after.tracks[c.trackId].hidden&&c.startTime+c.duration<=projectDuration(before)+.04)){
+  if(!permitsZeroAdditions(stage,before,output,job))throw Error('No audible, synchronized sound effect was inserted.');
+ }
+ if(stage==='applyEffects'&&JSON.stringify(before.clips)===JSON.stringify(after.clips)&&JSON.stringify(before.transitions)===JSON.stringify(after.transitions)&&JSON.stringify(before.settings)===JSON.stringify(after.settings)){if(!permitsZeroAdditions(stage,before,output,job))throw Error('Requested effects did not change the timeline.');}
  // Supporting edits must preserve original dialogue, placement and duration.
  if(['applyCaptions','applyMotionGraphics','applyBroll','applyZooms','applySoundEffects'].includes(stage))for(const c of Object.values(before.clips).filter(c=>c.assetId&&before.assets[c.assetId]?.kind==='video'&&before.tracks[c.trackId].kind==='video')){
   const n=after.clips[c.id];if(!n||['assetId','trackId','volume','startTime','duration','sourceStart','sourceEnd','speed'].some(k=>n[k as keyof typeof n]!==c[k as keyof typeof c]))throw Error('This stage would alter original footage or dialogue timing.');
@@ -137,7 +192,15 @@ export function validateCompletedJob(project:EditorProject,job:EditingJob){
    if(c.assetId&&!project.assets[c.assetId])throw Error('An edited media asset is missing.');
   }
  }
- if(!job.appliedOperations.length||project.revision<=job.initialRevision)throw Error('No requested edits were committed.');
+ const hasClarification=job.stages.some(s=>s.output?.questions&&s.output.questions.length>0);
+ const hasLegitimateSkipOrPreset=!!job.presetId||job.stages.some(s=>['applyMotionGraphics','applyBroll','applyZooms','applySoundEffects','applyEffects'].includes(s.id)&&permitsZeroAdditions(s.id,project,s.output||{summary:''},job))||(job.completedStages.includes('analyzeFootage')&&!job.stages.some(s=>s.id==='applyRequestedEdits'));
+ if(!job.appliedOperations.length||project.revision<=job.initialRevision){
+  if(!hasClarification&&!hasLegitimateSkipOrPreset)throw Error('No requested edits were committed.');
+ }
+ if(hasClarification){
+  const clarificationSummary=job.stages.find(s=>s.output?.questions?.length)?.output?.summary;
+  return {summary:clarificationSummary||'Clarification questions returned.'};
+ }
  return {summary:'All requested stages validated. Preview and export use this saved timeline. Export the MP4 to verify the encoded result.'};
 }
 
@@ -168,7 +231,7 @@ export async function runEditingJob(runtime:PipelineRuntime,initial:EditingJob,s
    signal.throwIfAborted();stage=job.stages[index];stage.status='validating';stage.output=output;await save(runtime.getProject());
    const base=runtime.getProject();if(base.revision!==job.timelineRevision||runtime.interacting())throw Error('Timeline changed during this stage. Start a fresh edit.');
    const changes=!!output.decisions?.length&&!['analyzeFootage','planMotionGraphics','findBroll'].includes(stage.id);const next=changes?buildStageProject(base,output):base;
-   stage.output=validateStageChanges(stage.id,base,next,output);
+   stage.output=validateStageChanges(stage.id,base,next,output,job);
    if(stage.id==='analyzeFootage'){
     const preset=PIPELINE_PRESETS.find(p=>p.id===job.presetId),operations=preset?.operations||readRequestedOperations(output.operations);
     job.stages=stagesFor(operations).map(id=>job.stages.find(s=>s.id===id)||{id,key:job.id+':'+id,status:'pending',attempts:0});stage=job.stages[index];

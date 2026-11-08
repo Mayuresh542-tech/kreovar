@@ -25,9 +25,6 @@ export const metadata: Metadata = {
   applicationName: "Kreovar",
   description: SITE_DESCRIPTION,
   robots: PUBLIC_ROBOTS,
-  alternates: {
-    canonical: SITE_URL,
-  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

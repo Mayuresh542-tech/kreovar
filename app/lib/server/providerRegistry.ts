@@ -183,7 +183,7 @@ export async function getAllProviders(): Promise<ProviderSafeMetadata[]> {
             : key === "radox"
             ? {modelId:EDITOR_AI_MODEL,apiBase:RADOX_API_BASE}
             : key === "groq"
-            ? { contentKitModelId: "openai/gpt-oss-20b", aiEditModelId: "openai/gpt-oss-120b" }
+            ? { contentKitModelId: "openai/gpt-oss-20b", aiEditModelId: "qwen/qwen3.8-27b" }
             : {},
         last_test_status: "untested",
         created_at: new Date().toISOString(),

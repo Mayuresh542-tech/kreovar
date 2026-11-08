@@ -6,13 +6,17 @@ export interface GeminiCompletionOptions {
   temperature?: number;
   maxTokens?: number;
   jsonMode?: boolean;
+  responseSchema?: Record<string, any>;
   userId?: string | null;
   operation?: string;
   signal?: AbortSignal;
+  model?: string;
 }
 
-const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+export const GEMINI_EDITOR_MODEL = "gemini-3.8-flash";
+const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || GEMINI_EDITOR_MODEL;
 const FALLBACK_GEMINI_MODELS = [
+  "gemini-3.8-flash",
   "gemini-3-flash-preview",
   "gemini-3.6-flash",
   "gemini-3.5-flash",
@@ -21,8 +25,8 @@ const FALLBACK_GEMINI_MODELS = [
 
 /**
  * Resolves the Gemini API key strictly server-side:
- * 1. Checks environment variable `GEMINI_API_KEY`
- * 2. Checks encrypted `provider_configs` table in Supabase via providerRegistry
+ * 1. Checks encrypted `provider_configs` table in Supabase via providerRegistry
+ * 2. Checks environment variable `GEMINI_API_KEY`
  * NEVER exposes this key to client components or browser bundles.
  */
 export async function getGeminiApiKey(): Promise<string | null> {
@@ -35,6 +39,11 @@ export async function getGeminiApiKey(): Promise<string | null> {
     console.warn("[geminiService] Failed to fetch provider credential from database:", err);
   }
 
+  const envKey = process.env.GEMINI_API_KEY;
+  if (envKey && envKey.trim()) {
+    return envKey.trim();
+  }
+
   return null;
 }
 
@@ -43,6 +52,10 @@ export async function getGeminiApiKey(): Promise<string | null> {
  */
 function cleanJsonText(raw: string): string {
   let text = raw.trim();
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (fenceMatch) {
+    return fenceMatch[1].trim();
+  }
   if (text.startsWith("```json")) {
     text = text.slice(7);
   } else if (text.startsWith("```")) {
@@ -51,7 +64,20 @@ function cleanJsonText(raw: string): string {
   if (text.endsWith("```")) {
     text = text.slice(0, -3);
   }
-  return text.trim();
+  text = text.trim();
+  if (!text.startsWith("{") && !text.startsWith("[")) {
+    const firstBrace = text.indexOf("{");
+    const lastBrace = text.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      return text.slice(firstBrace, lastBrace + 1);
+    }
+    const firstBracket = text.indexOf("[");
+    const lastBracket = text.lastIndexOf("]");
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+      return text.slice(firstBracket, lastBracket + 1);
+    }
+  }
+  return text;
 }
 
 /**
@@ -68,9 +94,10 @@ export async function generateGeminiContent(
 
   const startTime = Date.now();
   // Build deduplicated candidate models list: primary model first, followed by fallbacks
-  const primaryModel = options.operation?.includes("model:")
-    ? options.operation.split("model:")[1]
-    : DEFAULT_GEMINI_MODEL;
+  const primaryModel = options.model
+    || (options.operation?.includes("model:")
+      ? options.operation.split("model:")[1]
+      : DEFAULT_GEMINI_MODEL);
 
   const candidateModels = Array.from(
     new Set([primaryModel, ...FALLBACK_GEMINI_MODELS])
@@ -97,6 +124,9 @@ export async function generateGeminiContent(
 
   if (options.jsonMode) {
     bodyPayload.generationConfig.responseMimeType = "application/json";
+    if (options.responseSchema) {
+      bodyPayload.generationConfig.responseSchema = options.responseSchema;
+    }
   }
 
   let lastError: Error | null = null;

@@ -38,7 +38,7 @@ async function postHandler(req: NextRequest) {
       if (bytes > MAX_BODY) { await reader.cancel(); return NextResponse.json({ error: "This project is too large for AI editing. Use a smaller project." }, { status: 413 }); }
       chunks.push(value);
     }
-    let project: EditorProject, instruction: string, selectedClipIds: string[],playheadTime=0,footageFrames:FootageFrame[]=[],fallbackFootageFrames:FootageFrame[]|undefined,completeEdit=false,pipelineStage:EditStage|undefined,editingBudget:EditingBudget|undefined;
+    let project: EditorProject, instruction: string, selectedClipIds: string[],playheadTime=0,footageFrames:FootageFrame[]=[],fallbackFootageFrames:FootageFrame[]|undefined,completeEdit=false,pipelineStage:EditStage|undefined,editingBudget:EditingBudget|undefined,conversationHistory:{instructions:string;summary:string}[]|undefined;
     try {
       const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
       if(body.pipelineStage!==undefined){if(!EDIT_STAGES.includes(body.pipelineStage))throw Error("Unknown editing stage.");pipelineStage=body.pipelineStage;}
@@ -48,6 +48,13 @@ async function postHandler(req: NextRequest) {
       editingBudget=readEditingBudget(body.editingJobId,project.id);if(pipelineStage&&!editingBudget)throw Error("An editing job ID is required for the token budget.");
       if (!Array.isArray(body.selectedClipIds) || body.selectedClipIds.length > 300 || body.selectedClipIds.some((id: unknown) => typeof id !== "string" || !Object.hasOwn(project.clips, id))) throw new Error("Invalid clip selection.");
       selectedClipIds = body.selectedClipIds;
+      if(body.conversationHistory!==undefined){
+        if(!Array.isArray(body.conversationHistory)||body.conversationHistory.some((item:unknown)=>!item||typeof item!=="object"))throw new Error("Invalid conversation history.");
+        conversationHistory=body.conversationHistory.slice(-20).map((item:Record<string,unknown>)=>({
+          instructions:typeof item.instructions==="string"?item.instructions.slice(0,2000):typeof item.content==="string"?item.content.slice(0,2000):"",
+          summary:typeof item.summary==="string"?item.summary.slice(0,2000):""
+        }));
+      }
       footageFrames=readFootageFrames(body.footageFrames,project,selectedClipIds);if(body.fallbackFootageFrames!==undefined){fallbackFootageFrames=readFootageFrames(body.fallbackFootageFrames,project,selectedClipIds);if(!fallbackFootageFrames.length&&footageFrames.length)throw Error("Fallback observations cannot omit the source footage.");}if(body.completeEdit!==undefined&&typeof body.completeEdit!=="boolean")throw Error("Invalid editing mode.");completeEdit=body.completeEdit===true;
       if(body.playheadTime!==undefined){if(typeof body.playheadTime!=="number"||!Number.isFinite(body.playheadTime)||body.playheadTime<0)throw new Error("Invalid playhead time.");playheadTime=Math.min(projectDuration(project),body.playheadTime);}
     } catch (error) {
@@ -60,7 +67,7 @@ async function postHandler(req: NextRequest) {
     if (state.busy || state.count >= 6) return NextResponse.json({ error: "Please wait a minute before requesting another AI edit." }, { status: 429, headers: { "Retry-After": "60" } });
     state.count++; state.busy = true; requests.set(data.user.id, state);
     release = () => { state.busy = false; };
-    const plan = await planAiEdit(project, instruction, selectedClipIds, data.user.id, AbortSignal.any([req.signal, AbortSignal.timeout(80000)]),playheadTime,{footageFrames,fallbackFootageFrames,completeEdit,pipelineStage,editingBudget});
+    const plan = await planAiEdit(project, instruction, selectedClipIds, data.user.id, AbortSignal.any([req.signal, AbortSignal.timeout(80000)]),playheadTime,{footageFrames,fallbackFootageFrames,completeEdit,pipelineStage,editingBudget,conversationHistory});
     return NextResponse.json(plan, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if(error instanceof EditTokenBudgetError)return NextResponse.json({error:error.message,code:error.code},{status:error.status,headers:{'Cache-Control':'no-store'}});

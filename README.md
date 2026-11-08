@@ -34,7 +34,7 @@ The short-video editing workflow is bounded to 60 seconds. Export format, resolu
 - Next.js 16.4.3, React 19.2.4, TypeScript, and Tailwind CSS 4.
 - Supabase authentication, PostgreSQL, private storage, and migrations.
 - Remotion preview/composition, Mediabunny media handling, and FFmpeg-dependent server finishing where supported.
-- Groq is the default AI editor provider: Qwen handles bounded visual observations and GPT-OSS 120B plans edits. Radox is an explicit legacy opt-in (`EDITOR_AI_PRIMARY_PROVIDER=radox`), not an automatic retry target. Content/transcription paths retain their configured adapters.
+- Groq is the default AI editor provider: Qwen 3.7 27B is the primary model for both visual understanding and editing planning. Radox is an explicit legacy opt-in (`EDITOR_AI_PRIMARY_PROVIDER=radox`), not an automatic retry target. Content/transcription paths retain their configured adapters.
 - Voice.ai and other source-configured provider adapters; stock-media integrations require their own keys and applicable usage rights.
 - Whop subscriptions and signed webhook processing. Dodo integration is sandbox-only.
 - Cloudflare Workers is the exclusive production deployment and hosting platform.

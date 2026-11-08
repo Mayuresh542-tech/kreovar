@@ -52,8 +52,11 @@ export default function Library({tab}:{tab:LibraryTab}){
         try{
         setProgress({name:file.name,value:0});
         if(!file.size||file.size>100*1024*1024)throw new Error("Import files up to 100 MB.");
-        const imported=await importMedia(file,scope,value=>setProgress({name:file.name,value}));
-        const saved=await uploadAssetFile(file,{duration:imported.duration,width:imported.width,height:imported.height});
+        const imported=await importMedia(file,scope,value=>setProgress({name:file.name,value:Math.min(25,Math.round(value*0.25))}));
+        const saved=await uploadAssetFile(file,{duration:imported.duration,width:imported.width,height:imported.height},undefined,(msg,pct)=>{
+          if(typeof pct==="number")setProgress({name:file.name,value:25+Math.round(pct*0.7)});
+        });
+        setProgress({name:file.name,value:98});
         await linkAsset(project.id,saved.kind==="audio"?"voiceovers":saved.kind==="image"?"backgrounds":"raw_footage",saved.id);
         const asset={...imported,libraryId:saved.id,url:saved.url};
         if(replacing){const existing=store.getSnapshot().assets[replacing];if(asset.kind!==existing.kind)throw new Error("Relink with the same media type.");
@@ -81,7 +84,7 @@ export default function Library({tab}:{tab:LibraryTab}){
       <input ref={subtitleInput} type="file" accept=".srt" hidden onChange={e=>{if(e.target.files?.[0])void subtitles(e.target.files[0]);e.target.value="";}}/>
       {(tab==="media"||tab==="audio")&&<>
         <button className={`vx-import ${drag?"vx-drag-over":""}`} disabled={!!progress} onClick={()=>fileInput.current?.click()} onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);void upload(e.dataTransfer.files);}}>
-          <Upload size={24}/><strong>{progress?`Importing ${progress.name}`:"Import media"}</strong><span>{progress?`${progress.value}% · caching original`:"Drop files here or browse your device"}</span>
+          <Upload size={24}/><strong>{progress?`Importing ${progress.name}`:"Import media"}</strong><span>{progress?`${progress.value}% · ${progress.value<25?'reading file':progress.value<95?'uploading':'saving'}`:"Drop files here or browse your device"}</span>
           {progress&&<progress value={progress.value} max={100}/>}
         </button>
 

@@ -1,7 +1,7 @@
 import { getProviderCredential, recordProviderUsage } from "./providerRegistry";
 import {GroqCapacityError,readGroqCapacity,GroqRateLimitError,readGroqRateLimit} from "./groqCapacity";
 export type GroqOperation="content_kit_generation"|"editor_ai_edit";
-export const GROQ_MODELS:Record<GroqOperation,string>={content_kit_generation:"openai/gpt-oss-20b",editor_ai_edit:"openai/gpt-oss-120b"};
+export const GROQ_MODELS:Record<GroqOperation,string>={content_kit_generation:"openai/gpt-oss-20b",editor_ai_edit:"qwen/qwen3.8-27b"};
 export interface GroqJsonOptions {prompt:string;systemInstruction?:string;temperature?:number;maxTokens?:number;userId?:string|null;operation:GroqOperation;signal?:AbortSignal;schema?:Record<string,unknown>;reasoningEffort?:"low"|"medium"|"high";}
 export async function generateGroqJson<T>(options:GroqJsonOptions):Promise<T>{
   options.signal?.throwIfAborted();

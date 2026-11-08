@@ -25,6 +25,7 @@ const options: { kind: Kind; label: string; accept: string }[] = [
 
 export default function ProjectAssetUploads({ projectId, onSaved }: { projectId: string; onSaved: (project: VeeloxProject) => void }) {
   const [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [error, setError] = useState("");
+  const [progress, setProgress] = useState<{ percent: number; loaded: number; total: number } | null>(null);
   const lock = useRef(false),device=useRef<HTMLInputElement>(null),dialog=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement|null>(null);
   const [chosen,setChosen]=useState<Kind>(),[source,setSource]=useState<'choose'|'library'>();
   const option=options.find(item=>item.kind===chosen);
@@ -36,7 +37,7 @@ export default function ProjectAssetUploads({ projectId, onSaved }: { projectId:
   }
   async function upload(files: File[], kind: Kind) {
     if (lock.current || !files.length) return;
-    lock.current = true; setBusy(true); setError(""); setMessage(`Adding ${files.length} file(s)…`);
+    lock.current = true; setBusy(true); setError(""); setMessage(`Adding ${files.length} file(s)…`); setProgress(null);
     try {
       const max = kind === "captions" ? 1024 * 1024 : kind === "thumbnails" ? 10 * 1024 * 1024 : 100 * 1024 * 1024;
       const failures:string[]=[];let succeeded=0;
@@ -54,14 +55,19 @@ export default function ProjectAssetUploads({ projectId, onSaved }: { projectId:
       const metadata:Record<string,unknown>={};
       if(kind==="thumbnails"){const image=await createImageBitmap(file);metadata.width=image.width;metadata.height=image.height;image.close();}
       else if(kind!=="captions")metadata.duration=await readMediaDuration(file.type===mime?file:new File([file],file.name,{type:mime}));
-      const libraryAsset=await uploadAssetFile(file,metadata,undefined,setMessage);
+      const libraryAsset=await uploadAssetFile(file,metadata,undefined,(msg,pct,loaded,total)=>{
+        setMessage(msg);
+        if(typeof pct==="number"&&typeof loaded==="number"&&typeof total==="number"){
+          setProgress({percent:pct,loaded,total});
+        }
+      });
       const asset=projectAssetItem(libraryAsset);
       const saved = await addAssetToProject(projectId, kind, asset);
       if (!saved) throw new Error("The file could not be attached to this project. Please retry.");
       onSaved(saved);succeeded++;
       }catch(error){failures.push(file.name+": "+(error instanceof Error?error.message:"Upload failed."));}
       }
-      setMessage(`${succeeded} of ${files.length} files added to this project.`);
+      setMessage(`${succeeded} of ${files.length} files added to this project.`); setProgress(null);
       if(failures.length)setError(failures.join("; "));
     } catch (e) { setMessage(""); setError(e instanceof Error ? e.message : "Could not add this file. Please retry."); }
     finally { lock.current = false; setBusy(false); }
@@ -76,7 +82,13 @@ export default function ProjectAssetUploads({ projectId, onSaved }: { projectId:
       {source==='choose'?<div className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={()=>setSource('library')} className="min-h-24 rounded-xl border border-slate-200 p-5 text-left hover:bg-slate-50"><strong className="block text-sm">From Asset Library</strong><span className="mt-1 block text-xs text-slate-500">Reuse an asset you already saved.</span></button><button type="button" onClick={()=>{device.current?.click();setSource(undefined);}} className="min-h-24 rounded-xl border border-slate-200 p-5 text-left hover:bg-slate-50"><strong className="block text-sm">From Your Device</strong><span className="mt-1 block text-xs text-slate-500">Choose one or more files to upload.</span></button></div>:<><button type="button" disabled={busy} onClick={()=>setSource('choose')} className="mb-3 min-h-11 text-xs font-semibold">← Choose another source</button><AssetLibraryPanel key={chosen} onlyKind={projectImportKinds[chosen!]} roleOverride={chosen} chooseLabel="Add to project" hideUpload onChoose={fromLibrary}/></>}
      </div>
     </div>,document.body)}
-    {message && <p role="status" className="text-xs text-slate-600">{message}</p>}
+    {message && <div className="space-y-1.5 pt-1">
+      <div className="flex items-center justify-between text-xs text-slate-600">
+        <span className="font-medium">{message}</span>
+        {progress && progress.total > 0 && <span className="font-mono text-[11px] text-slate-400">{(progress.loaded / 1048576).toFixed(1)} / {(progress.total / 1048576).toFixed(1)} MB</span>}
+      </div>
+      {progress && <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-600 transition-all duration-150" style={{width:`${progress.percent}%`}}/></div>}
+    </div>}
     {error && <p role="alert" className="text-xs text-rose-600">{error}</p>}
   </section>;
 }

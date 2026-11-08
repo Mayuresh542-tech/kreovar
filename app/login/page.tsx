@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import AuthShell, { authInputClass, authLabelClass, authSubmitClass } from "../components/AuthShell";
+import GoogleAuthButton from "../components/GoogleAuthButton";
 import { supabase } from "../lib/supabase";
 import { useAuthGate } from "../lib/useAuthGate";
 import Link from "next/link";
@@ -65,6 +66,12 @@ export default function Login() {
       {accountDeleted && <p role="status" className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">Your account has been deleted. You have been signed out.</p>}
       {error && <div id="auth-error" role="alert" className="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs leading-relaxed text-rose-700">{error}</div>}
       
+      <GoogleAuthButton disabled={loading} onBusyChange={setLoading} onError={setError} />
+      <div className="relative mb-5 flex items-center justify-center">
+        <div className="w-full border-t border-slate-200" />
+        <span className="bg-white px-3 text-[11px] font-medium uppercase tracking-wider text-slate-400">or</span>
+      </div>
+
       <form onSubmit={e => { e.preventDefault(); void handleLogin(); }} aria-busy={loading} className="space-y-5">
         <div><label htmlFor="login-email" className={authLabelClass}>Email address</label><input id="login-email" name="email" type="email" autoComplete="email" maxLength={254} required placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} aria-describedby={error ? "auth-error" : undefined} className={authInputClass} /></div>
         <div><label htmlFor="login-password" className={authLabelClass}>Password</label><div className="relative"><input id="login-password" name="password" type={show ? "text" : "password"} autoComplete="current-password" maxLength={256} required  placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} disabled={loading} aria-describedby={error ? "auth-error" : undefined} className={authInputClass + " pr-12"} /><button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"} aria-pressed={show} aria-controls="login-password" className="absolute inset-y-0 right-1 flex w-10 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-blue-600">{show ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}</button></div></div>

@@ -29,10 +29,14 @@ export async function completeAssetUpload(userId:string,id:unknown){
  const bucket=await db.storage.getBucket(STUDIO_BUCKET);if(bucket.error||bucket.data?.public!==false)throw new Error("Private asset storage is unavailable.");
  const storage=db.storage.from(STUDIO_BUCKET),info=await storage.info(row.storage_path);
  if(info.error||Number(info.data?.size)!==Number(row.size_bytes))throw new Error("Upload incomplete. Select the file again to retry.");
- const downloaded=await storage.download(row.storage_path);if(downloaded.error||!downloaded.data||downloaded.data.size!==Number(row.size_bytes))throw new Error("Could not verify upload. Please retry.");
- const bytes=Buffer.from(await downloaded.data.arrayBuffer()),caption=validateAssetBytes(bytes,row.mime);
- const hash=createHash("sha256").update(bytes).digest("hex");
- if(row.storage_path!==userId+"/"+hash+"."+assetExtensions[row.mime])throw new Error("Upload integrity check failed. Select the original file again.");
+ let caption:Record<string,unknown>={};
+ if(["application/x-subrip","text/vtt","text/plain"].includes(row.mime)||Number(row.size_bytes)<=5*1024*1024){
+  const downloaded=await storage.download(row.storage_path);if(downloaded.error||!downloaded.data||downloaded.data.size!==Number(row.size_bytes))throw new Error("Could not verify upload. Please retry.");
+  const bytes=Buffer.from(await downloaded.data.arrayBuffer());
+  caption=validateAssetBytes(bytes,row.mime);
+  const hash=createHash("sha256").update(bytes).digest("hex");
+  if(row.storage_path!==userId+"/"+hash+"."+assetExtensions[row.mime])throw new Error("Upload integrity check failed. Select the original file again.");
+ }
  const ready=await db.from("studio_assets").update({status:"ready",metadata:{...assetMetadata(row.metadata),...caption}}).eq("id",row.id).eq("user_id",userId).eq("status","pending").select().single();
  if(ready.error||!ready.data)throw new Error("The upload could not be saved. Please retry.");
  return assetView(ready.data as AssetRow);

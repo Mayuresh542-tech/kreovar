@@ -18,7 +18,7 @@ export default function AuthLoadingScreen({
           <div className="vx-auth-loading-mark mb-7 flex h-20 w-20 items-center justify-center rounded-3xl border border-white bg-white/80">
             <BrandMark size={48} />
           </div>
-          <h1 className="text-lg font-semibold tracking-tight">{label}</h1>
+          <p role="status" className="text-lg font-semibold tracking-tight">{label}</p>
           <p className="mt-2 text-sm leading-relaxed text-slate-500">Just a moment.</p>
           <div aria-hidden="true" className="mt-6 h-1 w-32 overflow-hidden rounded-full bg-slate-200">
             <div className="vx-loading-track h-full w-1/2 rounded-full bg-blue-600" />
