@@ -64,6 +64,9 @@ function loader(mocks = {}) {
     'app/lib/editor/compositor.ts': {
       Compositor: class { sync() { return true; } render() {} dispose() {} }
     },
+    'app/lib/server/editorAiCatalog.ts': { loadAiCatalog: async () => [] },
+    'app/lib/server/editorStyleReferences.ts': { editorStyleReferenceContext: () => ({ references: [], images: [], selectedIds: [] }) },
+    'app/lib/server/radoxConfig.ts': { EDITOR_AI_MAX_TOKENS: 4096 },
     ...mocks
   };
 
@@ -141,5 +144,92 @@ describe('Task 1: Creator Presets & applyEffects Resilience', () => {
     // Should not throw on uncut single-clip footage with explanation
     const validated = pipeline.validateStageChanges('applyEffects', p, p, output);
     assert.equal(validated.summary, output.summary);
+  });
+});
+
+describe('Task 2: Caption Studio Integration & Model Prompting in editorAi.ts', () => {
+  const aiVal = load('app/lib/editor/aiValidation.ts');
+
+  test('validateAiPlan accepts Caption Studio reference templates', () => {
+    let p = sourceProject();
+    p = ops.addCaption(p, 'Hello world', 0, 3);
+    const clipId = Object.values(p.clips).find(c => c.contentId && p.captions[c.contentId])?.id;
+    assert.ok(clipId, 'Caption clip must exist');
+
+    const templatesToTest = [
+      'study-hormozi-style',
+      'study-ali-abdaal',
+      'study-mr-beast-style-2',
+      'study-clean-motion',
+      'study-thora-cinematic'
+    ];
+
+    for (const templateId of templatesToTest) {
+      const plan = {
+        summary: `Restyling with ${templateId}`,
+        decisions: [
+          {
+            op: 'applyCaptionTemplate',
+            clipIds: [clipId],
+            templateId
+          }
+        ]
+      };
+      const validated = aiVal.validateAiPlan(plan, p);
+      assert.equal(validated.list.decisions[0].templateId, templateId);
+    }
+  });
+
+  test('planAiEdit exposes Caption Studio templates and instructions in model prompt', async () => {
+    let capturedOptions = null;
+    const testLoader = loader({
+      'app/lib/server/editorProvider.ts': {
+        generateEditPlanJson: async (options) => {
+          capturedOptions = options;
+          return {
+            attempts: 1,
+            provider: 'groq',
+            model: 'qwen',
+            value: {
+              summary: 'Planned creator styling',
+              intent: { goal: 'edit', preserve: [], questions: [] },
+              decisions: [],
+              toolRequests: []
+            }
+          };
+        },
+        editorProviderSummary: (s) => s
+      }
+    });
+
+    const editorAi = testLoader('app/lib/server/editorAi.ts');
+    const p = sourceProject();
+    await editorAi.planAiEdit(p, 'make an engaging creator video', [], 'test-user', new AbortController().signal);
+
+    assert(capturedOptions, 'planAiEdit must call generateEditPlanJson with options');
+    const promptData = JSON.parse(capturedOptions.prompt);
+    const templateIds = promptData.captionTemplates.map(t => t.id);
+
+    const requiredTemplates = [
+      'study-hormozi-style',
+      'study-ali-abdaal',
+      'study-mr-beast-style-2',
+      'study-clean-motion',
+      'study-thora-cinematic',
+      'study-deep-glow',
+      'study-liquid-glass',
+      'study-scribble',
+      'study-pop-up'
+    ];
+
+    for (const reqId of requiredTemplates) {
+      assert(templateIds.includes(reqId), `captionTemplates in prompt must include ${reqId}`);
+    }
+
+    const sys = capturedOptions.systemInstruction;
+    assert(sys.includes('study-hormozi-style') || sys.includes('Hormozi'), 'System prompt should mention Hormozi style');
+    assert(sys.includes('study-ali-abdaal') || sys.includes('Ali Abdaal'), 'System prompt should mention Ali Abdaal style');
+    assert(sys.includes('returnToStart'), 'System prompt should guide on paired zoom keyframes with returnToStart');
+    assert(sys.includes('addTransition'), 'System prompt should guide on transitions between cuts');
   });
 });

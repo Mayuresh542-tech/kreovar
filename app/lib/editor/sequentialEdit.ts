@@ -20,12 +20,12 @@ export const STAGE_LABELS:Record<EditStage,string> = {
 };
 export interface PipelinePreset {id:string;name:string;instruction:string;operations:EditOperation[];captionTemplate:string}
 export const PIPELINE_PRESETS:PipelinePreset[] = [
+ {id:'engaging',name:'Engaging talking head',instruction:'Add animated captions, motion graphics, relevant B-roll and subtle zoom effects.',operations:['captions','motionGraphics','broll','zooms'],captionTemplate:'signature-poppins'},
  {id:'hormozi',name:'Hormozi Viral',instruction:'Add bold high-energy pop captions, dynamic punch zooms, callout accents and restrained sound effects.',operations:['captions','motionGraphics','zooms','soundEffects'],captionTemplate:'study-hormozi-style'},
  {id:'podcast-pro',name:'Smart Podcast',instruction:'Add clean spotlight captions, subtle conversation zooms, audio ducking and smooth transitions.',operations:['captions','zooms','effects'],captionTemplate:'study-ali-abdaal'},
  {id:'mrbeast',name:'MrBeast Energy',instruction:'Add bouncy colorful captions, rapid B-roll cutaways, graphic stats and subtle zoom pulses.',operations:['captions','motionGraphics','broll','zooms'],captionTemplate:'study-mr-beast-style-2'},
  {id:'documentary',name:'Cinematic Doc',instruction:'Add wide-spaced cinematic subtitles, archival B-roll overlays, slow zoom-in holds and smooth crossfades.',operations:['captions','broll','zooms','effects'],captionTemplate:'study-thora-cinematic'},
  {id:'clean',name:'Clean Minimal',instruction:'Add readable animated subtitles. Preserve the original footage, dialogue and framing.',operations:['captions'],captionTemplate:'study-clean-motion'},
- {id:'engaging',name:'Engaging talking head',instruction:'Add animated captions, motion graphics, relevant B-roll and subtle zoom effects.',operations:['captions','motionGraphics','broll','zooms'],captionTemplate:'signature-poppins'},
  {id:'punchy',name:'Caption emphasis',instruction:'Add animated captions, sparse motion graphic callouts, subtle zooms and restrained sound effects.',operations:['captions','motionGraphics','zooms','soundEffects'],captionTemplate:'signature-poppins'}
 ];
 export interface StageOutput {
