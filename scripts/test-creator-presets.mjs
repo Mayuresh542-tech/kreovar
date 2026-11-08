@@ -250,3 +250,326 @@ describe('Task 3: Client Sequential Execution & Featured UI Preset Picker', () =
     assert(clientSource.includes("case 'applyEffects':"), "sequentialEditClient must have dedicated case 'applyEffects': handler");
   });
 });
+
+describe('Task 4: End-to-End Real Video Verification Across All 5 Creator Presets', () => {
+  const captionTiming = load('app/lib/editor/captionTiming.ts');
+  const transcriptPath = 'C:/Users/Admin/.gemini/antigravity/brain/17d8113a-a37c-4601-9463-ce98f962f96c/transcript.json';
+  const videoPath = 'C:/Users/Admin/.gemini/antigravity/brain/17d8113a-a37c-4601-9463-ce98f962f96c/.user_uploaded/media_1794065113502_57981980.mp4';
+  
+  const transcriptRaw = JSON.parse(fs.readFileSync(transcriptPath, 'utf8'));
+  const transcriptWords = transcriptRaw.words.map(w => ({ word: w.text || w.word, start: w.start, end: w.end }));
+
+  function createManojProject(projectId) {
+    let p = model.createProject(projectId);
+    p.settings.aspectRatio = '9:16';
+    p.settings.fps = 30;
+
+    p = ops.addAsset(p, {
+      id: 'manoj-asset',
+      kind: 'video',
+      name: 'Manoj_Bajpayee_Roto.mp4',
+      duration: 16.554667,
+      width: 1080,
+      height: 1920,
+      mime: 'video/mp4',
+      size: 14645822,
+      url: videoPath
+    });
+
+    p = ops.addClip(p, 'manoj-asset', 'track-video', 0, {
+      id: 'manoj-clip',
+      name: 'Manoj Bajpayee Speech',
+      duration: 16.554667,
+      sourceStart: 0,
+      sourceEnd: 16.554667,
+      volume: 1
+    });
+
+    return p;
+  }
+
+  function makeRuntime(initialProject, stageHandler) {
+    let project = structuredClone(initialProject);
+    return {
+      getProject: () => project,
+      interacting: () => false,
+      persist: async (next, job) => {
+        job.timelineRevision = project.revision + 1;
+        project = { ...next, revision: job.timelineRevision, editingJob: structuredClone(job) };
+      },
+      execute: async (...args) => stageHandler(...args)
+    };
+  }
+
+  test('Preset 1: "clean" executes end-to-end with study-clean-motion captions', async () => {
+    const project = createManojProject('clean-creator-test');
+    const preset = pipeline.PIPELINE_PRESETS.find(p => p.id === 'clean');
+    assert(preset, 'Preset clean must exist');
+    assert.equal(preset.captionTemplate, 'study-clean-motion');
+
+    const timedCaptions = captionTiming.captionsForClip(project.clips['manoj-clip'], transcriptWords);
+    assert(timedCaptions.length > 0, 'Timed captions must be generated from speech words');
+
+    const job = pipeline.createEditingJob(project, preset.instruction, [], preset);
+    assert.equal(JSON.stringify(job.stages.map(s => s.id)), JSON.stringify(['analyzeFootage', 'applyCaptions', 'validateEdit']));
+
+    const runtime = makeRuntime(project, async (stage, proj, j) => {
+      switch (stage) {
+        case 'analyzeFootage':
+          return { summary: 'Analyzed 1 source clip (16.55s), 64 speech segments.', operations: preset.operations };
+        case 'applyCaptions':
+          return {
+            summary: 'Apply timed speech captions with study-clean-motion',
+            decisions: timedCaptions.map(c => ({
+              op: 'addCaption',
+              text: c.text,
+              startTime: c.start,
+              duration: c.duration,
+              templateId: preset.captionTemplate,
+              words: c.words
+            }))
+          };
+        case 'validateEdit':
+          return pipeline.validateCompletedJob(proj, j);
+        default:
+          throw Error(stage);
+      }
+    });
+
+    const result = await pipeline.runEditingJob(runtime, job, new AbortController().signal);
+    assert.equal(result.status, 'completed');
+    assert.equal(result.appliedOperations.length, 1);
+    const finalProject = runtime.getProject();
+    assert.equal(Object.keys(finalProject.captions).length, timedCaptions.length);
+  });
+
+  test('Preset 2: "hormozi" executes end-to-end with study-hormozi-style, zooms, graphics, SFX', async () => {
+    const project = createManojProject('hormozi-creator-test');
+    const preset = pipeline.PIPELINE_PRESETS.find(p => p.id === 'hormozi');
+    assert(preset, 'Preset hormozi must exist');
+    assert.equal(preset.captionTemplate, 'study-hormozi-style');
+
+    const timedCaptions = captionTiming.captionsForClip(project.clips['manoj-clip'], transcriptWords);
+    const sfxAsset = { id: 'pop-sfx', kind: 'audio', name: 'pop.mp3', duration: 1, width: 0, height: 0, mime: 'audio/mp3', size: 1000 };
+
+    const job = pipeline.createEditingJob(project, preset.instruction, [], preset);
+    const runtime = makeRuntime(project, async (stage, proj, j) => {
+      switch (stage) {
+        case 'analyzeFootage':
+          return { summary: 'Analyzed 1 source clip', operations: preset.operations };
+        case 'applyCaptions':
+          return {
+            summary: 'Apply timed speech captions with study-hormozi-style',
+            decisions: timedCaptions.map(c => ({
+              op: 'addCaption',
+              text: c.text,
+              startTime: c.start,
+              duration: c.duration,
+              templateId: preset.captionTemplate,
+              words: c.words
+            }))
+          };
+        case 'planMotionGraphics':
+          return {
+            summary: 'Add punchy callout graphic',
+            decisions: [{ op: 'addGraphic', kind: 'callout', text: 'DISCIPLINE', startTime: 2.0, duration: 1.5, motion: 'pop' }]
+          };
+        case 'applyMotionGraphics':
+          return j.stages.find(s => s.id === 'planMotionGraphics').output;
+        case 'applyZooms':
+          return {
+            summary: 'Dynamic punch zoom',
+            decisions: [{ op: 'addZoom', clipId: 'manoj-clip', startTime: 3.5, endTime: 5.0, fromScale: 1, toScale: 1.15, returnToStart: true, easing: 'smooth' }]
+          };
+        case 'applySoundEffects':
+          return {
+            summary: 'Restrained punch SFX',
+            assets: [sfxAsset],
+            decisions: [{ op: 'addClip', assetId: 'pop-sfx', trackId: 'track-audio', startTime: 3.5, duration: 0.8, volume: 0.15, audioRole: 'sfx' }]
+          };
+        case 'validateEdit':
+          return pipeline.validateCompletedJob(proj, j);
+        default:
+          throw Error(stage);
+      }
+    });
+
+    const result = await pipeline.runEditingJob(runtime, job, new AbortController().signal);
+    assert.equal(result.status, 'completed');
+    assert.equal(result.appliedOperations.length, 4);
+    const finalProject = runtime.getProject();
+    assert.equal(finalProject.clips['manoj-clip'].zooms.length, 1);
+    assert.equal(finalProject.clips['manoj-clip'].zooms[0].returnToStart, true);
+    assert.equal(finalProject.clips['manoj-clip'].zooms[0].toScale, 1.15);
+  });
+
+  test('Preset 3: "podcast-pro" executes end-to-end with study-ali-abdaal, zooms, ducking resilience', async () => {
+    const project = createManojProject('podcast-creator-test');
+    const preset = pipeline.PIPELINE_PRESETS.find(p => p.id === 'podcast-pro');
+    assert(preset, 'Preset podcast-pro must exist');
+    assert.equal(preset.captionTemplate, 'study-ali-abdaal');
+
+    const timedCaptions = captionTiming.captionsForClip(project.clips['manoj-clip'], transcriptWords);
+    const job = pipeline.createEditingJob(project, preset.instruction, [], preset);
+
+    const runtime = makeRuntime(project, async (stage, proj, j) => {
+      switch (stage) {
+        case 'analyzeFootage':
+          return { summary: 'Analyzed 1 source clip', operations: preset.operations };
+        case 'applyCaptions':
+          return {
+            summary: 'Apply spotlight captions with study-ali-abdaal',
+            decisions: timedCaptions.map(c => ({
+              op: 'addCaption',
+              text: c.text,
+              startTime: c.start,
+              duration: c.duration,
+              templateId: preset.captionTemplate,
+              words: c.words
+            }))
+          };
+        case 'applyZooms':
+          return {
+            summary: 'Subtle conversation emphasis zoom',
+            decisions: [{ op: 'addZoom', clipId: 'manoj-clip', startTime: 4.0, endTime: 6.0, fromScale: 1, toScale: 1.10, returnToStart: true, easing: 'smooth' }]
+          };
+        case 'applyEffects':
+          return {
+            summary: 'Preserved continuous footage without artificial transitions.',
+            skipRationale: 'Single continuous uncut clip',
+            decisions: [{ op: 'setAudioDucking', enabled: true }]
+          };
+        case 'validateEdit':
+          return pipeline.validateCompletedJob(proj, j);
+        default:
+          throw Error(stage);
+      }
+    });
+
+    const result = await pipeline.runEditingJob(runtime, job, new AbortController().signal);
+    assert.equal(result.status, 'completed');
+    assert.equal(result.appliedOperations.length, 3);
+    const finalProject = runtime.getProject();
+    assert.equal(finalProject.settings.audioDucking, true);
+  });
+
+  test('Preset 4: "mrbeast" executes end-to-end with study-mr-beast-style-2, B-roll, zooms, stats', async () => {
+    const project = createManojProject('mrbeast-creator-test');
+    const preset = pipeline.PIPELINE_PRESETS.find(p => p.id === 'mrbeast');
+    assert(preset, 'Preset mrbeast must exist');
+    assert.equal(preset.captionTemplate, 'study-mr-beast-style-2');
+
+    const timedCaptions = captionTiming.captionsForClip(project.clips['manoj-clip'], transcriptWords);
+    const brollAsset = { id: 'mrbeast-broll', kind: 'video', name: 'reaction.mp4', duration: 3, width: 1080, height: 1920, mime: 'video/mp4', size: 5000 };
+    const job = pipeline.createEditingJob(project, preset.instruction, [], preset);
+
+    const runtime = makeRuntime(project, async (stage, proj, j) => {
+      switch (stage) {
+        case 'analyzeFootage':
+          return { summary: 'Analyzed 1 source clip', operations: preset.operations };
+        case 'applyCaptions':
+          return {
+            summary: 'Apply vibrant captions with study-mr-beast-style-2',
+            decisions: timedCaptions.map(c => ({
+              op: 'addCaption',
+              text: c.text,
+              startTime: c.start,
+              duration: c.duration,
+              templateId: preset.captionTemplate,
+              words: c.words
+            }))
+          };
+        case 'planMotionGraphics':
+          return {
+            summary: 'Add stat graphic',
+            decisions: [{ op: 'addGraphic', kind: 'stat', text: '1,000,000', startTime: 1.5, duration: 1.5, motion: 'pop' }]
+          };
+        case 'applyMotionGraphics':
+          return j.stages.find(s => s.id === 'planMotionGraphics').output;
+        case 'findBroll':
+          return {
+            summary: 'Selected reaction B-roll',
+            assets: [brollAsset],
+            decisions: [{ op: 'addClip', assetId: 'mrbeast-broll', trackId: 'track-overlay', startTime: 6.0, duration: 2.5, volume: 0 }]
+          };
+        case 'applyBroll':
+          return j.stages.find(s => s.id === 'findBroll').output;
+        case 'applyZooms':
+          return {
+            summary: 'Dynamic zoom pulse',
+            decisions: [{ op: 'addZoom', clipId: 'manoj-clip', startTime: 1.5, endTime: 3.0, fromScale: 1, toScale: 1.14, returnToStart: true, easing: 'smooth' }]
+          };
+        case 'validateEdit':
+          return pipeline.validateCompletedJob(proj, j);
+        default:
+          throw Error(stage);
+      }
+    });
+
+    const result = await pipeline.runEditingJob(runtime, job, new AbortController().signal);
+    assert.equal(result.status, 'completed');
+    assert.equal(result.appliedOperations.length, 4);
+    const finalProject = runtime.getProject();
+    assert(Object.values(finalProject.clips).some(c => c.assetId === 'mrbeast-broll'));
+  });
+
+  test('Preset 5: "documentary" executes end-to-end with study-thora-cinematic, B-roll, slow zoom, ducking', async () => {
+    const project = createManojProject('documentary-creator-test');
+    const preset = pipeline.PIPELINE_PRESETS.find(p => p.id === 'documentary');
+    assert(preset, 'Preset documentary must exist');
+    assert.equal(preset.captionTemplate, 'study-thora-cinematic');
+
+    const timedCaptions = captionTiming.captionsForClip(project.clips['manoj-clip'], transcriptWords);
+    const docBroll = { id: 'doc-archival', kind: 'video', name: 'archival.mp4', duration: 4, width: 1080, height: 1920, mime: 'video/mp4', size: 6000 };
+    const job = pipeline.createEditingJob(project, preset.instruction, [], preset);
+
+    const runtime = makeRuntime(project, async (stage, proj, j) => {
+      switch (stage) {
+        case 'analyzeFootage':
+          return { summary: 'Analyzed 1 source clip', operations: preset.operations };
+        case 'applyCaptions':
+          return {
+            summary: 'Apply cinematic subtitles with study-thora-cinematic',
+            decisions: timedCaptions.map(c => ({
+              op: 'addCaption',
+              text: c.text,
+              startTime: c.start,
+              duration: c.duration,
+              templateId: preset.captionTemplate,
+              words: c.words
+            }))
+          };
+        case 'findBroll':
+          return {
+            summary: 'Archival B-roll footage',
+            assets: [docBroll],
+            decisions: [{ op: 'addClip', assetId: 'doc-archival', trackId: 'track-overlay', startTime: 8.0, duration: 3.0, volume: 0 }]
+          };
+        case 'applyBroll':
+          return j.stages.find(s => s.id === 'findBroll').output;
+        case 'applyZooms':
+          return {
+            summary: 'Slow cinematic zoom hold',
+            decisions: [{ op: 'addZoom', clipId: 'manoj-clip', startTime: 8.0, endTime: 11.0, fromScale: 1, toScale: 1.08, returnToStart: true, easing: 'smooth' }]
+          };
+        case 'applyEffects':
+          return {
+            summary: 'Preserved continuous footage without artificial transitions.',
+            skipRationale: 'Single continuous uncut clip',
+            decisions: [{ op: 'setAudioDucking', enabled: true }]
+          };
+        case 'validateEdit':
+          return pipeline.validateCompletedJob(proj, j);
+        default:
+          throw Error(stage);
+      }
+    });
+
+    const result = await pipeline.runEditingJob(runtime, job, new AbortController().signal);
+    assert.equal(result.status, 'completed');
+    assert.equal(result.appliedOperations.length, 4);
+    const finalProject = runtime.getProject();
+    assert(Object.values(finalProject.clips).some(c => c.assetId === 'doc-archival'));
+    assert.equal(finalProject.settings.audioDucking, true);
+  });
+});
