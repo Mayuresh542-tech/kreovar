@@ -1,5 +1,6 @@
 import type { EditorProject, Clip } from './model';
-import type { EditDecision, AiToolRequest } from './ai';
+import type { EditDecision } from './ai';
+import type { AiToolRequest } from './aiTools';
 import type { EditingConstraints } from './editingIntent';
 import { matchPhraseToSpeech, type SpeechSegmentLike } from './phraseMatcher';
 
@@ -132,7 +133,17 @@ export function reconcileEditingDecisions(
             if (d.op === 'addZoom') {
               d.startTime = match.start;
               d.endTime = Math.max(match.start + 0.6, match.end);
-              d.clipId = match.clipId;
+              const currentClip = project.clips[d.clipId];
+              const isVideoClip = currentClip && (currentClip.trackId === 'track-video' || project.tracks[currentClip.trackId]?.kind === 'video' || project.tracks[currentClip.trackId]?.kind === 'image');
+              if (!isVideoClip) {
+                const videoClip = Object.values(project.clips).find(
+                  c => (c.trackId === 'track-video' || project.tracks[c.trackId]?.kind === 'video' || project.tracks[c.trackId]?.kind === 'image') &&
+                       c.startTime <= match.start && (c.startTime + c.duration) >= match.end
+                );
+                if (videoClip) {
+                  d.clipId = videoClip.id;
+                }
+              }
               break;
             }
           }

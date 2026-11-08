@@ -5,6 +5,7 @@ import {analysisFootage} from "../editor/footageContext";
 import type {FootageFrame} from '../editor/footageContext';
 import {TEXT_PLACEMENTS} from "../editor/textPlacement";
 import {readEditingIntent} from "../editor/editingIntent";
+import {reconcileEditingDecisions} from "../editor/inPlaceReconciler";
 import {planningMetadata} from '../editor/planningMetadata';
 import {ALL_CAPTION_TEMPLATES as DEFAULT_CAPTION_TEMPLATES} from "../captions/referenceTemplates";
 import {applyEditDecisionList} from "../editor/ai";
@@ -92,19 +93,50 @@ CLARIFICATION: If user instructions are genuinely ambiguous or contradictory, re
   };
   let result=await complete(options);
   const validate=(value:unknown)=>{
+    const intent=readEditingIntent(value, instruction);
     if(context.pipelineStage==='applyRequestedEdits'){
-      const intent=readEditingIntent(value);
       if(intent?.questions?.length){
         return {summary:intent.summary,questions:intent.questions,list:{version:1 as const,projectId:project.id,baseRevision:project.revision,decisions:[]},toolRequests:[],catalog};
       }
     }
+    let workingValue = value;
+    let summaryNotes: string[] = [];
+    if ((context.pipelineStage === 'applyRequestedEdits' || !context.pipelineStage) && value && typeof value === 'object') {
+      const valObj = value as Record<string, unknown>;
+      const rawDecisions = Array.isArray(valObj.decisions) ? (valObj.decisions as any[]) : [];
+      const rawTools = Array.isArray(valObj.toolRequests) ? (valObj.toolRequests as any[]) : [];
+      const speech = speechContext(project);
+      const reconciled = reconcileEditingDecisions(
+        project,
+        rawDecisions,
+        rawTools,
+        intent?.constraints,
+        speech
+      );
+      summaryNotes = reconciled.summaryNotes;
+      workingValue = {
+        ...valObj,
+        decisions: reconciled.decisions,
+        toolRequests: reconciled.toolRequests
+      };
+    }
     if(context.pipelineStage){
-      const validated=validateAiPlan(value,project),toolProject=context.pipelineStage==='applyRequestedEdits'?applyEditDecisionList(project,validated.list):project,tools=validateAiTools((value as {toolRequests?:unknown}).toolRequests,toolProject,catalog);
+      const validated=validateAiPlan(workingValue,project),toolProject=context.pipelineStage==='applyRequestedEdits'?applyEditDecisionList(project,validated.list):project,tools=validateAiTools((workingValue as {toolRequests?:unknown}).toolRequests,toolProject,catalog);
       if(tools.some(r=>r.type==='image')&&process.env.IMAGE_GENERATION_ENABLED!=="true")throw Error('Image generation is unavailable. Do not request images or enable a provider.');
       assertStagePlan(context.pipelineStage,validated.list.decisions,tools,project);
-      const requiredOperations=context.pipelineStage==='analyzeFootage'?readRequestedOperations((value as {requiredOperations?:unknown}).requiredOperations):undefined;
-      return {...validated,toolRequests:tools,catalog,...(requiredOperations?{requiredOperations}:{})};
-    }const intent=readEditingIntent(value);if(intent?.questions.length)return {summary:intent.summary,list:{version:1 as const,projectId:project.id,baseRevision:project.revision,decisions:[]},toolRequests:[],catalog};const validated=validateAiPlan(value,project),editorialAnalysis=readEditorialAnalysis((value as {editorialAnalysis?:unknown}).editorialAnalysis);if(context.completeEdit&&Object.keys(project.captions).length&&!editorialAnalysis)throw Error("Explain your subject understanding, chosen caption template and B-roll strategy in editorialAnalysis.");if(context.completeEdit&&editorialAnalysis&&!instruction.includes("Do not create or restyle captions.")){const scope=analysisFootage(project,selectedClipIds),captionIds=Object.values(project.clips).filter(c=>c.contentId&&project.captions[c.contentId]&&!project.tracks[c.trackId].locked&&!project.tracks[c.trackId].hidden&&scope.some(v=>c.startTime>=v.startTime-.01&&c.startTime+c.duration<=v.startTime+v.duration+.01)).map(c=>c.id);const styled=new Set(validated.list.decisions.flatMap(d=>d.op==="applyCaptionTemplate"&&d.templateId===editorialAnalysis.captionStyle.templateId?d.clipIds:[]));if(captionIds.some(id=>!styled.has(id)))throw Error("Apply the caption template you chose in editorialAnalysis to every unlocked in-scope caption. Choosing a style in prose alone is not an edit.");}const toolRequests=validateAiTools((value as {toolRequests?:unknown})?.toolRequests,applyEditDecisionList(project,validated.list),catalog);if(context.completeEdit&&editorialAnalysis&&styleReference.selectedIds.length===1&&!instruction.includes('Do not create or restyle captions.'))reviewReferenceComposition(project,validated.list,selectedClipIds,styleReference.selectedIds[0],editorialAnalysis.captionStyle.templateId,toolRequests,{graphics:!instruction.includes('No graphics/shapes/titles.'),media:!instruction.includes('No stock B-roll.')});return {...validated,...(editorialAnalysis?{editorialAnalysis}:{}),...(intent?{summary:intent.summary+"\n\n"+validated.summary}:{}),toolRequests,catalog};};
+      const requiredOperations=context.pipelineStage==='analyzeFootage'?readRequestedOperations((workingValue as {requiredOperations?:unknown}).requiredOperations):undefined;
+      const combinedSummary = summaryNotes.length > 0 ? `${validated.summary}\n\n${summaryNotes.join('\n')}` : validated.summary;
+      return {...validated,summary:combinedSummary,toolRequests:tools,catalog,...(requiredOperations?{requiredOperations}:{})};
+    }
+    if(intent?.questions?.length)return {summary:intent.summary,list:{version:1 as const,projectId:project.id,baseRevision:project.revision,decisions:[]},toolRequests:[],catalog};
+    const validated=validateAiPlan(workingValue,project),editorialAnalysis=readEditorialAnalysis((workingValue as {editorialAnalysis?:unknown}).editorialAnalysis);
+    if(context.completeEdit&&Object.keys(project.captions).length&&!editorialAnalysis)throw Error("Explain your subject understanding, chosen caption template and B-roll strategy in editorialAnalysis.");
+    if(context.completeEdit&&editorialAnalysis&&!instruction.includes("Do not create or restyle captions.")){const scope=analysisFootage(project,selectedClipIds),captionIds=Object.values(project.clips).filter(c=>c.contentId&&project.captions[c.contentId]&&!project.tracks[c.trackId].locked&&!project.tracks[c.trackId].hidden&&scope.some(v=>c.startTime>=v.startTime-.01&&c.startTime+c.duration<=v.startTime+v.duration+.01)).map(c=>c.id);const styled=new Set(validated.list.decisions.flatMap(d=>d.op==="applyCaptionTemplate"&&d.templateId===editorialAnalysis.captionStyle.templateId?d.clipIds:[]));if(captionIds.some(id=>!styled.has(id)))throw Error("Apply the caption template you chose in editorialAnalysis to every unlocked in-scope caption. Choosing a style in prose alone is not an edit.");}
+    const toolRequests=validateAiTools((workingValue as {toolRequests?:unknown})?.toolRequests,applyEditDecisionList(project,validated.list),catalog);
+    if(context.completeEdit&&editorialAnalysis&&styleReference.selectedIds.length===1&&!instruction.includes('Do not create or restyle captions.'))reviewReferenceComposition(project,validated.list,selectedClipIds,styleReference.selectedIds[0],editorialAnalysis.captionStyle.templateId,toolRequests,{graphics:!instruction.includes('No graphics/shapes/titles.'),media:!instruction.includes('No stock B-roll.')});
+    const combinedSummary = summaryNotes.length > 0 ? `${validated.summary}\n\n${summaryNotes.join('\n')}` : validated.summary;
+    return {...validated,summary:combinedSummary,...(editorialAnalysis?{editorialAnalysis}:{}),...(intent?{summary:intent.summary+"\n\n"+combinedSummary}:{}),toolRequests,catalog};
+  };
   try{return finish(validate(result));}catch(error){
     signal.throwIfAborted();
     // One bounded correction for invalid decisions. Provider/quota failures are never retried here.

@@ -21,11 +21,11 @@ export interface ParsedEditingIntent {
 export function extractEditingConstraints(instruction = '', preserveList: string[] = []): EditingConstraints {
  const text = (instruction + ' ' + preserveList.join(' ')).toLowerCase();
 
- const noAudio = /\b(?:no\s+music|don'?t\s+add\s+(?:any\s+)?music|without\s+(?:any\s+)?music|no\s+background\s+audio|don'?t\s+change\s+audio|music\s+mat\b|audio\s+mat\b|bina\s+music\b|koi\s+music\s+mat\b)/i.test(text);
- const noSfx = /\b(?:no\s+sfx|no\s+sound\s+effects?|without\s+sfx|without\s+sound\s+effects?|sfx\s+mat\b|bina\s+sfx\b)/i.test(text);
- const noCuts = /\b(?:don'?t\s+cut|no\s+cuts?|without\s+cutting|don'?t\s+trim\s+(?:any\s+)?speech|don'?t\s+remove\s+(?:any\s+)?speech|cut\s+mat\b|mat\s+katna\b)/i.test(text);
- const noBroll = /\b(?:no\s+b[ -]?roll|without\s+b[ -]?roll|without\s+stock|no\s+stock|broll\s+mat\b)/i.test(text);
- const noZooms = /\b(?:no\s+zooms?|without\s+zooms?|zoom\s+mat\b)/i.test(text);
+ const noAudio = /\b(?:no\s+(?:music|audio|background\s+audio)|(?:do\s+not|don'?t)\s+(?:add\s+(?:any\s+)?|make\s+(?:any\s+)?|touch\s+(?:any\s+)?|change\s+)?(?:music|audio)|without\s+(?:any\s+)?(?:music|audio)|audio\s+changes?|preserve\s+(?:the\s+)?audio|music\s+mat\b|audio\s+mat\b|bina\s+music\b|koi\s+music\s+mat\b)/i.test(text);
+ const noSfx = /\b(?:no\s+sfx|no\s+sound\s+effects?|without\s+sfx|without\s+sound\s+effects?|(?:do\s+not|don'?t)\s+(?:add\s+(?:any\s+)?|use\s+(?:any\s+)?)(?:sfx|sound\s+effects?)|sfx\s+mat\b|bina\s+sfx\b)/i.test(text);
+ const noCuts = /\b(?:(?:do\s+not|don'?t)\s+cut|no\s+cuts?|without\s+cutting|(?:do\s+not|don'?t)\s+trim\s+(?:any\s+)?speech|(?:do\s+not|don'?t)\s+remove\s+(?:any\s+)?speech|cut\s+mat\b|mat\s+katna\b)/i.test(text);
+ const noBroll = /\b(?:no\s+b[ -]?roll|without\s+b[ -]?roll|without\s+stock|no\s+stock|(?:do\s+not|don'?t)\s+(?:add\s+(?:any\s+)?|use\s+(?:any\s+)?)(?:b[ -]?roll|stock)|broll\s+mat\b)/i.test(text);
+ const noZooms = /\b(?:no\s+zooms?|without\s+zooms?|(?:do\s+not|don'?t)\s+zoom|zoom\s+mat\b)/i.test(text);
  const removeZooms = /\b(?:remove\s+(?:the\s+)?zooms?|clear\s+(?:all\s+)?zooms?|delete\s+(?:the\s+)?zooms?)\b/i.test(text);
 
  const protectedIntervals: Array<{ start: number; end: number }> = [];
