@@ -233,3 +233,20 @@ describe('Task 2: Caption Studio Integration & Model Prompting in editorAi.ts', 
     assert(sys.includes('addTransition'), 'System prompt should guide on transitions between cuts');
   });
 });
+
+describe('Task 3: Client Sequential Execution & Featured UI Preset Picker', () => {
+  test('AiEditingChat filters presets to 5 featured creator presets', () => {
+    const chatSource = fs.readFileSync(path.join(root, 'app/components/editor/workspace/AiEditingChat.tsx'), 'utf8');
+    assert(chatSource.includes('FEATURED_PRESET_IDS'), 'AiEditingChat must define FEATURED_PRESET_IDS');
+    assert(chatSource.includes('hormozi'), 'Featured presets must include hormozi');
+    assert(chatSource.includes('podcast-pro'), 'Featured presets must include podcast-pro');
+    assert(chatSource.includes('mrbeast'), 'Featured presets must include mrbeast');
+    assert(chatSource.includes('documentary'), 'Featured presets must include documentary');
+    assert(chatSource.includes('clean'), 'Featured presets must include clean');
+  });
+
+  test('client applyEffects handles uncut single clip without throwing', async () => {
+    const clientSource = fs.readFileSync(path.join(root, 'app/lib/editor/sequentialEditClient.ts'), 'utf8');
+    assert(clientSource.includes("case 'applyEffects':"), "sequentialEditClient must have dedicated case 'applyEffects': handler");
+  });
+});

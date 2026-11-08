@@ -7,6 +7,9 @@ import {useProject} from '@/app/lib/editor/store';
 import {createEditingJob,PIPELINE_PRESETS,STAGE_LABELS,type EditingJob} from '@/app/lib/editor/sequentialEdit';
 import {runSequentialEdit} from '@/app/lib/editor/sequentialEditClient';
 
+export const FEATURED_PRESET_IDS = ['hormozi', 'podcast-pro', 'mrbeast', 'documentary', 'clean'] as const;
+const FEATURED_PRESETS = FEATURED_PRESET_IDS.map(id => PIPELINE_PRESETS.find(p => p.id === id)).filter((p): p is import('@/app/lib/editor/sequentialEdit').PipelinePreset => !!p);
+
 export default function AiEditingChat({active,onManual}:{active:boolean;onManual:()=>void}){
  const {store,repository,scope,selection,playback,authToken}=useEditor(),project=useProject(store),job=project.editingJob;
  const [input,setInput]=useState(''),[preset,setPreset]=useState<string>(),[busy,setBusy]=useState(false),[error,setError]=useState<string>();
@@ -43,7 +46,7 @@ export default function AiEditingChat({active,onManual}:{active:boolean;onManual
   </div>
   <form onSubmit={e=>{e.preventDefault();start();}} className="vx-ai-chat-input">
    <textarea aria-label="AI editing instructions" placeholder="Describe your edit…" value={input} maxLength={2000} disabled={busy} onChange={e=>{setInput(e.target.value);setPreset(undefined);}}/>
-   <fieldset className="vx-ai-chat-presets" disabled={busy}><legend>Try a preset</legend><div>{PIPELINE_PRESETS.map(p=><button key={p.id} type="button" aria-pressed={preset===p.id} title={p.instruction} onClick={()=>{setPreset(p.id);setInput(p.instruction);}}>{p.name}</button>)}</div></fieldset>
+   <fieldset className="vx-ai-chat-presets" disabled={busy}><legend>Try a preset</legend><div>{FEATURED_PRESETS.map(p=><button key={p.id} type="button" aria-pressed={preset===p.id} title={p.instruction} onClick={()=>{setPreset(p.id);setInput(p.instruction);}}>{p.name}</button>)}</div></fieldset>
    <div>{busy?<button type="button" className="vx-secondary" onClick={()=>pending.current?.abort()}><Square size={13}/> Cancel operation</button>:<button className="vx-primary" disabled={!input.trim()}><Send size={14}/> {resumable?'Start new edit':'Send'}</button>}</div>
   </form>
  </aside>;

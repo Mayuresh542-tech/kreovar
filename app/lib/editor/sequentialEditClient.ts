@@ -126,7 +126,21 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
     const toolProject=output.preparedApplied?project:buildStageProject(project,{summary:output.summary,decisions:(output.decisions||[]).slice(0,output.sourceDecisionCount)});
     return prepare(output,toolProject,checkpoint,signal);
    }
-   case 'applyZooms':case 'applyEffects':return saved||plan(stage,project,job,signal);
+   case 'applyZooms':return saved||plan(stage,project,job,signal);
+   case 'applyEffects':{
+    const output=saved||await plan(stage,project,job,signal);
+    const footageClips=analysisFootage(project,job.selection);
+    const hasTransitions=(output.decisions||[]).some(d=>d.op==='addTransition');
+    if(footageClips.length<=1&&!hasTransitions&&!output.decisions?.length){
+     return {
+      ...output,
+      summary:output.summary||'Preserved continuous footage without artificial transitions.',
+      skipRationale:output.skipRationale||'Single continuous uncut clip',
+      decisions:[{op:'setAudioDucking',enabled:true}]
+     };
+    }
+    return output;
+   }
    case 'applySoundEffects':{
     const output=saved||await plan(stage,project,job,signal);await checkpoint(output);const ready=await prepare(output,project,checkpoint,signal);
     ready.decisions=ready.decisions?.map(d=>d.op==='addClip'?{...d,audioRole:'sfx',volume:Math.min(.25,d.volume??.15)}:d);return ready;
