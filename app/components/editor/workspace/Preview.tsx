@@ -18,23 +18,29 @@ function Transport({toggle,zoom,setZoom,fullscreen}:{toggle:()=>void;zoom:number
 export default function Preview({quality,readOnly=false}:{quality:number;readOnly?:boolean}){
   const {store,playback,repository,selection,select,notify}=useEditor(),p=useProject(store);
   const canvas=useRef<HTMLCanvasElement>(null),stage=useRef<HTMLDivElement>(null),frame=useRef<HTMLDivElement>(null),outline=useRef<HTMLDivElement>(null),engine=useRef<Compositor|null>(null),bounds=useRef<VisualBounds[]>([]),selected=useRef<string | undefined>(undefined);
-  const [zoom,setZoom]=useState(1),[buffering,setBuffering]=useState(false);
+  const [zoom,setZoom]=useState(1),[buffering,setBuffering]=useState(false),[showAdjustments,setShowAdjustments]=useState(false);
   useEffect(()=>{void loadEditorStudioFonts(p).catch(()=>{});for(const layer of [...Object.values(p.textLayers),...Object.values(p.captions)])void loadCaptionFonts(`"${layer.style.font}"`,layer.style.weight,layer.style.size,layer.style.fontAccent,layer.text).catch(()=>{});},[p.textLayers,p.captions]);
   useEffect(()=>{selected.current=selection[0];},[selection]);
   useEffect(()=>{
     const compositor=new Compositor(repository,error=>notify(error.message));engine.current=compositor;
-    let request=0,last=performance.now(),waiting=false,lastRender=0,lastProject:typeof p|undefined,lastTime=-1,lastSize="";
+    let request=0,last=performance.now(),waiting=false,lastRender=0,lastProject:typeof p|undefined,lastTime=-1,lastSize="",cachedDurationProject:typeof p|undefined,cachedDuration=0,lastOutlineKey="",opaqueCanvas:HTMLCanvasElement|null=null;
     const loop=(now:number)=>{
-      const state=playback.getSnapshot(),project=store.getSnapshot(),duration=projectDuration(project),delta=Math.max(0,(now-last)/1000);last=now;
+      const state=playback.getSnapshot(),project=store.getSnapshot(),delta=Math.max(0,(now-last)/1000);last=now;
+      if(project!==cachedDurationProject){cachedDuration=projectDuration(project);cachedDurationProject=project;}
+      const duration=cachedDuration;
       try{
+        if(canvas.current&&canvas.current!==opaqueCanvas){canvas.current.getContext("2d",{alpha:false});opaqueCanvas=canvas.current;}
         const next=playbackTime(state.time,state.playing,waiting,delta,duration);
         const displayTime=duration?Math.min(next,Math.max(0,duration-1/project.settings.fps)):0;
         const wasWaiting=waiting;
         const ready=compositor.sync(project,displayTime,state.playing);
         if(waiting!==!ready){waiting=!ready;setBuffering(waiting);}
         if(ready && canvas.current && (project!==lastProject || `${canvas.current.width}:${canvas.current.height}`!==lastSize || wasWaiting!==waiting || (!state.playing && displayTime!==lastTime) || state.playing && now-lastRender>=1000/project.settings.fps)){bounds.current=compositor.render(canvas.current,project,displayTime);lastProject=project;lastTime=displayTime;lastRender=now;lastSize=`${canvas.current.width}:${canvas.current.height}`;}
-        const box=bounds.current.find(b=>b.id===selected.current),element=outline.current;
-        if(element&&canvas.current){element.style.display=box?"block":"none";if(box){const [w,h]=dimensions[project.settings.aspectRatio];element.style.left=`${box.x/w*100}%`;element.style.top=`${box.y/h*100}%`;element.style.width=`${box.width/w*100}%`;element.style.height=`${box.height/h*100}%`;element.style.transform=`translate(-50%,-50%) rotate(${box.rotation}deg)`;}}
+        const box=selected.current?bounds.current.find(b=>b.id===selected.current):undefined,element=outline.current;
+        if(element&&canvas.current){
+          if(!box){if(lastOutlineKey!=="none"){element.style.display="none";lastOutlineKey="none";}}
+          else{const [w,h]=dimensions[project.settings.aspectRatio],key=`${w}:${h}:${box.x}:${box.y}:${box.width}:${box.height}:${box.rotation}`;if(key!==lastOutlineKey){lastOutlineKey=key;element.style.display="block";element.style.left=`${box.x/w*100}%`;element.style.top=`${box.y/h*100}%`;element.style.width=`${box.width/w*100}%`;element.style.height=`${box.height/h*100}%`;element.style.transform=`translate(-50%,-50%) rotate(${box.rotation}deg)`;}}
+        }
         if(state.playing&&ready){playback.set(next,next<duration);}else if(!ready)compositor.pause();
       }catch(error){playback.set(state.time,false);notify(error instanceof Error?error.message:"Preview failed.");}
       request=requestAnimationFrame(loop);
@@ -70,7 +76,18 @@ export default function Preview({quality,readOnly=false}:{quality:number;readOnl
     const hit=[...bounds.current].reverse().find(b=>{const radians=-b.rotation*Math.PI/180,dx=x-b.x,dy=y-b.y;return Math.abs(dx*Math.cos(radians)-dy*Math.sin(radians))<b.width/2&&Math.abs(dx*Math.sin(radians)+dy*Math.cos(radians))<b.height/2;});
     select(hit?[hit.id]:[]);if(hit)gesture(event,"move",hit.id);
   }
-  return <section className="vx-preview vx-panel" aria-label="Video preview"><header className="vx-panel-heading"><span>Preview <span className="vx-subtle">/ {p.settings.aspectRatio}</span></span><span className="vx-badge">{buffering?"Loading media…":`${quality}p preview`}</span></header>
+  const adjustmentsCount=(p.editingJob?.skippedNotes||p.editingJob?.degradationNotices||[]).length;
+  const hasAdjustments=p.editingJob?.status==='completed'&&adjustmentsCount>0;
+  return <section className="vx-preview vx-panel" aria-label="Video preview"><header className="vx-panel-heading"><span>Preview <span className="vx-subtle">/ {p.settings.aspectRatio}</span></span>{hasAdjustments&&<button type="button" className="vx-canvas-degradation-chip" onClick={()=>setShowAdjustments(v=>!v)} title="Click to view notes">⚠️ {adjustmentsCount} adjustments</button>}<span className="vx-badge">{buffering?"Loading media…":`${quality}p preview`}</span></header>
+    {hasAdjustments&&showAdjustments&&(
+      <div className="vx-canvas-degradation-drawer">
+        <p className="vx-canvas-degradation-title">{p.editingJob?.completionMessage||"Video edit complete! Yahan kuch non-critical tasks hain jo skip huye:"}</p>
+        <ul>
+          {(p.editingJob?.skippedNotes||[]).map((note,i)=><li key={i}>{note}</li>)}
+          {!p.editingJob?.skippedNotes?.length&&(p.editingJob?.degradationNotices||[]).map((n,i)=><li key={i}>⚠️ {n.stage}: {n.reason}</li>)}
+        </ul>
+      </div>
+    )}
     <div className="vx-stage" ref={stage}><div className="vx-canvas-frame" ref={frame}>
       <canvas ref={canvas} width={renderWidth} height={renderHeight} onPointerDown={pick} aria-label="Project canvas"/>
       {!Object.keys(p.clips).length&&<div className="vx-canvas-empty"><Film size={30}/><strong>Your next story starts here</strong><span>Import media and add it to the timeline</span></div>}
@@ -79,4 +96,3 @@ export default function Preview({quality,readOnly=false}:{quality:number;readOnl
     <Transport toggle={()=>void toggle()} zoom={zoom} setZoom={setZoom} fullscreen={()=>void stage.current?.requestFullscreen().catch(e=>notify(e.message))}/>
   </section>;
 }
-

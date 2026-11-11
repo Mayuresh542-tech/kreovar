@@ -28,7 +28,7 @@ export interface TextLayer { id: string; text: string; style: TextStyle }
 export interface CaptionWord { word:string; start:number; end:number }
 export type CaptionMotion = "none" | "pop" | "word-reveal" | "karaoke";
 /** Word intervals use the caption source clock, so moves, splits and speed edits stay aligned. */
-export interface Caption extends TextLayer { studioStyle?:import("../captions/templates").CaptionStyleConfig;studioData?:import("./editorCaptionStudio").StudioCaptionData; highlightMode?:import("../captions/templates").HighlightingMode; highlightWords?:string; transcriptionId?: string; words?:CaptionWord[]; motion?:CaptionMotion; highlightColor?:string }
+export interface Caption extends TextLayer { templateId?: string; studioStyle?:import("../captions/templates").CaptionStyleConfig;studioData?:import("./editorCaptionStudio").StudioCaptionData; highlightMode?:import("../captions/templates").HighlightingMode; highlightWords?:string; transcriptionId?: string; words?:CaptionWord[]; motion?:CaptionMotion; highlightColor?:string }
 export type AudioRole="speech"|"background"|"sfx";
 export interface Clip {
   mediaAnimation?:import("./mediaAnimation").MediaAnimation;
@@ -80,3 +80,137 @@ export function formatTime(time: number, fps = 30) {
   const frames = Math.round(Math.max(0,time)*fps);
   return `${String(Math.floor(frames/fps/60)).padStart(2,"0")}:${String(Math.floor(frames/fps)%60).padStart(2,"0")}:${String(frames%fps).padStart(2,"0")}`;
 }
+
+/** Curated registry whitelist of all 47+ valid Caption Studio template presets */
+export const VALID_CAPTION_PRESETS = [
+  'study-hormozi-style',
+  'study-ali-abdaal',
+  'thora-cinematic',
+  'liquid-glass',
+  'mota-athletic',
+  'deep-glow',
+  'science-blueprint',
+  'viral-hinglish-pop',
+  // Curated 48 study reference templates
+  'study-scribble',
+  'study-lahore',
+  'study-dynamic',
+  'study-devin-jatho-2-0',
+  'study-lala',
+  'study-double-trouble',
+  'study-delhi',
+  'study-kalakar-motion',
+  'study-kathmandu',
+  'study-bubbles',
+  'study-ij-template',
+  'study-kalakar-glow',
+  'study-clean-motion',
+  'study-goa',
+  'study-islamabad',
+  'study-mumbai',
+  'study-karachi',
+  'study-shamani',
+  'study-shamani-2',
+  'study-flicker',
+  'study-underline',
+  'study-pop-up',
+  'study-dhaka',
+  'study-kalakar-shadow',
+  'study-kalakar',
+  'study-editing-skool',
+  'study-mr-beast-style-1',
+  'study-mr-beast-style-2',
+  'study-iman-gadzhi',
+  'study-devin-jatho',
+  'study-highlighted-word',
+  'study-clean-glow-style',
+  'study-kalakar-clean',
+  'study-black-punch',
+  'study-kalakar-word',
+  'study-pixelated-word',
+  'study-ziada',
+  'study-liquid-glass',
+  'study-top-up',
+  'study-mota',
+  'study-tabahi',
+  'study-deep-glow',
+  'study-seedha-saadha',
+  'study-thora-cinematic',
+  'study-viral-hinglish-pop',
+  'study-zero-gravity',
+  // Canonical aliases & trending studio templates
+  'hormozi-punch',
+  'viral-beast',
+  'quiet-luxury',
+  'clean-sub',
+  'kinetic-impact',
+  'heavy-shadow',
+  'ali-clean',
+  'tiktok-pop',
+  'diary-ceo',
+  'studio-pill',
+  'cyber-neon',
+  'arcade-punch',
+  'ugc-organic',
+  'tiktok-native',
+  'cinematic-letterbox',
+  'vox-tape',
+  'studio-lime',
+  'studio-cobalt',
+  'studio-ivory',
+  'studio-ink',
+  'studio-amber',
+  'studio-mono',
+  'studio-rose',
+  'studio-podcast',
+  'signature-poppins',
+  'dancing-poppins',
+  'editorial-serif',
+  'handwritten-outfit',
+  // AI Edit style recipes
+  'edit-paper',
+  'edit-impact',
+  'edit-vinyl',
+  'edit-blueprint',
+  'edit-sketch',
+  'edit-story',
+  'edit-prism',
+  'edit-prime',
+  'edit-vista'
+] as const;
+
+export type CaptionPresetId = typeof VALID_CAPTION_PRESETS[number];
+
+export interface CaptionDecision {
+  presetId: CaptionPresetId; // MUST be one of VALID_CAPTION_PRESETS
+  caseMode?: 'uppercase' | 'original' | 'titlecase';
+  positionY?: 'top' | 'center' | 'bottom';
+  maxWordsPerBatch?: 1 | 2 | 3;
+}
+
+export function isKnownCaptionPreset(id: unknown): id is CaptionPresetId {
+  return typeof id === 'string' && (VALID_CAPTION_PRESETS as readonly string[]).includes(id);
+}
+
+export function normalizeCaptionPresetId(rawId: string): CaptionPresetId {
+  const clean = String(rawId || '').toLowerCase().trim();
+  if (clean.includes('ali') || clean.includes('abdaal')) return 'study-ali-abdaal';
+  if (clean.includes('hormozi')) return 'study-hormozi-style';
+  if (clean.includes('beast')) return 'study-mr-beast-style-2';
+  if (clean.includes('thora') || clean.includes('cinema')) return 'study-thora-cinematic';
+  if (clean.includes('glass')) return 'study-liquid-glass';
+  if (clean.includes('glow')) return 'study-deep-glow';
+  if (clean.includes('mota') || clean.includes('athletic')) return 'study-mota';
+  if (clean.includes('hinglish')) return 'viral-hinglish-pop';
+  if (clean.includes('blueprint') || clean.includes('science')) return 'edit-blueprint';
+  if (clean.includes('clean') || clean.includes('sub')) return 'study-clean-motion';
+  if (clean.includes('scribble')) return 'study-scribble';
+  if (clean.includes('paper')) return 'edit-paper';
+  if (clean.includes('impact')) return 'edit-impact';
+  if (isKnownCaptionPreset(rawId)) return rawId;
+  if (isKnownCaptionPreset(clean)) return clean as CaptionPresetId;
+  const withStudy = ('study-' + clean.replace(/^study-/, '')) as CaptionPresetId;
+  if (isKnownCaptionPreset(withStudy)) return withStudy;
+  return 'study-hormozi-style';
+}
+

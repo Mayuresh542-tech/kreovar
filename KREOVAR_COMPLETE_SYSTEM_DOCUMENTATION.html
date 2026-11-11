@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kreovar — Full Technical Specification & Feature Architecture</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1a202c;
+    background: #ffffff;
+    line-height: 1.6;
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 30px;
+  }
+  h1 { font-size: 2.2rem; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-top: 40px; }
+  h2 { font-size: 1.6rem; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-top: 36px; }
+  h3 { font-size: 1.25rem; color: #334155; margin-top: 24px; }
+  p, li { font-size: 1.05rem; color: #334155; }
+  table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 0.95rem; }
+  th, td { border: 1px solid #cbd5e1; padding: 10px 14px; text-align: left; }
+  th { background-color: #f1f5f9; color: #0f172a; font-weight: 600; }
+  tr:nth-child(even) { background-color: #f8fafc; }
+  code { background-color: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.9em; color: #0284c7; }
+  pre { background-color: #0f172a; color: #f8fafc; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 0.9rem; line-height: 1.45; }
+  pre code { background: none; color: inherit; padding: 0; }
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; background: #e0f2fe; color: #0369a1; }
+  .box { background: #f8fafc; border-left: 4px solid #0284c7; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+</style>
+</head>
+<body>
+
+<h1>Kreovar — Comprehensive System Architecture & Engineering Documentation</h1>
+<div class="box">
+  <strong>Document Title:</strong> Kreovar Full Technical Specification & Feature Architecture<br>
+  <strong>System Version:</strong> 0.1.0-production (Cloudflare Edge Release)<br>
+  <strong>Production URL:</strong> <a href="https://kreovar.online">https://kreovar.online</a><br>
+  <strong>Author:</strong> Kreovar Core Engineering Team
+</div>
+
+<h2>1. Executive Summary & Product Vision</h2>
+<p>Kreovar (internal codebase name <code>veelox</code>) is a full-stack, AI-native video creation and autonomous post-production platform designed specifically for high-retention short-form video (TikTok, Instagram Reels, YouTube Shorts) and professional long-form content (Podcasts, Documentaries, Educational Explainers).</p>
+<p>By parsing natural language user prompts (supporting English, Hindi, and Hinglish), Kreovar executes multi-step editorial workflows across visual framing, audio mastering, typography, B-roll insertion, and camera movement while strictly respecting timeline constraints, speaker identity, and user-specified boundaries.</p>
+
+<h2>2. High-Level System Architecture</h2>
+<p>Kreovar operates on a modern distributed architecture combining <strong>Cloudflare Edge Workers</strong>, <strong>Supabase PostgreSQL / Storage</strong>, <strong>High-Throughput Inference Engines (Groq & Gemini)</strong>, and <strong>Client-Side Hardware-Accelerated Video Processing (WebCodecs & WebGPU)</strong>.</p>
+<pre>
+[User Browser: React 19 / WebCodecs]
+       │
+       ▼ (HTTPS / WebSockets)
+[Cloudflare Edge Workers Runtime (vinext / nodejs_compat)]
+       │
+       ├─► Supabase (PostgreSQL, RLS, S3 Storage)
+       ├─► Groq Cloud (Whisper v3 Turbo, Llama 3.3 70B, Qwen 2.5 32B)
+       ├─► Google GenAI (Gemini 1.5/2.0 Flash Multimodal Vision)
+       ├─► Stock Media (Pexels & Pixabay APIs)
+       └─► Voice & Payments (ElevenLabs, Whop, Dodo Payments)
+</pre>
+
+<h2>3. Technology Stack & Third-Party Services</h2>
+<table>
+  <tr><th>Layer</th><th>Technology</th><th>Version</th><th>Purpose in Kreovar</th></tr>
+  <tr><td><strong>Framework</strong></td><td>Next.js (App Router)</td><td>16.4.3</td><td>Full-stack application framework, React Server Components</td></tr>
+  <tr><td><strong>UI & Motion</strong></td><td>React & Framer Motion</td><td>19.3.1 / 12.40.0</td><td>Concurrent UI rendering and hardware-accelerated transitions</td></tr>
+  <tr><td><strong>Edge Bundler</strong></td><td>Vinext / Vite</td><td>1.4.3 / 8.3.5</td><td>Cloudflare Workers production bundling and edge SSR</td></tr>
+  <tr><td><strong>Video Composition</strong></td><td>Remotion</td><td>4.0.526</td><td>Programmatic timeline rendering and canvas video preview</td></tr>
+  <tr><td><strong>Client Codecs</strong></td><td>Mediabunny</td><td>1.61.3</td><td>Zero-server cost browser-side WebCodecs MP4 export</td></tr>
+  <tr><td><strong>Image Engine</strong></td><td>Sharp</td><td>0.35.5</td><td>Server-side SVG rasterization and Caption Studio badge creation</td></tr>
+  <tr><td><strong>Native Video</strong></td><td>FFmpeg</td><td>8.1.1</td><td>Server-side video compositing, zoom filters, and audio mixing</td></tr>
+  <tr><td><strong>Database & Auth</strong></td><td>Supabase</td><td>2.106.2</td><td>Relational PostgreSQL, Row Level Security, user sessions, S3 buckets</td></tr>
+  <tr><td><strong>Speech & AI</strong></td><td>Groq Cloud</td><td>Latest</td><td>Whisper v3 Turbo transcription and Llama 3.3 70B editorial planning</td></tr>
+  <tr><td><strong>Vision AI</strong></td><td>Google Gemini</td><td>1.5 / 2.0 Flash</td><td>Multimodal frame reasoning and visual timeline understanding</td></tr>
+  <tr><td><strong>Monetization</strong></td><td>Whop & Dodo Payments</td><td>2.4.0</td><td>Global creator checkout, subscriptions, and webhook handling</td></tr>
+</table>
+
+<h2>4. The AI Video Editor — Deep Dive Engine</h2>
+
+<h3>4.1 Project Data Model & Timeline Schema (<code>model.ts</code>)</h3>
+<p>A Kreovar project is represented as a strictly typed, immutable tree structure with independent tracks (<code>main</code>, <code>overlay</code>, <code>image</code>, <code>captions</code>, <code>titles</code>, <code>audio</code>) and clips possessing exact microsecond timestamps, speed properties, transforms (scale, rotation, opacity), and visual effects (brightness, contrast, saturation, blur, RGB offsets).</p>
+
+<h3>4.2 The 11-Stage Autonomous Orchestration Pipeline (<code>sequentialEdit.ts</code>)</h3>
+<p>To eliminate hallucinations and timeline corruption, Kreovar implements an 11-stage autonomous state machine:</p>
+<ol>
+  <li><strong><code>analyzeFootage</code>:</strong> Analyzes raw duration, sampled video frames, and Whisper speech segments to establish required operations.</li>
+  <li><strong><code>applyCaptions</code>:</strong> Applies kinetic captions matched to the video tone without re-transcribing existing audio.</li>
+  <li><strong><code>planMotionGraphics</code>:</strong> Identifies key spoken concept moments requiring graphic illustration.</li>
+  <li><strong><code>applyMotionGraphics</code>:</strong> Generates vector shapes (arrows, callouts, cards) with exact entry/exit keyframes.</li>
+  <li><strong><code>findBroll</code>:</strong> Performs semantic search for real stock footage grounded in the transcript.</li>
+  <li><strong><code>applyBroll</code>:</strong> Inserts B-roll onto overlay tracks, completely muted (<code>volume: 0</code>) with 0.25s crossfades.</li>
+  <li><strong><code>applyZooms</code>:</strong> Identifies vocal emphasis peaks and applies punch-in zooms (1.18x–1.35x).</li>
+  <li><strong><code>applySoundEffects</code>:</strong> Layers subtle SFX (0.08–0.25 volume) under transitions, zooms, and topic shifts.</li>
+  <li><strong><code>applyEffects</code>:</strong> Applies filmic color grading, contrast, or lens blur ramps.</li>
+  <li><strong><code>applyRequestedEdits</code>:</strong> Conversational execution handling all 28 direct editing operations.</li>
+  <li><strong><code>validateEdit</code>:</strong> Automated linting verifying track integrity and zero-collision cuts.</li>
+</ol>
+
+<h3>4.3 Conversational Intent Parsing & Negative Constraints (<code>editingIntent.ts</code>)</h3>
+<p>Kreovar recognizes English, Hindi, and Hinglish negation keywords (<code>don't</code>, <code>never</code>, <code>mat</code>, <code>nahi</code>, <code>bina</code>, <code>without</code>). If a user says "add B-roll but don't add music or touch my voice", the engine strictly enforces zero modifications to audio tracks.</p>
+
+<h3>4.4 In-Place Mutation & Reconciler (<code>inPlaceReconciler.ts</code>)</h3>
+<p>When users issue follow-up instructions (e.g. "make captions yellow" or "remove the zoom at 5s"), the Reconciler directly updates existing clip properties in-place, eliminating duplicate tracks or ghost layers.</p>
+
+<h3>4.5 Semantic Phrase Timestamp Matcher (<code>phraseMatcher.ts</code>)</h3>
+<p>Bridges natural human phrasing with audio timestamps. Prompts like "when I talk about consistency, zoom in" are matched against Whisper word timestamps via fuzzy string alignment.</p>
+
+<h3>4.6 Dual Export Pipeline: Browser WebCodecs vs. Server FFmpeg</h3>
+<ul>
+  <li><strong>Browser WebCodecs (<code>mediabunny</code>):</strong> Encodes H.264/AAC MP4 directly on the user's GPU inside the browser canvas in real time. Zero server compute costs.</li>
+  <li><strong>Server-Side FFmpeg:</strong> Generates high-fidelity transparent PNG sequences via Sharp and mixes multi-stream video/audio with non-destructive normalization (<code>normalize=0</code>).</li>
+</ul>
+
+<h2>5. Caption Studio — Subtitle & Kinetic Typography Engine</h2>
+<p>Includes 47+ pre-built reference templates inspired by top creators:</p>
+<ul>
+  <li><strong>Ali Abdaal Spotlight:</strong> Dark matte charcoal rounded pill container, Solar Gold active word spotlight, clean white body text.</li>
+  <li><strong>Hormozi Viral Pop:</strong> Giant Impact (62px), 5px black outline, 3D shadow, Electric Lime to Yellow gradient, Crimson Red alert keywords.</li>
+  <li><strong>Thora Cinematic:</strong> Lower-third placement, wide letter spacing (3.5px), Royal Amber Gold accents.</li>
+  <li><strong>Liquid Glass:</strong> Translucent frosted glass pill (<code>#0F172Aee</code>), Electric Cyan highlights.</li>
+  <li><strong>Mota Athletic:</strong> Slanted athletic typography, Flame Orange & Sunburst Yellow, floating <code>⚡ KEEP SHOWING UP ⚡</code> badge.</li>
+  <li><strong>Deep Glow:</strong> Luminous radiant golden halo aura filter behind bold uppercase text.</li>
+  <li><strong>Science Blueprint:</strong> High-tech navy card, cyan accents, floating <code>💡 SUNLIGHT ➔ ELECTRICAL CURRENT</code> diagram badge.</li>
+</ul>
+
+<h2>6. Smart Footage & B-Roll System</h2>
+<p>Automatically maps speech entities to real portrait (9:16) stock video clips from Pexels and Pixabay, auto-trimming and fading them over speech without muting dialogue.</p>
+
+<h2>7. Dynamic Camera Zooms & Visual Pacing</h2>
+<p>Eliminates viewer drop-off by applying rhythmic jump-cut punch-ins (1.25x–1.35x) on key emphasis moments and pulling back out to wide framing every 2.5–3 seconds.</p>
+
+<h2>8. Sound Design & Audio Engine</h2>
+<p>Includes 10+ built-in sound effects (whooshes, pops, clicks, chimes, sub-drops) synchronized with camera movement and visual badges, mixed non-destructively.</p>
+
+<h2>9. AI Voice Studio & Text-to-Speech</h2>
+<p>Integrated with ElevenLabs and Voice AI for voiceover generation, voice cloning, and direct timeline placement.</p>
+
+<h2>10. Trend & Content Intelligence</h2>
+<p>Uses <code>google-trends-api</code> to discover breakout queries and generate high-hook viral scripts structured for maximum viewer retention.</p>
+
+<h2>11. Authentication, Database & Edge Deployment</h2>
+<p>Hosted globally on Cloudflare Workers (<code>https://kreovar.online</code>) with sub-15ms startup time, backed by Supabase PostgreSQL with strict Row Level Security (RLS).</p>
+
+<h2>12. How to Open in Google Docs</h2>
+<ol>
+  <li>Open <a href="https://drive.google.com">Google Drive</a>.</li>
+  <li>Upload <code>KREOVAR_COMPLETE_SYSTEM_DOCUMENTATION.md</code> or <code>KREOVAR_COMPLETE_SYSTEM_DOCUMENTATION.html</code>.</li>
+  <li>Right click ➔ <strong>Open with Google Docs</strong>.</li>
+  <li>Google Docs will automatically format all headings, tables, callout boxes, and code snippets natively!</li>
+</ol>
+
+</body>
+</html>

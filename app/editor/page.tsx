@@ -33,7 +33,7 @@ function EditorIndexContent() {
   }
 
   return (
-    <div className="w-full h-dvh overflow-auto bg-[#F8FAFC]">
+    <div className="w-screen h-[100dvh] overflow-hidden bg-[#F8FAFC] text-[#0F172A] flex flex-col">
       <VeeloxVideoEditor
         projectId={queryProjectId || "default_project"}
         projectTitle={queryTopic || (queryProjectId ? `Project Workspace` : "New Video Production")}

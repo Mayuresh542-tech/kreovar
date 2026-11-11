@@ -13,7 +13,7 @@ import {keyframeTransform} from './keyframes';
 import {drawShape,shapeDimensions} from "./shapes";
 import {drawStyleSurface} from "./styleSurface";
 import {drawGraphicPanel} from './motionGraphics';
-import { Clip, EditorProject, TextLayer, Track, clamp, dimensions, textForClip } from "./model";
+import { Clip, EditorProject, TextLayer, Track, Transition, clamp, dimensions, textForClip } from "./model";
 import { MediaRepository, waitMedia } from "./media";
 
 import {captionMotionFrame} from "./captionMotion";
@@ -23,12 +23,69 @@ interface Entry { assetKey:string; element:HTMLMediaElement|HTMLImageElement; re
 export interface VisualBounds { id:string; x:number; y:number; width:number; height:number; rotation:number }
 interface Layer { clip:Clip; track:Track; opacity:number; x:number; scale:number; hold?:boolean }
 const priority={video:0,overlay:1,image:2,text:3,caption:4,audio:5};
+interface ProjectRenderIndex {
+  revision: number;
+  trackOrderLength: number;
+  clipCount: number;
+  transitionCount: number;
+  allClips: Clip[];
+  visualTracks: Track[];
+  transitionsByToClipId: Map<string, Transition[]>;
+  speechWindows: { start: number; end: number }[];
+  studioSegments: Map<string, import("../captions/presets").CaptionSegment>;
+}
+const projectIndexCache = new WeakMap<EditorProject, ProjectRenderIndex>();
+function objectKeyCount(obj: Record<string, unknown>): number {
+  let count = 0;
+  for (const _ in obj) count++;
+  return count;
+}
+function getProjectIndex(p: EditorProject): ProjectRenderIndex {
+  let cached = projectIndexCache.get(p);
+  const clipCount = objectKeyCount(p.clips);
+  const transitionCount = objectKeyCount(p.transitions);
+  if (
+    cached &&
+    cached.revision === p.revision &&
+    cached.trackOrderLength === p.trackOrder.length &&
+    cached.clipCount === clipCount &&
+    cached.transitionCount === transitionCount
+  ) {
+    return cached;
+  }
+  const allClips = Object.values(p.clips);
+  const visualTracks = p.trackOrder
+    .map(id => p.tracks[id])
+    .filter((t): t is Track => !!t && t.kind !== "audio")
+    .sort((a, b) => priority[a.kind] - priority[b.kind]);
+  const transitionsByToClipId = new Map<string, Transition[]>();
+  for (const t of Object.values(p.transitions)) {
+    const list = transitionsByToClipId.get(t.toClipId);
+    if (list) list.push(t);
+    else transitionsByToClipId.set(t.toClipId, [t]);
+  }
+  cached = {
+    revision: p.revision,
+    trackOrderLength: p.trackOrder.length,
+    clipCount,
+    transitionCount,
+    allClips,
+    visualTracks,
+    transitionsByToClipId,
+    speechWindows: speechWindows(p),
+    studioSegments: new Map(),
+  };
+  projectIndexCache.set(p, cached);
+  return cached;
+}
 export function visibleLayers(p:EditorProject,time:number):Layer[]{
   const layers:Layer[]=[];
-  const tracks=p.trackOrder.map(id=>p.tracks[id]).filter(t=>!t.hidden&&t.kind!=="audio").sort((a,b)=>priority[a.kind]-priority[b.kind]);
-  for(const track of tracks){
-    for(const id of track.clipIds){const c=p.clips[id];if(time<c.startTime || time>=c.startTime+c.duration)continue;
-      const transition=Object.values(p.transitions).find(t=>t.toClipId===id&&time<c.startTime+t.duration);
+  const { visualTracks, transitionsByToClipId } = getProjectIndex(p);
+  for(const track of visualTracks){
+    if(track.hidden)continue;
+    for(const id of track.clipIds){const c=p.clips[id];if(!c||time<c.startTime || time>=c.startTime+c.duration)continue;
+      const candidateTransitions = transitionsByToClipId.get(id);
+      const transition = candidateTransitions?.find(t=>time<c.startTime+t.duration);
       const layer:Layer={clip:c,track,opacity:1,x:0,scale:1};
       if(transition){const progress=clamp((time-c.startTime)/transition.duration,0,1),out=p.clips[transition.fromClipId];
         if(out){const outgoing:Layer={clip:out,track,opacity:1,x:0,scale:1,hold:true};
@@ -42,13 +99,23 @@ export function visibleLayers(p:EditorProject,time:number):Layer[]{
     }
   }return layers.sort((a,b)=>(a.clip.shape?2.5:priority[a.track.kind])-(b.clip.shape?2.5:priority[b.track.kind]));
 }
-function layoutText(ctx:CanvasRenderingContext2D,layer:TextLayer,width:number,totalWords?:number){
-  const s=layer.style;ctx.font=`${s.weight} ${s.size}px ${captionFontFamily(s.font,layer.text)}`;
+type TextLayoutResult = { mixed?: ReturnType<typeof mixedTextLines>; lines: string[]; inkWidth: number; width: number; height: number };
+const textLayoutCache = new Map<string, TextLayoutResult>();
+function layoutText(ctx:CanvasRenderingContext2D,layer:TextLayer,width:number,totalWords?:number):TextLayoutResult{
+  const s=layer.style;
+  const caption=layer as import("./model").Caption;
+  const cacheKey=`${layer.text}\0${s.font}\0${s.weight}\0${s.size}\0${s.letterSpacing}\0${s.lineHeight}\0${s.maxWidth??""}\0${s.casing??""}\0${s.maxWordsPerLine??""}\0${s.fontAccent?.font??""}:${s.fontAccent?.weight??""}\0${caption.highlightMode??""}\0${width}\0${totalWords??""}`;
+  const cached=textLayoutCache.get(cacheKey);
+  ctx.font=`${s.weight} ${s.size}px ${captionFontFamily(s.font,layer.text)}`;
   if("letterSpacing" in ctx)ctx.letterSpacing=`${s.letterSpacing}px`;
+  if(cached)return cached;
   const maxWidth=width*(s.maxWidth??.86);
-  if(s.fontAccent||s.maxWordsPerLine||(layer as import("./model").Caption).highlightMode){const mixed=mixedTextLines(ctx,styledText(layer),s.size,s.font,s.weight,s.fontAccent,Math.max(1,maxWidth-32),s.maxWordsPerLine,totalWords);const inkWidth=Math.max(1,...mixed.rows.map(row=>row.reduce((n,r)=>n+r.width,0)+Math.max(0,row.length-1)*mixed.gap));return {mixed,lines:mixed.rows.map(row=>row.map(r=>r.text).join(' ')),inkWidth,width:s.maxWidth?maxWidth:Math.max(40,inkWidth)+32,height:mixed.rows.length*s.size*s.lineHeight+24};}
-  const lines=wrapText(styledText(layer),Math.max(1,maxWidth-32),text=>ctx.measureText(text).width);
-  return {lines,inkWidth:Math.max(1,...lines.map(line=>ctx.measureText(line).width)),width:s.maxWidth?maxWidth:Math.max(40,...lines.map(line=>ctx.measureText(line).width))+32,height:lines.length*s.size*s.lineHeight+24};
+  let result:TextLayoutResult;
+  if(s.fontAccent||s.maxWordsPerLine||caption.highlightMode){const mixed=mixedTextLines(ctx,styledText(layer),s.size,s.font,s.weight,s.fontAccent,Math.max(1,maxWidth-32),s.maxWordsPerLine,totalWords);const inkWidth=Math.max(1,...mixed.rows.map(row=>row.reduce((n,r)=>n+r.width,0)+Math.max(0,row.length-1)*mixed.gap));result={mixed,lines:mixed.rows.map(row=>row.map(r=>r.text).join(' ')),inkWidth,width:s.maxWidth?maxWidth:Math.max(40,inkWidth)+32,height:mixed.rows.length*s.size*s.lineHeight+24};}
+  else{const lines=wrapText(styledText(layer),Math.max(1,maxWidth-32),text=>ctx.measureText(text).width);const inkWidth=Math.max(1,...lines.map(line=>ctx.measureText(line).width));result={lines,inkWidth,width:s.maxWidth?maxWidth:Math.max(40,inkWidth)+32,height:lines.length*s.size*s.lineHeight+24};}
+  if(textLayoutCache.size>=128){const first=textLayoutCache.keys().next().value;if(first!==undefined)textLayoutCache.delete(first);}
+  textLayoutCache.set(cacheKey,result);
+  return result;
 }
 /** Shared preview/export renderer. Its media pool is bounded to active + one second of lookahead. */
 export class Compositor {
@@ -96,12 +163,13 @@ export class Compositor {
   }
   private sourceTime(c:Clip,time:number,hold=false){return clamp(c.sourceStart+(hold?c.duration-0.001:time-c.startTime)*c.speed,c.sourceStart,Math.max(c.sourceStart,c.sourceEnd-0.001));}
   sync(p:EditorProject,time:number,playing:boolean):boolean {
-    const windows=speechWindows(p),layers=visibleLayers(p,time),holdIds=new Set(layers.filter(l=>l.hold).map(l=>l.clip.id));
+    const index=getProjectIndex(p),windows=index.speechWindows,layers=visibleLayers(p,time),holdIds=new Set(layers.filter(l=>l.hold).map(l=>l.clip.id));
     const wanted=new Set(layers.map(l=>l.clip.id));let ready=true;
-    for(const c of Object.values(p.clips)){
+    const lookahead=playing?3:1;
+    for(const c of index.allClips){
       const track=p.tracks[c.trackId],active=time>=c.startTime&&time<c.startTime+c.duration;
       if(active&&!track.hidden)wanted.add(c.id);
-      if(!track.hidden&&c.startTime>time&&c.startTime<time+1){wanted.add(c.id);void this.ensure(p,c);}
+      if(!track.hidden&&c.startTime>time&&c.startTime<time+lookahead){wanted.add(c.id);void this.ensure(p,c);}
     }
     for(const id of wanted){const c=p.clips[id];void this.ensure(p,c);const entry=this.entries.get(id),element=entry?.element;
       if(entry?.error)throw entry.error;if(entry?.playError)throw entry.playError;
@@ -112,7 +180,7 @@ export class Compositor {
       if(!entry?.ready){ready=false;continue;}
       if(element instanceof HTMLMediaElement){
         const hold=holdIds.has(id),target=Math.min(this.sourceTime(c,time,hold),Math.max(0,element.duration-.001));
-        if(!element.seeking&&Math.abs(element.currentTime-target)>(playing?.12*c.speed:.015)){element.currentTime=target;ready=false;}
+        if(!element.seeking&&Math.abs(element.currentTime-target)>(playing?.22*c.speed:.015)){element.currentTime=target;ready=false;}
         if(element.seeking||element.readyState<2)ready=false;
         element.playbackRate=c.speed;
         if(entry.gain&&this.context)entry.gain.gain.setTargetAtTime(hold?0:clipGain(p,c,time,windows),this.context.currentTime,.008);
@@ -133,6 +201,7 @@ export class Compositor {
   setFrame(id:string,image:CanvasImageSource,width:number,height:number){this.frames.set(id,{image,width,height});}
   render(canvas:HTMLCanvasElement,p:EditorProject,time:number):VisualBounds[]{
     const ctx=canvas.getContext("2d");if(!ctx)return[];
+    const index=getProjectIndex(p);
     const [width,height]=dimensions[p.settings.aspectRatio],bounds:VisualBounds[]=[];
     ctx.setTransform(canvas.width/width,0,0,canvas.height/height,0,0);ctx.globalAlpha=1;ctx.filter="none";ctx.fillStyle=p.settings.background;ctx.fillRect(0,0,width,height);
     for(const layer of visibleLayers(p,time)){
@@ -141,10 +210,18 @@ export class Compositor {
       const sourceTime=c.sourceStart+Math.max(0,(layer.hold?c.startTime+c.duration-1/p.settings.fps:time)-c.startTime)*c.speed,treatment=visualTreatmentAt(c,layer.hold?c.startTime+c.duration-1/p.settings.fps:time);
       const local=time-c.startTime,fade=layer.hold?1:Math.min(c.fadeIn?clamp(local/c.fadeIn,0,1):1,c.fadeOut?clamp((c.duration-local)/c.fadeOut,0,1):1);
       ctx.save();ctx.globalAlpha=t.opacity*layer.opacity*fade*treatment.opacity;ctx.translate(width*(.5+t.x+layer.x),height*(.5+t.y));ctx.rotate(t.rotation*Math.PI/180);ctx.scale(t.scale*layer.scale*treatment.scale*animation.scaleX,t.scale*layer.scale*treatment.scale*animation.scaleY);
-      const fx=c.effects;ctx.filter=`brightness(${1+fx.brightness/100}) contrast(${1+fx.contrast/100}) saturate(${1+fx.saturation/100}) blur(${Math.min(50,fx.blur+treatment.blur+animation.blur)}px)`;
+      const fx=c.effects,blur=Math.min(50,fx.blur+treatment.blur+animation.blur);
+      if(fx.brightness!==0||fx.contrast!==0||fx.saturation!==0||blur>0.01){
+        const parts:string[]=[];
+        if(fx.brightness!==0)parts.push(`brightness(${1+fx.brightness/100})`);
+        if(fx.contrast!==0)parts.push(`contrast(${1+fx.contrast/100})`);
+        if(fx.saturation!==0)parts.push(`saturate(${1+fx.saturation/100})`);
+        if(blur>0.01)parts.push(`blur(${blur}px)`);
+        ctx.filter=parts.join(" ");
+      }
       let bw=width,bh=height;
       const rich=c.contentId?p.captions[c.contentId]:undefined;
-      if(rich?.studioStyle){const segment=studioSegment(p,c);ctx.translate(-width/2,-height/2);drawCaptions(ctx,[segment],rich.studioStyle,time,width,height);const b=studioCaptionBounds(rich.studioStyle,width,height);if(!layer.hold)bounds.push({id:c.id,x:b.x+width*t.x,y:b.y+height*t.y,width:b.width*t.scale,height:b.height*t.scale,rotation:t.rotation});ctx.restore();continue;}
+      if(rich?.studioStyle){let segment=index.studioSegments.get(c.id);if(!segment){segment=studioSegment(p,c);index.studioSegments.set(c.id,segment);}ctx.translate(-width/2,-height/2);drawCaptions(ctx,[segment],rich.studioStyle,time,width,height);const b=studioCaptionBounds(rich.studioStyle,width,height);if(!layer.hold)bounds.push({id:c.id,x:b.x+width*t.x,y:b.y+height*t.y,width:b.width*t.scale,height:b.height*t.scale,rotation:t.rotation});ctx.restore();continue;}
       if(c.shape){const size=shapeDimensions(c.shape,p.settings.aspectRatio);bw=size.width;bh=size.height;drawShape(ctx,c.shape,bw,bh,{sourceTime});}
       else if(text){const caption=c.contentId?p.captions[c.contentId]:undefined,motion=caption?captionMotionFrame(caption,c,time):undefined;
         const rendered=motion?{...text,text:motion.text}:text;

@@ -65,6 +65,37 @@ h1, h2, h3, h4, h5, h6 {
   scrollbar-color: #CBD5E1 transparent;
 }
 
+/* Custom minimalist scrollbars matching Kreovar's light workstation UI */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+.scrollbar-thumb-slate-700,
+.scrollbar-thumb-slate-300 {
+  scrollbar-color: #CBD5E1 transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

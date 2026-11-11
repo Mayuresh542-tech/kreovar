@@ -402,6 +402,7 @@ export const SPEECH_LANGUAGES=[
 ] as const;
 export function readSpeechLanguage(value:unknown):string|undefined{
  if(value===undefined||value===null||value===''||value==='auto'||value==='mixed')return undefined;
+ if(value==='hinglish')return 'hinglish';
  if(typeof value!=='string'||!SPEECH_LANGUAGES.some(item=>item.code===value))throw Error('Choose a supported caption language.');
  return value;
 }

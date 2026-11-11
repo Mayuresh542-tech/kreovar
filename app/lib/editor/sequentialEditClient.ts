@@ -1,4 +1,4 @@
-import {publicErrorMessage,publicServiceText} from '../serviceMessages';
+﻿import {publicErrorMessage,publicServiceText} from '../serviceMessages';
 import {captureFootageEvidence} from './footageFramesClient';
 import {analysisFootage,type FootageFrame} from './footageContext';
 import {speechContext} from './speechContext';
@@ -9,12 +9,13 @@ import {linkAsset} from '../assets/client';
 import {supabase} from '../supabase';
 import {saveCheckpoint} from './recovery';
 import {stockKeys} from './stockSelection';
-import {projectDuration,type EditorProject,type MediaAsset} from './model';
+import {projectDuration,type EditorProject,type MediaAsset,normalizeCaptionPresetId} from './model';
 import type {EditorStore} from './store';
 import type {MediaRepository} from './media';
-import {buildStageProject,assertStagePlan,stageInstruction,validateCompletedJob,runEditingJob,explicitOperations,PIPELINE_PRESETS,hasSkipRationale,type EditingJob,type EditStage,type StageOutput} from './sequentialEdit';
+import {buildStageProject,assertStagePlan,stageInstruction,validateCompletedJob,runEditingJob,explicitOperations,PIPELINE_PRESETS,hasSkipRationale,type EditingJob,type EditStage,type StageOutput,type PipelineDegradationNotice} from './sequentialEdit';
 import {loadEditorStudioFonts} from './editorCaptionStudio';
 import {Compositor} from './compositor';
+import {extractEditingConstraints} from './editingIntent';
 
 function canSkipSupportingStage(stage:EditStage,project:EditorProject,output?:StageOutput,job?:EditingJob):boolean{
  if(projectDuration(project)<4.0)return true;
@@ -73,16 +74,18 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
    case 'analyzeFootage':{
     const footage=analysisFootage(project,job.selection);if(!footage.length&&job.presetId)throw Error('Add original footage to the timeline first.');
     if(!frames)await readFrames(project,job.selection);
-    const operations=PIPELINE_PRESETS.find(p=>p.id===job.presetId)?.operations||(footage.length?explicitOperations(job.instructions):undefined);
+    const isCustomRequested=job.stages.some(s=>s.id==='applyRequestedEdits');
+    const operations=isCustomRequested?['requestedEdits' as const]:(PIPELINE_PRESETS.find(p=>p.id===job.presetId)?.operations||(footage.length?explicitOperations(job.instructions):undefined));
     const result=operations?{summary:`Analyzed ${footage.length} source clip(s), ${projectDuration(project).toFixed(2)} seconds, ${frames?.length||0} sampled frames and ${speechContext(project).length} available speech segments. Planned ${operations.join(', ')}.`,operations}:await plan(stage,project,job,signal);
     return {...result,analysis:{duration:projectDuration(project),footageIds:footage.map(c=>c.id),speechSegments:speechContext(project).length,sampledFrames:frames?.length||0,assetIds:Object.keys(project.assets)}};
    }
    case 'applyCaptions':{
     const footage=analysisFootage(project,job.selection),existing=Object.values(project.clips).filter(c=>c.contentId&&project.captions[c.contentId]&&footage.some(v=>c.startTime>=v.startTime-.01&&c.startTime+c.duration<=v.startTime+v.duration+.01));
     if(existing.some(c=>project.tracks[c.trackId].locked||project.tracks[c.trackId].hidden))throw Error('Unlock and show caption tracks before applying captions.');
-    const requests=footage.filter(c=>!existing.some(cap=>cap.startTime<c.startTime+c.duration&&cap.startTime+cap.duration>c.startTime)).map(c=>({type:'captions' as const,clipId:c.id,templateId:job.captionTemplate}));
+    const normalizedTemplate = normalizeCaptionPresetId(job.captionTemplate || 'study-hormozi-style');
+    const requests=footage.filter(c=>!existing.some(cap=>cap.startTime<c.startTime+c.duration&&cap.startTime+cap.duration>c.startTime)).map(c=>({type:'captions' as const,clipId:c.id,templateId:normalizedTemplate}));
     try{
-     return await prepare(saved||{summary:'Apply timed speech captions with '+job.captionTemplate,animateCaptions:/animat|engaging|punchy/i.test(job.instructions)||['engaging','punchy'].includes(job.presetId||''),decisions:existing.length?[{op:'applyCaptionTemplate',clipIds:existing.map(c=>c.id),templateId:job.captionTemplate}]:[],requests},project,checkpoint,signal);
+     return await prepare(saved||{summary:'Apply timed speech captions with '+normalizedTemplate,animateCaptions:/animat|engaging|punchy/i.test(job.instructions)||['engaging','punchy'].includes(job.presetId||''),decisions:existing.length?[{op:'applyCaptionTemplate',clipIds:existing.map(c=>c.id),templateId:normalizedTemplate}]:[],requests},project,checkpoint,signal);
     }catch(err){
      const isPreset=!!(job.presetId||project.editingJob?.presetId);
      if(isPreset){
@@ -137,7 +140,54 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
     return {...output,summary:'Insert selected B-roll with original dialogue preserved',decisions:output.decisions.map(d=>d.op==='addClip'?{...d,volume:0,audioRole:'background' as const}:d)};
    }
    case 'applyRequestedEdits':{
-    const output=saved||await plan(stage,project,job,signal);
+    let output=saved||await plan(stage,project,job,signal);
+    const constraints = extractEditingConstraints(job.instructions);
+
+    // Zero-hallucination guardrail: Block arbitrary floating summary text
+    if (constraints.requestedFloatingSummaryText) {
+     const cleanDecisions = (output.decisions || []).filter(d => d.op !== 'addText');
+     const existingCaptions = Object.values(project.clips).filter(c => c.contentId && project.captions[c.contentId]);
+     if (existingCaptions.length > 0) {
+      if (!cleanDecisions.some(d => d.op === 'applyCaptionTemplate')) {
+       cleanDecisions.unshift({
+        op: 'applyCaptionTemplate',
+        clipIds: existingCaptions.map(c => c.id),
+        templateId: 'study-hormozi-style'
+       });
+      }
+     } else if (!output.requests?.some(r => r.type === 'captions')) {
+      const firstFootage = Object.values(project.clips).find(c => c.assetId && project.assets[c.assetId]?.kind === 'video');
+      if (firstFootage) {
+       output.requests = [...(output.requests || []), { type: 'captions', clipId: firstFootage.id, templateId: 'study-hormozi-style' }];
+      }
+     }
+     output.decisions = cleanDecisions;
+     const notice: PipelineDegradationNotice = {
+      stage: 'applyCaptions',
+      status: 'skipped',
+      reason: 'Zero-hallucination guardrail active: Floating summary or explanatory text is blocked. Spoken dialogue was bound to caption template instead.',
+      suggestedAction: 'Spoken dialogue captions are displayed with engaging typography.',
+      timestamp: Date.now()
+     };
+     output.degradationNotices = [...(output.degradationNotices || []), notice];
+     output.summary = "Applied spoken dialogue captions with 'study-hormozi-style'. Floating summary text was skipped under zero-hallucination guardrail.";
+    }
+
+    // Caption style switch without altering timestamps or duplicating tracks
+    if (constraints.requestedCaptionPreset) {
+     const matched = constraints.requestedCaptionPreset;
+     const existingCaptions = Object.values(project.clips).filter(c => c.contentId && project.captions[c.contentId]);
+     if (existingCaptions.length > 0) {
+      const cleanDecisions: import('./ai').EditDecision[] = (output.decisions || []).filter(d => d.op !== 'applyCaptionTemplate' && d.op !== 'addCaption');
+      cleanDecisions.unshift({
+       op: 'applyCaptionTemplate' as const,
+       clipIds: existingCaptions.map(c => c.id),
+       templateId: matched
+      });
+      output.decisions = cleanDecisions;
+      output.summary = `Updated caption style to ${matched} without altering word timestamps.`;
+     }
+    }
     if(!output.decisions?.length&&!output.requests?.length&&!output.questions?.length)throw Error(output.summary||'AI did not return any actionable requested edits.');
     if(output.sourceDecisionCount===undefined)output.sourceDecisionCount=output.decisions?.length||0;
     await checkpoint(output);

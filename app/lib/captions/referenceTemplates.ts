@@ -54,6 +54,7 @@ export const REFERENCE_CAPTION_TEMPLATES:ReferenceCaptionTemplate[]=[
  make('Deep Glow','Archivo Black',900,'#ffffff','#ffffff',{glow:24,glowColor:'#ffffff',entrance:'fade'},{textTransform:'uppercase'},'Archivo Black replaces The Bold Font.'),
  make('Seedha Saadha','Rubik',900,'#ffffff','#ffffff',{entrance:'none'},{textTransform:'uppercase',strokeWidth:4.2,strokeColor:'#000000'}),
  make('Thora Cinematic','Montserrat',600,'#ffffff','#ffffff',{layout:'stacked',rowSplit:.67,entrance:'fade'},{textTransform:'uppercase',lineSpacing:1,letterSpacing:'.20833em'}),
+ make('Viral Hinglish Pop','Montserrat',900,'#ffffff','#ffe600',{emphasisScale:1.35,emphasisSelection:'last',entrance:'pop'},{textTransform:'uppercase',strokeWidth:4,strokeColor:'#000000'}),
  make('Zero Gravity','Montserrat',400,'#ffffff','#ffffff',{layout:'split',hold:'float',entrance:'slide-up'}),
 ];
 export function referenceCaptionTemplate(id:string){return REFERENCE_CAPTION_TEMPLATES.find(t=>t.id===id);}

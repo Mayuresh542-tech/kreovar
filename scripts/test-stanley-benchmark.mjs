@@ -125,7 +125,7 @@ function createSampleProject() {
   return p;
 }
 
-describe('Stanley vs Kreovar Intelligence Benchmark Suite', () => {
+describe('Kreovar Intelligence Benchmark Suite', () => {
   test('Benchmark Case 06: Caption-only refinement updates existing captions in-place without duplicate layers', async () => {
     const project = createSampleProject();
     const existingCaptionCount = Object.keys(project.captions).length;

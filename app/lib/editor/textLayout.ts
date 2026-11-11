@@ -5,10 +5,11 @@ export type MeasureText=(text:string)=>number;
 export function styledText(layer:TextLayer){
  return layer.style.casing==='uppercase'?layer.text.toUpperCase():layer.style.casing==='capitalize'?layer.text.replace(/\b\w/g,c=>c.toUpperCase()):layer.text;
 }
+const graphemeSegmenter=typeof Intl.Segmenter==='function'?new Intl.Segmenter(undefined,{granularity:'grapheme'}):null;
 /** Shared word/grapheme wrapping for preview, export and conservative placement estimation. */
 export function wrapText(content:string,width:number,measure:MeasureText){
  const lines:string[]=[];
- const graphemes=(s:string)=>typeof Intl.Segmenter==='function'?[...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(s)].map(v=>v.segment):Array.from(s);
+ const graphemes=(s:string)=>graphemeSegmenter?[...graphemeSegmenter.segment(s)].map(v=>v.segment):Array.from(s);
  for(const paragraph of content.split('\n')){
   let line='';
   for(const word of paragraph.split(/\s+/).filter(Boolean)){

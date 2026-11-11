@@ -1,4 +1,5 @@
 import {readSpeechLanguage} from "@/app/lib/captions/speechLanguages";
+import {normalizeHinglishWords,normalizeHinglishText} from "@/app/lib/editor/hinglishNormalizer";
 import {reserveUsage,finishUsage,usageError,PlanLimitError} from '@/app/lib/server/planUsage';
 import {speechDuration} from '@/app/lib/server/speechDuration';
 import {transcribeWithGroq,SpeechProviderError} from "@/app/lib/server/groqTranscription";
@@ -145,7 +146,7 @@ async function postHandler(req: NextRequest) {
     const rawWords = elevenData.words || [];
 
     // Filter and format word timestamps
-    const words: TTSWordTimestamp[] = rawWords
+    let words: TTSWordTimestamp[] = rawWords
       .filter((w: {type?:string;text?:string;start?:number;end?:number}) => w.type !== "audio_event" && typeof w.text === "string" && w.text.trim())
       .map((w: {text:string;start?:number;end?:number}) => ({
         word: String(w.text).trim(),
@@ -153,8 +154,13 @@ async function postHandler(req: NextRequest) {
         end: Number(w.end ?? (w.start ?? 0) + 0.3),
       }));
 
-    const fullTranscript =
-      elevenData.text || words.map((w) => w.word).join(" ");
+    if (speechLanguage === 'hinglish') {
+      words = normalizeHinglishWords(words);
+    }
+
+    const fullTranscript = speechLanguage === 'hinglish'
+      ? normalizeHinglishText(elevenData.text || words.map((w) => w.word).join(" "))
+      : (elevenData.text || words.map((w) => w.word).join(" "));
 
     // Group words into natural kinetic caption segments (3-4 words per segment)
     const segments = groupWordsIntoSegments(words, 4);

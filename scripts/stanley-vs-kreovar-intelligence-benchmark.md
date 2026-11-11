@@ -1,4 +1,4 @@
-# Stanley vs Kreovar AI Video Editing Intelligence Benchmark
+# Kreovar AI Video Editing Intelligence Benchmark Suite
 
 > **Document Type:** Automated Evaluation Suite & Quality Assurance Benchmark  
 > **Target:** Conversational AI Video Editing Orchestration Engine  
@@ -388,7 +388,7 @@ To run these benchmark evaluations automatically against Kreovar's AI editing en
 
 ```bash
 # Execute the full intelligence benchmark suite
-node --test scripts/test-stanley-benchmark.mjs
+node --test scripts/test-kreovar-benchmark.mjs
 ```
 
 Each benchmark test executes in isolated memory using the VM loader, feeding the prompt through `planAiEdit` and validating the resulting `EditDecisionList` against the typed pass/fail assertions.

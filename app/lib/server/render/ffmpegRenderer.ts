@@ -162,67 +162,82 @@ export async function renderTimelineWithFFmpeg(
   try {
     await onProgress?.(5, "Preparing video compilation assets...");
 
-    // 1. Collect and download video clips
+    // 1–4. Download video clips, voiceover, music, and watermark in parallel
     const videoTrack = timeline.tracks.find((t) => t.type === "video");
     const rawClips = videoTrack?.items || [];
+    const voiceoverTrack = timeline.tracks.find((t) => t.type === "voiceover");
+    const voiceoverItem = voiceoverTrack?.items?.[0];
+    const musicTrack = timeline.tracks.find((t) => t.type === "music");
+    const musicItem = musicTrack?.items?.[0];
+    const watermarkConfig = timeline.settings?.watermark;
 
-    const localClipFiles: Array<{ path: string; duration: number; animation: string }> = [];
+    await onProgress?.(8, `Downloading media assets (${rawClips.length} video clip${rawClips.length === 1 ? "" : "s"})...`);
 
-    for (let i = 0; i < rawClips.length; i++) {
-      const clip = rawClips[i];
+    let completedDownloads = 0;
+    const totalDownloads =
+      rawClips.length +
+      (voiceoverItem?.source ? 1 : 0) +
+      (musicItem?.source ? 1 : 0) +
+      (watermarkConfig?.enabled && watermarkConfig.logoUrl ? 1 : 0);
+
+    const trackProgress = async () => {
+      completedDownloads++;
+      await onProgress?.(
+        Math.min(35, 8 + Math.round((completedDownloads / Math.max(1, totalDownloads)) * 27)),
+        `Downloaded ${completedDownloads}/${totalDownloads} assets...`
+      );
+    };
+
+    const clipDownloadPromises = rawClips.map(async (clip, i) => {
       const clipFileName = `clip_${i}.mp4`;
       const clipDest = path.join(scratchDir, clipFileName);
-
-      await onProgress?.(
-        Math.min(25, 5 + Math.round((i / Math.max(1, rawClips.length)) * 20)),
-        `Downloading B-roll footage ${i + 1}/${rawClips.length}...`
-      );
-
       const downloaded = await downloadAsset(clip.source, clipDest);
       if (!downloaded) throw new Error("An original clip could not be downloaded. Relink it and retry.");
-      if (downloaded) {
-        localClipFiles.push({
-          path: clipFileName,
-          duration: clip.duration,
-          animation: clip.animation || "none",
-        });
-      } else {
-        // Fallback: Generate a clean solid gradient video using ffmpeg color filter
-        const fallbackName = `clip_fallback_${i}.mp4`;
-        const fallbackPath = path.join(scratchDir, fallbackName);
+      await trackProgress();
+      return {
+        path: clipFileName,
+        duration: clip.duration,
+        animation: clip.animation || "none",
+      };
+    });
 
-        await new Promise<void>((resolve, reject) => {
-          const gen = spawn(
-            "ffmpeg",
-            [
-              "-y",
-              "-f",
-              "lavfi",
-              "-i",
-              `color=c=0x0E1322:s=${width}x${height}:d=${clip.duration}:r=30`,
-              "-c:v",
-              "libx264",
-              "-pix_fmt",
-              "yuv420p",
-              fallbackName,
-            ],
-            { cwd: scratchDir }
-          );
-          gen.on("close", (code) => {
-            if (code === 0) {
-              localClipFiles.push({
-                path: fallbackName,
-                duration: clip.duration,
-                animation: "none",
-              });
-              resolve();
-            } else {
-              reject(new Error(`Failed to generate fallback clip ${i}`));
-            }
-          });
-        });
-      }
-    }
+    const voPromise = voiceoverItem?.source
+      ? (async () => {
+          const voName = "voiceover.mp3";
+          const voDownloaded = await downloadAsset(voiceoverItem.source, path.join(scratchDir, voName));
+          if (!voDownloaded) throw new Error("Voiceover could not be downloaded. Regenerate or relink it.");
+          await trackProgress();
+          return voName;
+        })()
+      : Promise.resolve<string | null>(null);
+
+    const musicPromise = musicItem?.source
+      ? (async () => {
+          const musicName = "music.mp3";
+          const musicDownloaded = await downloadAsset(musicItem.source, path.join(scratchDir, musicName));
+          if (!musicDownloaded) throw new Error("Music could not be downloaded. Remove or replace it.");
+          await trackProgress();
+          return musicName;
+        })()
+      : Promise.resolve<string | null>(null);
+
+    const watermarkPromise =
+      watermarkConfig?.enabled && watermarkConfig.logoUrl
+        ? (async () => {
+            const wmName = "watermark.png";
+            const wmDownloaded = await downloadAsset(watermarkConfig.logoUrl, path.join(scratchDir, wmName));
+            if (!wmDownloaded) throw new Error("Watermark could not be downloaded. Remove or replace it.");
+            await trackProgress();
+            return wmName;
+          })()
+        : Promise.resolve<string | null>(null);
+
+    const [localClipFiles, localVoiceoverName, localMusicName, localWatermarkName] = await Promise.all([
+      Promise.all(clipDownloadPromises),
+      voPromise,
+      musicPromise,
+      watermarkPromise,
+    ]);
 
     if (localClipFiles.length === 0) {
       // Guarantee at least one video background
@@ -238,6 +253,8 @@ export async function renderTimelineWithFFmpeg(
             `color=c=0x0A0D14:s=${width}x${height}:d=${totalDuration}:r=30`,
             "-c:v",
             "libx264",
+            "-preset",
+            "ultrafast",
             "-pix_fmt",
             "yuv420p",
             baseClipName,
@@ -247,51 +264,6 @@ export async function renderTimelineWithFFmpeg(
         gen.on("close", (code) => (code === 0 ? resolve() : reject(new Error("Failed base clip"))));
       });
       localClipFiles.push({ path: baseClipName, duration: totalDuration, animation: "none" });
-    }
-
-    // 2. Collect and download voiceover audio
-    const voiceoverTrack = timeline.tracks.find((t) => t.type === "voiceover");
-    const voiceoverItem = voiceoverTrack?.items?.[0];
-    let localVoiceoverName: string | null = null;
-
-    if (voiceoverItem?.source) {
-      await onProgress?.(30, "Syncing spoken voiceover audio...");
-      const voName = "voiceover.mp3";
-      const voPath = path.join(scratchDir, voName);
-      const voDownloaded = await downloadAsset(voiceoverItem.source, voPath);
-      if (!voDownloaded) throw new Error("Voiceover could not be downloaded. Regenerate or relink it.");
-      if (voDownloaded) {
-        localVoiceoverName = voName;
-      }
-    }
-
-    // 3. Collect and download background music
-    const musicTrack = timeline.tracks.find((t) => t.type === "music");
-    const musicItem = musicTrack?.items?.[0];
-    let localMusicName: string | null = null;
-
-    if (musicItem?.source) {
-      await onProgress?.(35, "Configuring background music & audio ducking...");
-      const musicName = "music.mp3";
-      const musicPath = path.join(scratchDir, musicName);
-      const musicDownloaded = await downloadAsset(musicItem.source, musicPath);
-      if (!musicDownloaded) throw new Error("Music could not be downloaded. Remove or replace it.");
-      if (musicDownloaded) {
-        localMusicName = musicName;
-      }
-    }
-
-    // 4. Check for watermark
-    const watermarkConfig = timeline.settings?.watermark;
-    let localWatermarkName: string | null = null;
-    if (watermarkConfig?.enabled && watermarkConfig.logoUrl) {
-      const wmName = "watermark.png";
-      const wmPath = path.join(scratchDir, wmName);
-      const wmDownloaded = await downloadAsset(watermarkConfig.logoUrl, wmPath);
-      if (!wmDownloaded) throw new Error("Watermark could not be downloaded. Remove or replace it.");
-      if (wmDownloaded) {
-        localWatermarkName = wmName;
-      }
     }
 
     // 5. Generate ASS subtitles file
@@ -468,7 +440,9 @@ export async function renderTimelineWithFFmpeg(
       "-c:v",
       "libx264",
       "-preset",
-      "fast",
+      "veryfast",
+      "-threads",
+      "0",
       "-crf",
       "22",
       "-pix_fmt",

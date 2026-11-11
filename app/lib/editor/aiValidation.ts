@@ -11,7 +11,7 @@ import {readKeyframes,MOTION_PRESETS} from './keyframes';
 import {readMotionGraphic,GRAPHIC_KINDS} from './motionGraphics';
 import {textPlacementId} from "./textPlacement";
 import {ALL_CAPTION_TEMPLATES as DEFAULT_CAPTION_TEMPLATES} from "../captions/referenceTemplates";
-import { EditorProject, MediaAsset, Clip, Track, TextLayer, Ratio, defaultStyle, defaultTransform, aspectRatios } from "./model";
+import { EditorProject, MediaAsset, Clip, Track, TextLayer, Ratio, defaultStyle, defaultTransform, aspectRatios, isKnownCaptionPreset, normalizeCaptionPresetId } from "./model";
 import { EditDecision, EditDecisionList, applyEditDecisionList } from "./ai";
 
 const ratios = aspectRatios;
@@ -110,7 +110,7 @@ export function aiProjectSnapshot(value: unknown): EditorProject {
   return { schemaVersion: 1, id: id(p.id), title: string(p.title), revision: number(p.revision, 0, Number.MAX_SAFE_INTEGER), updatedAt: "", trackOrder, tracks, clips, assets, textLayers, captions, transitions: {}, settings: { aspectRatio: choice(settings.aspectRatio, ratios), fps: number(settings.fps, 1, 120), background: "#000000",...(settings.audioDucking===undefined?{}:{audioDucking:boolean(settings.audioDucking)}) } };
 }
 
-function templateId(value:unknown){const result=id(value);if(!DEFAULT_CAPTION_TEMPLATES.some(t=>t.id===result))throw new Error("Unknown caption template.");return result;}
+function templateId(value:unknown){const result=id(value);if(isKnownCaptionPreset(result))return result;if(!DEFAULT_CAPTION_TEMPLATES.some(t=>t.id===result)){const normalized=normalizeCaptionPresetId(result);if(isKnownCaptionPreset(normalized))return normalized;throw new Error("Unknown caption template.");}return result;}
 function decision(value: unknown): EditDecision {
   const d = object(value);
   switch (d.op) {

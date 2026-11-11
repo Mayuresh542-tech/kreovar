@@ -26,7 +26,7 @@ function EditorPageContent({ params }: { params: Promise<{ id: string }> }) {
   }
 
   return (
-    <div className="w-full h-dvh overflow-auto bg-[#F8FAFC]">
+    <div className="w-screen h-[100dvh] overflow-hidden bg-[#F8FAFC] text-[#0F172A] flex flex-col">
       <VeeloxVideoEditor
         projectId={id}
         projectTitle={`Project #${id.slice(0, 8)}`}

@@ -1,5 +1,6 @@
 "use client";
 import {SPEECH_LANGUAGES} from "../lib/captions/speechLanguages";
+import {normalizeHinglishWords,normalizeHinglishText} from "../lib/editor/hinglishNormalizer";
 import {loadCaptionDocumentFonts} from '../lib/captions/studioFonts';
 import {Suspense,useEffect,useMemo,useRef,useState} from "react";
 import {useRouter,useSearchParams} from "next/navigation";
@@ -33,7 +34,13 @@ function CaptionsContent(){
  const [segments,setSegments]=useState<CaptionSegment[]>([]),[templateId,setTemplateId]=useState(DEFAULT_CAPTION_TEMPLATES[0].id),[url,setUrl]=useState<string|null>(null),[fileName,setFileName]=useState(""),[busy,setBusy]=useState(""),[error,setError]=useState(""),[time,setTime]=useState(0),[duration,setDuration]=useState(0),[aspect,setAspect]=useState(16/9),[text,setText]=useState(params.get("script")||params.get("text")||""),[exporting,setExporting]=useState(false),[progress,setProgress]=useState(0),[exportUrl,setExportUrl]=useState<string|null>(null),[captionAsset,setCaptionAsset]=useState<StudioAsset|null>(null),[modal,setModal]=useState(false);
  const original=useRef<File|null>(null),video=useRef<HTMLVideoElement>(null),overlay=useRef<HTMLCanvasElement>(null),job=useRef<AbortController|null>(null),exportJob=useRef<AbortController|null>(null);
  const [exportFormat,setExportFormat]=useState<"mp4"|"webm">("mp4");
- const [detectedLanguage,setDetectedLanguage]=useState(""),[captionLanguage,setCaptionLanguage]=useState("auto");
+ const [detectedLanguage,setDetectedLanguage]=useState(""),[captionLanguage,setCaptionLanguage]=useState("auto"),[scriptMode,setScriptMode]=useState<"hinglish"|"hindi"|"english">("hinglish");
+ function applyScriptMode(mode:"hinglish"|"hindi"|"english"){
+  setScriptMode(mode);
+  if(mode==="hinglish"){setCaptionLanguage("hinglish");if(segments.length){remember();const updated=segments.map(s=>({...s,text:normalizeHinglishText(s.text),words:s.words?normalizeHinglishWords(s.words):undefined}));setSegments(updated);setText(updated.map(s=>s.text).join(" "));}}
+  else if(mode==="hindi")setCaptionLanguage("hi");
+  else if(mode==="english")setCaptionLanguage("en");
+ }
  const template=referenceCaptionTemplate(templateId)||getTemplateById(templateId);
  const [styleOverrides,setStyleOverrides]=useState<Partial<CaptionStyleConfig>>({highlightingMode:"keyword"}),[samplePlaying,setSamplePlaying]=useState(false),[generating,setGenerating]=useState(false);
  const captionStyle=useMemo(()=>({...template.style,...styleOverrides}),[template,styleOverrides]);
@@ -69,7 +76,8 @@ function CaptionsContent(){
    const meta=await openCaptionVideo(file,controller.signal);localUrl=meta.url;
    controller.signal.throwIfAborted();original.current=file;setFileName(file.name);setDuration(meta.duration);setAspect(meta.width/meta.height||16/9);setUrl(localUrl);localUrl=undefined;
    const data=await transcribeCaptionVideo(file,meta.duration,controller.signal,setBusy,captionLanguage);
-   const timed=(data.segments as CaptionSegment[]||[]).filter(s=>typeof s.text==="string"&&Number.isFinite(s.start)&&Number.isFinite(s.end)&&s.end>s.start&&s.start<meta.duration).map(s=>({...s,end:Math.min(s.end,meta.duration)}));if(!timed.length)throw new Error("No speech was found. You can import an SRT caption file instead.");
+   const rawTimed=(data.segments as CaptionSegment[]||[]).filter(s=>typeof s.text==="string"&&Number.isFinite(s.start)&&Number.isFinite(s.end)&&s.end>s.start&&s.start<meta.duration).map(s=>({...s,end:Math.min(s.end,meta.duration)}));if(!rawTimed.length)throw new Error("No speech was found. You can import an SRT caption file instead.");
+   const timed=(scriptMode==='hinglish'||captionLanguage==='hinglish')?rawTimed.map(s=>({...s,text:normalizeHinglishText(s.text),words:s.words?normalizeHinglishWords(s.words):undefined})):rawTimed;
    setDetectedLanguage(typeof data.language==="string"?data.language.slice(0,80):"");setSegments(timed);setText(data.transcript||"");setCaptionAsset(data.asset||null);
   }catch(cause){setError(controller.signal.aborted?"Caption generation cancelled. You can retry or import an SRT file.":cause instanceof Error?cause.message:"Transcription failed. Import an SRT or retry.");}finally{if(localUrl)URL.revokeObjectURL(localUrl);if(job.current===controller){job.current=null;setGenerating(false);setBusy("");}}
  }
@@ -93,7 +101,15 @@ function CaptionsContent(){
   <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
    <div className="min-w-0 space-y-4">
     <section className={panel}><h2 className="mb-3 text-sm font-semibold">1. Choose your video</h2>
-     <label className="mb-3 block text-xs font-medium">Spoken language<select aria-label="Caption language" value={captionLanguage} disabled={!!busy||exporting} onChange={event=>setCaptionLanguage(event.target.value)} className="mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="auto">Auto-detect</option><option value="mixed">Hinglish / Mixed (auto-detect)</option>{SPEECH_LANGUAGES.map(item=><option key={item.code} value={item.code}>{item.name}</option>)}</select><span className="mt-1 block text-[11px] font-normal text-slate-500">Choose before uploading your video.</span></label>
+     <div className="mb-3">
+      <label className="mb-1 block text-xs font-medium">Script Mode</label>
+      <div className="grid grid-cols-3 gap-2" role="group" aria-label="Script Mode">
+       <button type="button" className={`min-h-10 rounded-lg border px-2 text-xs font-semibold transition-colors ${scriptMode==='hinglish'?'border-blue-600 bg-blue-50 text-blue-700 shadow-xs':'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`} onClick={()=>applyScriptMode('hinglish')}>Hinglish (Latin)</button>
+       <button type="button" className={`min-h-10 rounded-lg border px-2 text-xs font-semibold transition-colors ${scriptMode==='hindi'?'border-blue-600 bg-blue-50 text-blue-700 shadow-xs':'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`} onClick={()=>applyScriptMode('hindi')}>Hindi (Devanagari)</button>
+       <button type="button" className={`min-h-10 rounded-lg border px-2 text-xs font-semibold transition-colors ${scriptMode==='english'?'border-blue-600 bg-blue-50 text-blue-700 shadow-xs':'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`} onClick={()=>applyScriptMode('english')}>English</button>
+      </div>
+     </div>
+     <label className="mb-3 block text-xs font-medium">Spoken language<select aria-label="Caption language" value={captionLanguage} disabled={!!busy||exporting} onChange={event=>{setCaptionLanguage(event.target.value);if(event.target.value==='hinglish')setScriptMode('hinglish');else if(event.target.value==='hi')setScriptMode('hindi');else if(event.target.value==='en')setScriptMode('english');}} className="mt-1 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="auto">Auto-detect</option><option value="hinglish">Hinglish / Roman Hindi (Latin)</option><option value="hi">Hindi (Devanagari)</option><option value="en">English</option>{SPEECH_LANGUAGES.filter(item=>!['hi','en'].includes(item.code)).map(item=><option key={item.code} value={item.code}>{item.name}</option>)}</select><span className="mt-1 block text-[11px] font-normal text-slate-500">Choose before uploading your video.</span></label>
      <label className={`${button} w-full cursor-pointer border-dashed bg-slate-50`}><Upload size={18}/><span className="min-w-0 break-all">{fileName||"Choose video — MP4, MOV or WebM"}</span><input aria-label="Upload video for captions" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm,.m4v" disabled={!!busy||exporting} onChange={e=>{const f=e.target.files?.[0];e.target.value="";if(f)void uploadVideo(f);}} className="sr-only"/></label>
      {busy&&<div className="mt-3 flex flex-wrap items-center gap-3"><p role="status" className="flex items-center gap-2 text-sm text-blue-700"><LoaderCircle size={16} className="animate-spin"/>{busy}</p>{generating&&<button type="button" className={button} onClick={()=>job.current?.abort()}>Cancel generation</button>}</div>}
      {url&&!busy&&!segments.length&&<button type="button" className={`${button} mt-3`} disabled={exporting} onClick={()=>{if(original.current)void uploadVideo(original.current);}}>Retry captions</button>}

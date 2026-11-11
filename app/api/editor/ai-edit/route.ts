@@ -62,10 +62,17 @@ async function postHandler(req: NextRequest) {
     }
     try{await requireOwnedProject(getAdminClient(),data.user.id,project.id);}catch{return NextResponse.json({error:"This project is unavailable."},{status:404});}
     const now = Date.now();
-    for (const [id, state] of requests) if (!state.busy && now - state.since > 60000) requests.delete(id);
-    const state = requests.get(data.user.id) || { since: now, count: 0, busy: false };
-    if (state.busy || state.count >= 6) return NextResponse.json({ error: "Please wait a minute before requesting another AI edit." }, { status: 429, headers: { "Retry-After": "60" } });
-    state.count++; state.busy = true; requests.set(data.user.id, state);
+    for (const [id, s] of requests) if (now - s.since > 90000 || (!s.busy && now - s.since > 60000)) requests.delete(id);
+    let state = requests.get(data.user.id);
+    if (!state || now - state.since > 60000) {
+      state = { since: now, count: 0, busy: false };
+      requests.set(data.user.id, state);
+    } else if (state.busy && now - state.since > 85000) {
+      state.busy = false;
+    }
+    const maxRequests = pipelineStage ? 30 : 10;
+    if (state.busy || state.count >= maxRequests) return NextResponse.json({ error: "Please wait a minute before requesting another AI edit." }, { status: 429, headers: { "Retry-After": "60" } });
+    state.count++; state.busy = true;
     release = () => { state.busy = false; };
     const plan = await planAiEdit(project, instruction, selectedClipIds, data.user.id, AbortSignal.any([req.signal, AbortSignal.timeout(80000)]),playheadTime,{footageFrames,fallbackFootageFrames,completeEdit,pipelineStage,editingBudget,conversationHistory});
     return NextResponse.json(plan, { headers: { "Cache-Control": "no-store" } });

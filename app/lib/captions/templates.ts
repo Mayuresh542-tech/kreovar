@@ -92,6 +92,38 @@ export const CAPTION_CATEGORIES: CaptionCategory[] = [
 ];
 
 export const DEFAULT_CAPTION_TEMPLATES: CaptionTemplate[] = [
+  // 0. TRENDING: Viral Hinglish Pop (Romanized Hindi optimized)
+  {
+    id: "viral-hinglish-pop",
+    name: "Viral Hinglish Pop",
+    category: "Trending",
+    tagline: "Romanized Hindi pop · High-contrast stroke",
+    description: "Optimized for punchy uppercase Romanized Hindi (Hinglish) with high-contrast outlines and energetic keyword highlights.",
+    style: {
+      fontFamily: "'Montserrat', -apple-system, sans-serif",
+      fontSize: 36,
+      fontWeight: 900,
+      textTransform: "uppercase",
+      textColor: "#FFFFFF",
+      highlightColor: "#FFE600",
+      strokeColor: "#000000",
+      strokeWidth: 4,
+      shadowColor: "rgba(0, 0, 0, 0.95)",
+      shadowBlur: 0,
+      shadowOffsetX: 3,
+      shadowOffsetY: 4,
+      containerBg: "transparent",
+      alignment: "center",
+      position: "center",
+      positionYPercent: 65,
+      maxWordsPerLine: 3,
+      lineSpacing: 1.15,
+      letterSpacing: "0.02em",
+      animation: "pop",
+      animationSpeed: 0.16,
+      highlightingMode: "current-word",
+    },
+  },
   // 1. TRENDING: Hormozi Punch
   {
     id: "hormozi-punch",

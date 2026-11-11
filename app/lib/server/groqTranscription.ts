@@ -1,4 +1,5 @@
 import {readSpeechLanguage} from "../captions/speechLanguages";
+import {normalizeHinglishWords,normalizeHinglishText} from "../editor/hinglishNormalizer";
 /** Server-side ASR adapter. No translation, key logging, or provider fallback. */
 export class SpeechProviderError extends Error {
  constructor(message:string,readonly status:number,readonly retryAfter?:string){super(message);this.name='SpeechProviderError';}
@@ -12,7 +13,10 @@ export async function transcribeWithGroq(audio:Buffer,mime:string,key:string,sig
  if(!ext)throw new SpeechProviderError('Extract speech audio in a supported browser before generating captions. Try updated Chrome or Edge.',415);
  if(!key.trim())throw new SpeechProviderError('Speech transcription is not configured.',503);
  const form=new FormData();form.append('file',new Blob([new Uint8Array(audio)],{type:mime}),'speech.'+ext);
- if(languageHint)form.append('language',languageHint);
+ if(languageHint&&languageHint!=='hinglish')form.append('language',languageHint);
+ if(languageHint==='hinglish'){
+  form.append('prompt','Transcribe the Hindi and English speech using clean Latin/English alphabets (Hinglish/Roman Hindi), maintaining accurate word-level timestamps. Example: yaar, bhai, kya kar raha hai, matlab, bilkul, kaise ho, sahi hai, accha.');
+ }
  form.append('model','whisper-large-v3');form.append('response_format','verbose_json');form.append('timestamp_granularities[]','word');form.append('timestamp_granularities[]','segment');form.append('temperature','0');
  const response=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{method:'POST',headers:{Authorization:'Bearer '+key},body:form,signal:AbortSignal.any([signal,AbortSignal.timeout(45000)]),cache:'no-store'});
  if(!response.ok){
@@ -33,5 +37,13 @@ export async function transcribeWithGroq(audio:Buffer,mime:string,key:string,sig
  // in spoken order; never sort words or invent replacement timestamps.
  const aligned:typeof words=[];
  for(const word of words){let item=word;while(aligned.length&&item.start<aligned[aligned.length-1].end){const previous=aligned.pop()!;item={...item,text:previous.text+' '+item.text,start:Math.min(previous.start,item.start),end:Math.max(previous.end,item.end)};}aligned.push(item);}
- return {words:aligned,text:typeof data.text==='string'?data.text:words.map((w:{text:string})=>w.text).join(' '),language_code:typeof data.language==='string'?data.language:'und',audio_duration_secs:typeof data.duration==='number'&&Number.isFinite(data.duration)?data.duration:words.at(-1)?.end||0};
+ const normalizedWords = languageHint === 'hinglish' ? normalizeHinglishWords(aligned) : aligned;
+ const rawText = typeof data.text === 'string' ? data.text : words.map((w: { text: string }) => w.text).join(' ');
+ const normalizedText = languageHint === 'hinglish' ? normalizeHinglishText(rawText) : rawText;
+ return {
+  words: normalizedWords,
+  text: normalizedText,
+  language_code: languageHint === 'hinglish' ? 'hin-Latn' : (typeof data.language === 'string' ? data.language : 'und'),
+  audio_duration_secs: typeof data.duration === 'number' && Number.isFinite(data.duration) ? data.duration : words.at(-1)?.end || 0
+ };
 }

@@ -3,16 +3,35 @@ export interface RgbOffset {x:number;y:number}
 export function shiftRgbPixels(pixels:Uint8ClampedArray,width:number,height:number,offsetX:number,offsetY:number,output=new Uint8ClampedArray(pixels.length)){
  const dx=Math.round(offsetX),dy=Math.round(offsetY);
  if(!dx&&!dy){output.set(pixels);return output;}
- const at=(x:number,y:number)=>x<0||y<0||x>=width||y>=height?-1:(y*width+x)*4;
- for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-  const to=(y*width+x)*4,r=at(x-dx,y-dy),g=to,b=at(x+dx,y+dy),ra=r<0?0:pixels[r+3],ga=pixels[g+3],ba=b<0?0:pixels[b+3],alpha=Math.max(ra,ga,ba);
-  output[to]=alpha&&r>=0?pixels[r]*ra/alpha:0;output[to+1]=alpha?pixels[g+1]*ga/alpha:0;output[to+2]=alpha&&b>=0?pixels[b+2]*ba/alpha:0;output[to+3]=alpha;
+ const rowBytes=width*4;
+ for(let y=0;y<height;y++){
+  const rowBase=y*rowBytes;
+  const ry=y-dy,by=y+dy;
+  const rValidY=ry>=0&&ry<height,bValidY=by>=0&&by<height;
+  const rRowBase=ry*rowBytes,bRowBase=by*rowBytes;
+  for(let x=0;x<width;x++){
+   const to=rowBase+x*4;
+   const rx=x-dx,bx=x+dx;
+   const r=rValidY&&rx>=0&&rx<width?rRowBase+rx*4:-1;
+   const b=bValidY&&bx>=0&&bx<width?bRowBase+bx*4:-1;
+   const ra=r<0?0:pixels[r+3],ga=pixels[to+3],ba=b<0?0:pixels[b+3];
+   if((ra&ga&ba)===255){
+    output[to]=pixels[r];output[to+1]=pixels[to+1];output[to+2]=pixels[b+2];output[to+3]=255;
+    continue;
+   }
+   const alpha=ra>=ga?(ra>=ba?ra:ba):(ga>=ba?ga:ba);
+   if(!alpha){output[to]=0;output[to+1]=0;output[to+2]=0;output[to+3]=0;continue;}
+   output[to]=r>=0?pixels[r]*ra/alpha:0;
+   output[to+1]=pixels[to+1]*ga/alpha;
+   output[to+2]=b>=0?pixels[b+2]*ba/alpha:0;
+   output[to+3]=alpha;
+  }
  }
  return output;
 }
 type RasterCanvas=OffscreenCanvas|HTMLCanvasElement;
 type RasterContext=OffscreenCanvasRenderingContext2D|CanvasRenderingContext2D;
-interface Scratch {input:RasterCanvas;output:RasterCanvas;inputCtx:RasterContext;outputCtx:RasterContext}
+interface Scratch {input:RasterCanvas;output:RasterCanvas;inputCtx:RasterContext;outputCtx:RasterContext;result?:ImageData}
 const scratch=new WeakMap<CanvasRenderingContext2D,Scratch>();
 function createScratch():Scratch {
  const create=():RasterCanvas=>typeof OffscreenCanvas!=='undefined'?new OffscreenCanvas(1,1):document.createElement('canvas');
@@ -29,7 +48,8 @@ export function drawChromaticMedia(ctx:CanvasRenderingContext2D,image:CanvasImag
  const w=Math.max(1,Math.ceil(width*rasterScale))+pad*2,h=Math.max(1,Math.ceil(height*rasterScale))+pad*2;
  for(const canvas of [buffers.input,buffers.output])if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
  buffers.inputCtx.clearRect(0,0,w,h);buffers.inputCtx.drawImage(image,pad,pad,width*rasterScale,height*rasterScale);
- const original=buffers.inputCtx.getImageData(0,0,w,h),result=buffers.outputCtx.createImageData(w,h);
- shiftRgbPixels(original.data,w,h,offset.x*rasterScale,offset.y*rasterScale,result.data);buffers.outputCtx.putImageData(result,0,0);
+ const original=buffers.inputCtx.getImageData(0,0,w,h);
+ if(!buffers.result||buffers.result.width!==w||buffers.result.height!==h)buffers.result=buffers.outputCtx.createImageData(w,h);
+ shiftRgbPixels(original.data,w,h,offset.x*rasterScale,offset.y*rasterScale,buffers.result.data);buffers.outputCtx.putImageData(buffers.result,0,0);
  ctx.drawImage(buffers.output,x-pad/rasterScale,y-pad/rasterScale,w/rasterScale,h/rasterScale);
 }

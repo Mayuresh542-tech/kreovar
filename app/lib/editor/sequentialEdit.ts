@@ -1,6 +1,11 @@
 import {STAGE_CAPABILITIES} from './editingCapabilities';
 import type {EditorProject, MediaAsset} from './model';
-import {projectDuration} from './model';
+import {projectDuration, VALID_CAPTION_PRESETS, type CaptionPresetId, type CaptionDecision, isKnownCaptionPreset, normalizeCaptionPresetId} from './model';
+import {referenceCaptionTemplate} from '../captions/referenceTemplates';
+import {DEFAULT_CAPTION_TEMPLATES} from '../captions/templates';
+import {GRAPHIC_KINDS} from './motionGraphics';
+
+export {VALID_CAPTION_PRESETS, type CaptionPresetId, type CaptionDecision, isKnownCaptionPreset, normalizeCaptionPresetId};
 import type {EditDecision} from './ai';
 import {applyEditDecisionList} from './ai';
 import {validateAiPlan, aiProjectSnapshot} from './aiValidation';
@@ -43,7 +48,25 @@ export interface StageOutput {
  requests?:AiToolRequest[]; operations?:EditOperation[];
  analysis?:{duration:number;footageIds:string[];speechSegments:number;sampledFrames:number;assetIds:string[]};
  evidence?:{clipId:string;contentId?:string;assetId?:string;kind:string;signature:string;visible?:boolean}[];
+ degradationNotices?: PipelineDegradationNotice[];
+ skippedNotes?: string[];
 }
+export interface PipelineDegradationNotice {
+ stage: 'findBroll' | 'applyBroll' | 'applySoundEffects' | 'applyZooms' | 'applyCaptions' | 'planMotionGraphics' | EditStage;
+ status: 'skipped' | 'partial_failure';
+ reason: string;
+ suggestedAction?: string;
+ timestamp?: number;
+}
+
+export interface SequentialEditResult {
+ timeline: EditorProject;
+ notices: PipelineDegradationNotice[];
+ success: boolean;
+ skippedNotes?: string[];
+ message?: string;
+}
+
 export interface EditingStage {id:EditStage;key:string;status:StageStatus;attempts:number;output?:StageOutput;error?:string}
 export interface EditingJob {
  tokenBudget?:{usedTokens:number;reservedTokens:number;limit:number};
@@ -52,6 +75,9 @@ export interface EditingJob {
  currentStage?:EditStage;status:'ready'|'running'|'failed'|'cancelled'|'completed';
  completedStages:EditStage[];failedStages:EditStage[];timelineRevision:number;initialRevision:number;
  appliedOperations:string[];generatedAssets:string[];errors:string[];stages:EditingStage[];createdAt:string;
+ degradationNotices?: PipelineDegradationNotice[];
+ skippedNotes?: string[];
+ completionMessage?: string;
 }
 export function stagesFor(operations:EditOperation[]):EditStage[]{
  if(operations.includes('requestedEdits')){if(operations.length!==1)throw Error('Custom requestedEdits must run alone, not mixed with preset stages.');return ['analyzeFootage','applyRequestedEdits','validateEdit'];}
@@ -118,6 +144,7 @@ export function permitsZeroAdditions(stage: EditStage, before: EditorProject, ou
  if (hasSkipRationale(output)) return true;
  const isPreset = !!(job?.presetId || before.editingJob?.presetId);
  if (isPreset) return true;
+ if (['findBroll', 'applyBroll', 'applySoundEffects', 'applyEffects'].includes(stage)) return true;
  const initialSpeechSegments = job?.stages?.find(s => s.id === 'analyzeFootage')?.output?.analysis?.speechSegments ?? before.editingJob?.stages?.find(s => s.id === 'analyzeFootage')?.output?.analysis?.speechSegments;
  const noSpeech = initialSpeechSegments === 0 || speechContext(before).length === 0;
  if (noSpeech) {
@@ -155,12 +182,18 @@ export function validateStageChanges(stage:EditStage,before:EditorProject,after:
  if(['applyCaptions','applyMotionGraphics','applyBroll','applyZooms'].includes(stage)&&visible.length!==changed.length)throw Error('An edit is hidden or outside the footage duration.');
  if(stage==='applyCaptions'){
   const hasValidVisibleCaption=visible.some(c=>c.contentId&&after.captions[c.contentId])||(output.decisions?.some(d=>d.op==='applyCaptionTemplate')&&Object.values(after.clips).some(c=>c.contentId&&after.captions[c.contentId]));
-  const isPreset=!!(job?.presetId||before.editingJob?.presetId);
+  const isResilient=!!(job?.presetId||before.editingJob?.presetId||(job?.stages&&job.stages.length>3));
   const speechSegments=job?.stages?.find(s=>s.id==='analyzeFootage')?.output?.analysis?.speechSegments??before.editingJob?.stages?.find(s=>s.id==='analyzeFootage')?.output?.analysis?.speechSegments;
   const noSpeech=speechSegments===0||speechContext(before).length===0;
-  const permitsZeroCaptions=(isPreset&&noSpeech)||projectDuration(before)<4.0||speechSegments===0||hasSkipRationale(output);
+  const permitsZeroCaptions=(isResilient&&noSpeech)||projectDuration(before)<4.0||speechSegments===0||hasSkipRationale(output);
   if(!hasValidVisibleCaption&&!permitsZeroCaptions)throw Error('Captions were not applied visibly with valid timing.');
   if(visible.some(c=>c.contentId&&after.captions[c.contentId]&&!after.captions[c.contentId].text.trim()))throw Error('Captions were not applied visibly with valid timing.');
+  for (const c of visible.filter(c => c.contentId && after.captions[c.contentId])) {
+   const cap = after.captions[c.contentId!];
+   if (cap.templateId && !isKnownCaptionPreset(cap.templateId)) {
+    cap.templateId = normalizeCaptionPresetId(cap.templateId);
+   }
+  }
  }
  if(stage==='applyMotionGraphics'&&!visible.some(c=>(c.graphic||c.shape)&&c.keyframes?.length)){
   if(!permitsZeroAdditions(stage,before,output,job))throw Error('No visible animated motion graphic was created.');
@@ -193,13 +226,79 @@ export function validateCompletedJob(project:EditorProject,job:EditingJob){
   }
  }
  const hasClarification=job.stages.some(s=>s.output?.questions&&s.output.questions.length>0);
- const hasLegitimateSkipOrPreset=!!job.presetId||job.stages.some(s=>['applyMotionGraphics','applyBroll','applyZooms','applySoundEffects','applyEffects'].includes(s.id)&&permitsZeroAdditions(s.id,project,s.output||{summary:''},job))||(job.completedStages.includes('analyzeFootage')&&!job.stages.some(s=>s.id==='applyRequestedEdits'));
+ const hasLegitimateSkipOrPreset=!!job.presetId||job.stages.some(s=>['applyMotionGraphics','applyBroll','applyZooms','applySoundEffects','applyEffects'].includes(s.id)&&permitsZeroAdditions(s.id,project,s.output||{summary:''},job))||(job.completedStages?.includes('analyzeFootage')&&!job.stages.some(s=>s.id==='applyRequestedEdits'));
  if(!job.appliedOperations.length||project.revision<=job.initialRevision){
   if(!hasClarification&&!hasLegitimateSkipOrPreset)throw Error('No requested edits were committed.');
  }
  if(hasClarification){
   const clarificationSummary=job.stages.find(s=>s.output?.questions?.length)?.output?.summary;
   return {summary:clarificationSummary||'Clarification questions returned.'};
+ }
+ // Strict Caption Template Enforcement & Zero-Hallucinated Text Linting
+ for (const c of Object.values(project.clips)) {
+  const isCaption = (c.trackId && project.tracks[c.trackId]?.kind === 'caption') || (c.contentId && project.captions[c.contentId]);
+  if (isCaption && c.contentId && project.captions[c.contentId]) {
+   const cap = project.captions[c.contentId];
+   const currentTpl = (cap as { templateId?: string }).templateId;
+   if (!currentTpl || !isKnownCaptionPreset(currentTpl)) {
+    const fallback: CaptionPresetId = 'study-hormozi-style';
+    (cap as { templateId?: string }).templateId = fallback;
+    const ref = referenceCaptionTemplate(fallback) || DEFAULT_CAPTION_TEMPLATES[0];
+    if (ref) {
+     cap.studioStyle = { ...ref.style };
+    }
+   }
+  }
+  const isTextTrack = c.trackId && project.tracks[c.trackId]?.kind === 'text';
+  if (isTextTrack && c.contentId && project.textLayers[c.contentId] && !project.captions[c.contentId]) {
+   const isStandardLowerThird = c.graphic && GRAPHIC_KINDS.includes(c.graphic.kind);
+   if (!isStandardLowerThird) {
+    delete project.clips[c.id];
+    if (project.tracks[c.trackId]) {
+     project.tracks[c.trackId].clipIds = project.tracks[c.trackId].clipIds.filter(id => id !== c.id);
+    }
+    delete project.textLayers[c.contentId];
+    if (!job.degradationNotices) job.degradationNotices = [];
+    job.degradationNotices.push({
+     stage: 'applyCaptions',
+     status: 'skipped',
+     reason: 'Blocked arbitrary floating text on text track; only standard lower-third presets and transcript captions are permitted.',
+     suggestedAction: 'Spoken dialogue captions are displayed with engaging typography.',
+     timestamp: Date.now()
+    });
+   }
+  }
+ }
+
+ const allNotices: PipelineDegradationNotice[] = [
+  ...(job.degradationNotices || []),
+  ...job.stages.flatMap(s => s.output?.degradationNotices || [])
+ ];
+ const uniqueNotices = Array.from(new Map(allNotices.map(n => [`${n.stage}:${n.reason}`, n])).values());
+ job.degradationNotices = uniqueNotices;
+ if (uniqueNotices.length > 0) {
+  const skippedNotes = uniqueNotices.map(n => {
+   if (n.stage === 'applyBroll' || n.stage === 'findBroll') {
+    return `⚠️ B-Roll: Suitable 9:16 stock clip nahi mila, isliye original footage ko intact maintain kiya gaya.`;
+   }
+   if (n.stage === 'applySoundEffects') {
+    return `⚠️ SFX: Sound effect asset unavailable ya boundary timing hone ke karan sound bypass kar di gayi.`;
+   }
+   if (n.stage === 'applyZooms') {
+    return `⚠️ Zooms: Framing change skip kiya gaya taaki natural balance bana rahe.`;
+   }
+   if (n.stage === 'planMotionGraphics' || n.stage === 'applyMotionGraphics') {
+    return `⚠️ Motion Graphics: Visual clutter avoid karne ke liye graphics bypass kiye gaye.`;
+   }
+   return `⚠️ ${STAGE_LABELS[n.stage as EditStage] || n.stage}: ${n.reason}`;
+  });
+  job.skippedNotes = skippedNotes;
+  job.completionMessage = "Video edit complete! Yahan kuch non-critical tasks hain jo skip huye:";
+  return {
+   summary: 'All requested stages validated with adjustments. Preview and export use this saved timeline. Export the MP4 to verify the encoded result.',
+   degradationNotices: uniqueNotices,
+   skippedNotes
+  };
  }
  return {summary:'All requested stages validated. Preview and export use this saved timeline. Export the MP4 to verify the encoded result.'};
 }
@@ -232,25 +331,76 @@ export async function runEditingJob(runtime:PipelineRuntime,initial:EditingJob,s
    }catch(err){
     if(signal.aborted)throw err;
     const isPreset=!!(job.presetId||before.editingJob?.presetId);
+    const isEnrichment=['findBroll','applyBroll','applySoundEffects','applyEffects'].includes(stage.id);
     const isSupportingStage=['applyCaptions','planMotionGraphics','applyMotionGraphics','findBroll','applyBroll','applyZooms','applySoundEffects','applyEffects'].includes(stage.id);
-    if(isPreset&&isSupportingStage){
+    if((isPreset&&isSupportingStage)||isEnrichment){
      output={
       summary:`${STAGE_LABELS[stage.id]} was unavailable or skipped for this footage; moving to next step.`,
       decisions:stage.id==='applyEffects'?[{op:'setAudioDucking',enabled:true}]:[],
-      skipRationale:`${STAGE_LABELS[stage.id]} skipped: `+(err instanceof Error?err.message:'stage execution failed')
+      skipRationale:`${STAGE_LABELS[stage.id]} skipped: `+(err instanceof Error?err.message:'stage execution failed'),
+      degradationNotices: [{
+       stage: stage.id,
+       status: 'skipped',
+       reason: `${STAGE_LABELS[stage.id]}: ` + (err instanceof Error ? err.message : 'stage execution failed'),
+       suggestedAction: stage.id === 'findBroll' || stage.id === 'applyBroll'
+        ? 'Check stock footage query or manually upload B-roll media.'
+        : stage.id === 'applySoundEffects'
+        ? 'Check SFX audio availability in project assets.'
+        : 'Review footage properties or retry stage.',
+       timestamp: Date.now()
+      }]
      };
     }else{
      throw err;
     }
    }
    if(output.tokenBudget)job.tokenBudget=output.tokenBudget;
+   if(output.degradationNotices?.length)job.degradationNotices=[...(job.degradationNotices||[]),...output.degradationNotices];
    signal.throwIfAborted();stage=job.stages[index];stage.status='validating';stage.output=output;await save(runtime.getProject());
    const base=runtime.getProject();if(base.revision!==job.timelineRevision||runtime.interacting())throw Error('Timeline changed during this stage. Start a fresh edit.');
-   const changes=!!output.decisions?.length&&!['analyzeFootage','planMotionGraphics','findBroll'].includes(stage.id);const next=changes?buildStageProject(base,output):base;
-   stage.output=validateStageChanges(stage.id,base,next,output,job);
+   let changes=!!output.decisions?.length&&!['analyzeFootage','planMotionGraphics','findBroll'].includes(stage.id);
+   let next=changes?buildStageProject(base,output):base;
+   try{
+    stage.output=validateStageChanges(stage.id,base,next,output,job);
+   }catch(valErr){
+    if(signal.aborted)throw valErr;
+    const isResilient=!!(job.presetId||before.editingJob?.presetId||job.stages.length>3);
+    const isSupportingStage=['applyCaptions','planMotionGraphics','applyMotionGraphics','findBroll','applyBroll','applyZooms','applySoundEffects','applyEffects'].includes(stage.id);
+    if(isResilient&&isSupportingStage){
+     output={
+      summary:`${STAGE_LABELS[stage.id]} was unavailable or skipped for this footage; moving to next step.`,
+      decisions:stage.id==='applyEffects'?[{op:'setAudioDucking',enabled:true}]:[],
+      skipRationale:`${STAGE_LABELS[stage.id]} skipped: `+(valErr instanceof Error?valErr.message:'validation failed'),
+      degradationNotices: [{
+       stage: stage.id,
+       status: 'skipped',
+       reason: `${STAGE_LABELS[stage.id]}: ` + (valErr instanceof Error ? valErr.message : 'validation check failed; preserved baseline timeline'),
+       suggestedAction: 'Review timeline track and clip properties.',
+       timestamp: Date.now()
+      }]
+     };
+     changes=false;
+     next=base;
+     stage.output=validateStageChanges(stage.id,base,base,output,job);
+    }else{
+     throw valErr;
+    }
+   }
    if(stage.id==='analyzeFootage'){
-    const preset=PIPELINE_PRESETS.find(p=>p.id===job.presetId),operations=preset?.operations||readRequestedOperations(output.operations);
-    job.stages=stagesFor(operations).map(id=>job.stages.find(s=>s.id===id)||{id,key:job.id+':'+id,status:'pending',attempts:0});stage=job.stages[index];
+    if(!job.stages.some(s=>s.id==='applyRequestedEdits')){
+     const configuredOps = [...new Set(job.stages.map(s => {
+       if (s.id === 'applyCaptions') return 'captions' as const;
+       if (s.id === 'planMotionGraphics' || s.id === 'applyMotionGraphics') return 'motionGraphics' as const;
+       if (s.id === 'findBroll' || s.id === 'applyBroll') return 'broll' as const;
+       if (s.id === 'applyZooms') return 'zooms' as const;
+       if (s.id === 'applySoundEffects') return 'soundEffects' as const;
+       if (s.id === 'applyEffects') return 'effects' as const;
+       return null;
+     }).filter((op): op is ('captions' | 'motionGraphics' | 'broll' | 'zooms' | 'soundEffects' | 'effects') => op !== null))];
+     const preset=PIPELINE_PRESETS.find(p=>p.id===job.presetId);
+     const operations=(job.presetId && configuredOps.length > 0) ? configuredOps : (preset?.operations||readRequestedOperations(output.operations));
+     job.stages=stagesFor(operations).map(id=>job.stages.find(s=>s.id===id)||{id,key:job.id+':'+id,status:'pending',attempts:0});stage=job.stages[index];
+    }
    }
    stage.status='committing';await save(base);
    stage=job.stages[index];stage.status='completed';job.completedStages=[...new Set([...job.completedStages,stage.id])];job.failedStages=job.failedStages.filter(id=>id!==stage.id);

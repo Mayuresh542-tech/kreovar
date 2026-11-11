@@ -9,7 +9,7 @@ import {rippleCut,type CutRange} from "./rippleCut";
 import {applyTextPlacement,type TextPlacementId} from "./textPlacement";
 import {MAX_VIDEO_SECONDS} from "./limits";
 import {projectDuration} from "./model";
-import { Clip, EditorProject, TransitionKind, TextStyle, Ratio } from "./model";
+import { Clip, EditorProject, TransitionKind, TextStyle, Ratio, normalizeCaptionPresetId } from "./model";
 import * as edit from "./operations";
 import {appendSequence} from "./sequence";
 import {applyCaptionTemplate,addTemplatedCaption} from "./captionTemplates";
@@ -63,7 +63,7 @@ export function applyEditDecisionList(p:EditorProject,list:EditDecisionList):Edi
       case"rippleCut":return rippleCut(project,d.ranges);
       case"applyTextPlacement":return applyTextPlacement(project,d.clipIds,d.placementId);
       case"appendSequence":return appendSequence(project,d.assetIds,d.trackId).project;
-      case"applyCaptionTemplate":{const template=DEFAULT_CAPTION_TEMPLATES.find(t=>t.id===d.templateId);if(!template)throw new Error("Unknown caption template.");const next=applyCaptionTemplate(project,d.clipIds,template);return preserveCaptionAnchors(project,next,d.clipIds);}
+      case"applyCaptionTemplate":{const normId=normalizeCaptionPresetId(d.templateId);const template=DEFAULT_CAPTION_TEMPLATES.find(t=>t.id===normId||t.id===d.templateId);if(!template)throw new Error("Unknown caption template.");const next=applyCaptionTemplate(project,d.clipIds,template);return preserveCaptionAnchors(project,next,d.clipIds);}
       case"setAudioDucking":return {...project,settings:{...project.settings,audioDucking:d.enabled}};
       case"addClip":{const asset=project.assets[d.assetId];if(d.duration!==undefined&&asset&&asset.kind!=="image"&&d.duration>asset.duration+.01)throw new Error("AI clip exceeds its original media.");let next=edit.addClip(project,d.assetId,d.trackId,d.startTime,{...(d.duration===undefined?{}:{duration:d.duration,sourceEnd:d.duration}),...(d.audioRole===undefined?{}:{audioRole:d.audioRole}),...(d.volume===undefined?{}:{volume:d.volume})});const added=Object.keys(next.clips).find(id=>!project.clips[id])!;if(d.transform)next=edit.changeClipProperty(next,added,{transform:d.transform});if(d.visualTreatment){assertInsertedVisualTreatment(d.visualTreatment,next.clips[added].sourceEnd);next=setVisualTreatment(next,added,d.visualTreatment);}if(d.keyframes){const c=next.clips[added];if(d.keyframes.some(f=>f.sourceTime<c.sourceStart||f.sourceTime>c.sourceEnd))throw Error('Inserted media keyframes must fit its source interval.');next=setTransformKeyframes(next,added,d.keyframes);}return next;}
       case"duplicateClip":return edit.duplicateClip(project,d.clipId,d.startTime);
