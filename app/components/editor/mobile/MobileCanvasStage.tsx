@@ -11,8 +11,12 @@ import {
   Sparkles,
   Upload,
   ZoomIn,
+  Shield,
+  ArrowUp,
+  ArrowDown,
+  AlignCenter,
 } from "lucide-react";
-import { loadEditorStudioFonts } from "@/app/lib/editor/editorCaptionStudio";
+import { loadEditorStudioFonts, applyStudioStyle } from "@/app/lib/editor/editorCaptionStudio";
 import { loadCaptionFonts } from "@/app/lib/captions/typography";
 import { playbackTime } from "@/app/lib/editor/playbackClock";
 import { Compositor, VisualBounds } from "@/app/lib/editor/compositor";
@@ -22,6 +26,7 @@ import {
   projectDuration,
   Ratio,
 } from "@/app/lib/editor/model";
+import { changeClipProperty, reframeProject } from "@/app/lib/editor/operations";
 import { usePlayback, useProject } from "@/app/lib/editor/store";
 import { useEditor } from "../workspace/EditorContext";
 
@@ -56,6 +61,8 @@ export default function MobileCanvasStage({
   const [previewScale, setPreviewScale] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [tapFeedback, setTapFeedback] = useState<"play" | "pause" | null>(null);
+  const [showSafeZones, setShowSafeZones] = useState(true);
+  const [showReframeMenu, setShowReframeMenu] = useState(false);
 
   // Touch gesture refs
   const pinchStartDistRef = useRef<number | null>(null);
@@ -180,7 +187,12 @@ export default function MobileCanvasStage({
         }
 
         if (state.playing && ready) {
-          playback.set(next, true);
+          if (curDuration <= 0) {
+            playback.set(0, false);
+            compositor.pause();
+          } else {
+            playback.set(next, true);
+          }
         } else if (!ready) {
           compositor.pause();
         }
@@ -205,12 +217,14 @@ export default function MobileCanvasStage({
     // Also listen for global play toggle events from MobileEditorLayout playback bar
     const onTogglePlayEvent = () => {
       const state = playback.getSnapshot();
+      const curDur = projectDuration(store.getSnapshot());
+      if (curDur <= 0) return;
       if (state.playing) {
         playback.set(state.time, false);
       } else {
         void engineRef.current
           ?.activateAudio()
-          .then(() => playback.set(state.time >= projectDuration(store.getSnapshot()) ? 0 : state.time, true))
+          .then(() => playback.set(state.time >= curDur ? 0 : state.time, true))
           .catch((e) => notify(e instanceof Error ? e.message : "Audio unavailable."));
       }
     };
@@ -359,6 +373,65 @@ export default function MobileCanvasStage({
   const renderWidth = Math.round((quality * aspectW) / aspectH);
   const hasClips = Object.keys(project.clips).length > 0;
 
+  const selectedClip = selection[0] ? project.clips[selection[0]] : undefined;
+  const isVisualSelected =
+    selectedClip &&
+    project.tracks[selectedClip.trackId] &&
+    project.tracks[selectedClip.trackId].kind !== "audio";
+  const isCaptionSelected =
+    selectedClip &&
+    (selectedClip.contentId && !!project.captions[selectedClip.contentId]);
+
+  const alignSelectedClip = useCallback(
+    (position: "top" | "center" | "bottom" | "centerX") => {
+      const selectedId = selection[0];
+      if (!selectedId) return;
+      navigator.vibrate?.(8);
+      run((p) => {
+        const clip = p.clips[selectedId];
+        if (!clip) return p;
+
+        if (clip.contentId && p.captions[clip.contentId]) {
+          const cap = p.captions[clip.contentId];
+          const curStyle = cap.studioStyle;
+          const pos = position === "top" ? "top" : position === "bottom" ? "bottom" : "center";
+          const yPercent = position === "top" ? 16 : position === "bottom" ? 76 : 48;
+          if (curStyle) {
+            return applyStudioStyle(p, [clip.id], {
+              ...curStyle,
+              position: pos,
+              positionYPercent: yPercent,
+              studio: {
+                ...curStyle.studio,
+                positionXPercent:
+                  position === "centerX" ? 50 : curStyle.studio?.positionXPercent ?? 50,
+              },
+            });
+          }
+          const nextY = position === "top" ? -0.32 : position === "bottom" ? 0.26 : 0;
+          return changeClipProperty(p, clip.id, {
+            transform: {
+              ...clip.transform,
+              x: position === "centerX" ? 0 : clip.transform.x,
+              y: position === "centerX" ? clip.transform.y : nextY,
+            },
+          });
+        }
+
+        const nextY = position === "top" ? -0.32 : position === "bottom" ? 0.26 : 0;
+        return changeClipProperty(p, clip.id, {
+          transform: {
+            ...clip.transform,
+            x: position === "centerX" ? 0 : clip.transform.x,
+            y: position === "centerX" ? clip.transform.y : nextY,
+          },
+        });
+      });
+      notify(`Aligned to ${position === "centerX" ? "center X" : position}.`);
+    },
+    [selection, run, notify]
+  );
+
   return (
     <section
       ref={stageRef}
@@ -369,22 +442,110 @@ export default function MobileCanvasStage({
       className="vx-stage flex-1 min-h-0 w-full bg-[#EDF1F6] relative flex items-center justify-center p-2 overflow-hidden touch-none overscroll-none select-none"
       aria-label="Mobile Video Preview Canvas"
     >
-      {/* Top-Left Floating Aspect Ratio Pill */}
-      <button
-        type="button"
-        onClick={cycleAspectRatio}
-        aria-label={`Aspect ratio ${aspectRatio}, tap to switch`}
-        className="absolute top-2.5 left-3 z-20 min-h-[34px] px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-md border border-slate-200 text-[11px] font-semibold text-blue-700 flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform"
-      >
-        {aspectRatio === "9:16" ? (
-          <Smartphone size={12} className="text-blue-600" />
-        ) : aspectRatio === "1:1" ? (
-          <SquareIcon size={12} className="text-blue-600" />
-        ) : (
-          <Monitor size={12} className="text-blue-600" />
+      {/* Top-Left Floating Aspect Ratio Pill + Safe Zone Guide Toggle */}
+      <div className="absolute top-2.5 left-3 z-20 flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={cycleAspectRatio}
+          aria-label={`Aspect ratio ${aspectRatio}, tap to switch`}
+          className="min-h-[34px] px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-md border border-slate-200 text-[11px] font-semibold text-blue-700 flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform"
+        >
+          {aspectRatio === "9:16" ? (
+            <Smartphone size={12} className="text-blue-600" />
+          ) : aspectRatio === "1:1" ? (
+            <SquareIcon size={12} className="text-blue-600" />
+          ) : (
+            <Monitor size={12} className="text-blue-600" />
+          )}
+          <span className="font-mono">{aspectRatio}</span>
+        </button>
+
+        {aspectRatio === "9:16" && (
+          <button
+            type="button"
+            onClick={() => {
+              setShowSafeZones((prev) => !prev);
+              navigator.vibrate?.(6);
+            }}
+            aria-label="Toggle 9:16 Social Safe Zone guidelines"
+            aria-pressed={showSafeZones}
+            className={`min-h-[34px] px-2.5 py-1 rounded-full border text-[10px] font-semibold flex items-center gap-1 shadow-sm active:scale-95 transition-all ${
+              showSafeZones
+                ? "bg-blue-600 text-white border-blue-600 shadow-blue-500/20"
+                : "bg-white/95 backdrop-blur-md border-slate-200 text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Shield size={11} className={showSafeZones ? "text-white" : "text-blue-600"} />
+            <span>Safe Zone</span>
+          </button>
         )}
-        <span className="font-mono">{aspectRatio}</span>
-      </button>
+
+        {/* 1-Click Smart Reframe Pill */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              setShowReframeMenu((prev) => !prev);
+              navigator.vibrate?.(6);
+            }}
+            aria-label="1-Click 9:16 Smart Reframing"
+            className="min-h-[34px] px-2.5 py-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-semibold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+          >
+            <Sparkles size={11} />
+            <span>Reframe</span>
+          </button>
+
+          {showReframeMenu && (
+            <div className="absolute top-full left-0 mt-2 w-56 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-xl z-50 p-1.5 text-xs space-y-1">
+              <div className="px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+                1-Click 9:16 Reframe
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  run((p) => reframeProject(p, "fit-with-blur"));
+                  notify("Applied 1-Click Fit with Blur (9:16)");
+                  setShowReframeMenu(false);
+                }}
+                className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex flex-col text-slate-800"
+              >
+                <span className="font-semibold text-xs flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Fit with Blur
+                </span>
+                <span className="text-[10px] text-slate-500">Blurred wings top & bottom</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  run((p) => reframeProject(p, "center-crop"));
+                  notify("Applied 1-Click Center Crop (1.77x Eye-Line)");
+                  setShowReframeMenu(false);
+                }}
+                className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex flex-col text-slate-800"
+              >
+                <span className="font-semibold text-xs flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Center Crop
+                </span>
+                <span className="text-[10px] text-slate-500">1.77x punch-in eye-line (-0.14)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  run((p) => reframeProject(p, "split-screen"));
+                  notify("Applied 1-Click Split Screen (A-Roll + B-Roll)");
+                  setShowReframeMenu(false);
+                }}
+                className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex flex-col text-slate-800"
+              >
+                <span className="font-semibold text-xs flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Split Screen
+                </span>
+                <span className="text-[10px] text-slate-500">A-roll top + B-roll bottom</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Top-Right Floating Resolution & FPS Chip */}
       <button
@@ -450,6 +611,80 @@ export default function MobileCanvasStage({
           style={{ display: "none" }}
           className="absolute border-2 border-blue-600 pointer-events-none z-20 rounded-sm"
         />
+
+        {/* 9:16 Social Media Safe Zone Overlay (TikTok / Reels / Shorts Margins) */}
+        {showSafeZones && aspectRatio === "9:16" && (
+          <div className="absolute inset-0 pointer-events-none z-15 overflow-hidden flex flex-col justify-between">
+            {/* Top Safe Area Boundary (avoids notch, search, following/for you tabs) */}
+            <div className="relative w-full h-[14%] border-b border-dashed border-cyan-400/70 bg-cyan-500/5 flex items-end px-2 pb-1">
+              <span className="text-[9px] font-mono font-medium text-cyan-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                Top Safe Margin (14%)
+              </span>
+            </div>
+
+            {/* Center Eye-Level & Crosshair (Golden Ratio Focus Area for Viral Captions & B-Rolls) */}
+            <div className="absolute top-[48%] left-0 right-0 -translate-y-1/2 border-t border-dashed border-amber-400/50 flex items-center justify-between px-2">
+              <span className="text-[8px] font-mono font-bold text-amber-300/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                🎯 Viral Eye-Level (48%)
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400/70" />
+            </div>
+
+            {/* Right Action Icons Margin Overlay (Like, Comment, Bookmark, Share icons zone) */}
+            <div className="absolute right-0 top-[26%] bottom-[24%] w-[16%] border-l border-dashed border-rose-400/50 bg-rose-500/5 flex flex-col justify-center items-center gap-2 pr-0.5">
+              <span className="text-[7px] font-mono text-rose-300/80 -rotate-90 whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                TikTok Icons (16%)
+              </span>
+            </div>
+
+            {/* Bottom Safe Area Boundary (avoids username, caption text, sound marquee, bottom nav) */}
+            <div className="relative w-full h-[22%] border-t border-dashed border-cyan-400/70 bg-cyan-500/5 flex items-start px-2 pt-1">
+              <span className="text-[9px] font-mono font-medium text-cyan-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                Safe Lower Third (22% Bottom Margin)
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Accurate Alignment Pills when a visual layer is selected */}
+        {isVisualSelected && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-25 flex items-center gap-1 bg-slate-900/90 backdrop-blur-md px-2 py-1 rounded-full border border-white/20 shadow-lg text-[10px] text-white">
+            <span className="font-semibold text-slate-300 mr-0.5 text-[9px] uppercase tracking-wide">
+              {isCaptionSelected ? "Caption" : "B-Roll"}:
+            </span>
+            <button
+              type="button"
+              onClick={() => alignSelectedClip("top")}
+              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/25 active:bg-blue-600 transition-colors flex items-center gap-0.5"
+            >
+              <ArrowUp size={10} />
+              <span>Top</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => alignSelectedClip("center")}
+              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/25 active:bg-blue-600 transition-colors flex items-center gap-0.5 font-semibold text-amber-300"
+            >
+              <span>🎯 Center</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => alignSelectedClip("bottom")}
+              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/25 active:bg-blue-600 transition-colors flex items-center gap-0.5"
+            >
+              <ArrowDown size={10} />
+              <span>Safe Bot</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => alignSelectedClip("centerX")}
+              className="px-1.5 py-0.5 rounded-full bg-white/10 hover:bg-white/25 active:bg-blue-600 transition-colors"
+              title="Align Center Horizontally"
+            >
+              <AlignCenter size={11} />
+            </button>
+          </div>
+        )}
 
         {/* Double-tap Play/Pause Visual Ripple */}
         {tapFeedback && (

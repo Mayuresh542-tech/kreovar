@@ -25,6 +25,7 @@ import {
   CAPTION_CATEGORIES,
   DEFAULT_CAPTION_TEMPLATES,
 } from "../lib/captions/templates";
+import { ALL_CAPTION_TEMPLATES } from "../lib/captions/referenceTemplates";
 import {
   fetchAllCaptionTemplates,
   createCustomCaptionTemplate,
@@ -86,13 +87,13 @@ function CaptionTemplatesContent() {
   const user = session?.user;
 
   // Template registry state
-  const [systemTemplates, setSystemTemplates] = useState<CaptionTemplate[]>(DEFAULT_CAPTION_TEMPLATES);
+  const [systemTemplates, setSystemTemplates] = useState<CaptionTemplate[]>(ALL_CAPTION_TEMPLATES);
   const [userTemplates, setUserTemplates] = useState<CaptionTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<CaptionTemplate>(DEFAULT_CAPTION_TEMPLATES[0]);
+  const [selectedTemplate, setSelectedTemplate] = useState<CaptionTemplate>(ALL_CAPTION_TEMPLATES[0]);
   const [activeCategory, setActiveCategory] = useState<string>("All");
 
   // Customizer & styling
-  const [customStyle, setCustomStyle] = useState<CaptionStyleConfig>(DEFAULT_CAPTION_TEMPLATES[0].style);
+  const [customStyle, setCustomStyle] = useState<CaptionStyleConfig>(ALL_CAPTION_TEMPLATES[0].style);
   const [isCustomizing, setIsCustomizing] = useState(false);
 
   // Projects state
@@ -133,7 +134,11 @@ function CaptionTemplatesContent() {
   useEffect(() => {
     async function loadData() {
       const { systemTemplates: sys, userTemplates: usr } = await fetchAllCaptionTemplates();
-      setSystemTemplates(sys);
+      // Combine ALL_CAPTION_TEMPLATES with any custom/server templates
+      const mergedSystem = Array.from(
+        new Map([...ALL_CAPTION_TEMPLATES, ...sys].map((t) => [t.id, t])).values()
+      );
+      setSystemTemplates(mergedSystem);
       setUserTemplates(usr);
 
       // Load user projects
@@ -205,6 +210,15 @@ function CaptionTemplatesContent() {
   const allTemplates = useMemo(() => {
     return [...userTemplates, ...systemTemplates];
   }, [userTemplates, systemTemplates]);
+
+  const availableCategories = useMemo(() => {
+    const cats = new Set<string>();
+    CAPTION_CATEGORIES.forEach((c) => cats.add(c));
+    allTemplates.forEach((t) => {
+      if (t.category) cats.add(t.category);
+    });
+    return Array.from(cats);
+  }, [allTemplates]);
 
   const filteredTemplates = useMemo(() => {
     if (activeCategory === "All") return allTemplates;
@@ -609,7 +623,7 @@ function CaptionTemplatesContent() {
 
               {/* Horizontal Scrollable Category Pills */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
-                {["All", ...CAPTION_CATEGORIES].map((cat) => {
+                {["All", ...availableCategories].map((cat) => {
                   const isCatActive = activeCategory === cat;
                   return (
                     <button
@@ -632,6 +646,13 @@ function CaptionTemplatesContent() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {filteredTemplates.map((tmpl) => {
                   const isSelected = selectedTemplate.id === tmpl.id;
+                  const isCustomScript = transcript !== DEFAULT_SCRIPT || !!loadedProjectSegments;
+                  const designatedText = (tmpl as any).sampleText;
+                  const cardText = isCustomScript
+                    ? (activeSegment?.text || designatedText || "THIS IS HOW YOU GROW")
+                    : (designatedText || "THIS IS HOW YOU GROW");
+                  const cardWords = isCustomScript ? activeSegment?.words : undefined;
+
                   return (
                     <CaptionCardPreview
                       key={tmpl.id}
@@ -648,8 +669,8 @@ function CaptionTemplatesContent() {
                         setIsCustomizing(true);
                       }}
                       onDelete={tmpl.isCustom ? handleDeleteCustomTemplate : undefined}
-                      sampleText={activeSegment?.text || "THIS IS HOW YOU GROW"}
-                      sampleWords={activeSegment?.words}
+                      sampleText={cardText}
+                      sampleWords={cardWords}
                       isApplying={isApplying && selectedTemplate.id === tmpl.id}
                     />
                   );

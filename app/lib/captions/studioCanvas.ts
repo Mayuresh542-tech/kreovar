@@ -176,13 +176,16 @@ export function drawStudioCaption(ctx:CanvasRenderingContext2D,segment:CaptionSe
    ctx.save();
    ctx.font=d.hold==='font-shuffle'?`${word.weight} ${fs}px ${['Inter','Montserrat','Instrument Serif'][Math.floor(elapsed*2+n)%3]}`:`${word.italic?'italic ':''}${word.weight} ${fs}px ${word.fontCss}`;
    ctx.textAlign='center';ctx.textBaseline='middle';ctx.direction=word.dir;ctx.letterSpacing=word.spacing*factor+'px';
-   ctx.globalAlpha=clamp(p.alpha*out.alpha*((d.spotlight||segment.wordStyles?.[current]?.spotlight)&&current>=0&&n!==current?.3:1),0,1);
+   const baseAlpha=ctx.globalAlpha;
+   ctx.globalAlpha=clamp(baseAlpha*p.alpha*out.alpha*((d.spotlight||segment.wordStyles?.[current]?.spotlight)&&current>=0&&n!==current?.3:1),0,1);
    if(style.animation==='word-by-word'&&time<word.start)ctx.globalAlpha=0;
    ctx.translate(item.x+ww/2+(p.x+out.x+loop.x)*fs,row.y+(p.y+out.y+loop.y)*fs+Math.abs(item.relative)*sinHalfArc*fs*1.6);
    ctx.rotate((p.rotation+out.rotation+loop.rotation+(row.edgeRow?d.rowRotation||0:0))*Math.PI/180+item.angle);ctx.scale(p.scale*out.scale*loop.scale*(d.scaleX??1),p.scale*out.scale*loop.scale);
    const blur=p.blur+out.blur;
-   if(blur>0)ctx.filter=`blur(${blur*scale}px)`;
-   else if(ctx.filter!=='none')ctx.filter='none';
+   const baseFilter=(ctx.filter&&ctx.filter!=='none')?ctx.filter:'';
+   const wordBlur=blur>0?`blur(${blur*scale}px)`:'';
+   const composed=[baseFilter,wordBlur].filter(Boolean).join(' ')||'none';
+   if(ctx.filter!==composed)ctx.filter=composed;
    let color=active?style.highlightColor:style.textColor;if(d.hold==='rainbow')color=`hsl(${(elapsed*60+n*24)%360} 90% 65%)`;
    const reveal=Math.min(p.reveal,out.reveal),letters=word.letters,text=reveal<1?letters.slice(0,Math.ceil(letters.length*reveal)).join(''):word.text;
    if(active&&style.highlightBg){ctx.fillStyle=style.highlightBg;rounded(ctx,-ww/2-4*scale,-fs*.65,ww+8*scale,fs*1.3,4*scale);}

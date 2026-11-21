@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Play, MoreVertical, Plus, Trash2, Edit3, Film, Layers } from "lucide-react";
+import { Play, MoreVertical, Plus, Trash2, Edit3, Film, Layers, Sparkles } from "lucide-react";
 import StudioShell from "../components/StudioShell";
 import AuthLoadingScreen from "../components/AuthLoadingScreen";
 import { useAuthGate } from "../lib/useAuthGate";
@@ -127,14 +127,25 @@ function ProjectsContent() {
             
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs sm:text-sm transition-colors shadow-xs self-start sm:self-auto cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Project</span>
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => router.push("/editor?projectId=demo_creator_starter")}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-semibold text-xs sm:text-sm transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span>Try Demo</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs sm:text-sm transition-colors shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Project</span>
+            </button>
+          </div>
         </div>
 
         {/* Filter Pills (Screen 6) */}
@@ -160,7 +171,39 @@ function ProjectsContent() {
 
         {/* Clean Project Cards List (Screen 6) */}
         <div className="space-y-3">
-          {filteredProjects.length === 0 && <p className="text-sm text-slate-500">No projects match this view. Create a project to get started.</p>}
+          {filteredProjects.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-gradient-to-b from-blue-50/40 to-slate-50 p-8 text-center space-y-4">
+              <div className="mx-auto w-12 h-12 rounded-2xl bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700 shadow-xs">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1">
+                <h3 className="text-base font-bold text-slate-900">
+                  Ready to experience AI video editing?
+                </h3>
+                <p className="text-xs text-slate-600">
+                  Load our prebuilt 15-second creator starter project with vertical video, timed speech transcript, kinetic captions, and B-roll to test all AI features instantly.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/editor?projectId=demo_creator_starter")}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm transition-all hover:shadow cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5 fill-white" />
+                  <span>Launch Interactive Demo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 font-medium text-xs transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Create Empty Project</span>
+                </button>
+              </div>
+            </div>
+          )}
           {filteredProjects.map((project) => {
             const statusConfig =
               project.status === "Completed"

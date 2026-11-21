@@ -39,7 +39,11 @@ export type MotionAnimationType =
   | "slow_zoom_in"
   | "slow_zoom_out"
   | "pan_left"
-  | "pan_right";
+  | "pan_right"
+  | "ken-burns-push"
+  | "ken-burns-pull"
+  | "ken-burns-pan-left"
+  | "ken-burns-pan-right";
 
 export type SpeedCurvePreset =
   | "normal"

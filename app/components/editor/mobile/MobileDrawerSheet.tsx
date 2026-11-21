@@ -19,6 +19,14 @@ import {
   Minimize2,
   Check,
   LoaderCircle,
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  ArrowUp,
+  ArrowDown,
+  Target,
+  Shield,
+  Layers,
 } from "lucide-react";
 import type { MobileToolDrawerTab } from "./MobileBottomBar";
 import { useEditor } from "../workspace/EditorContext";
@@ -32,10 +40,13 @@ import {
   addAsset,
   addCaption,
   addClip,
+  addTrack,
   changeClipProperty,
   duplicateClip,
+  moveClip,
   removeClip,
   splitClip,
+  reframeProject,
 } from "@/app/lib/editor/operations";
 import { importMedia } from "@/app/lib/editor/media";
 import { BUILTIN_SFX } from "@/app/lib/assets/builtinSfx";
@@ -48,6 +59,7 @@ import {
   studioTemplate,
 } from "@/app/lib/editor/editorCaptionStudio";
 import CaptionStylePreview from "../../captions/CaptionStylePreview";
+import SilenceTrimmerControls from "../workspace/SilenceTrimmerControls";
 import { supabase } from "@/app/lib/supabase";
 import { uploadAssetFile, linkAsset } from "@/app/lib/assets/client";
 import { mediaFilename } from "@/app/lib/media/download";
@@ -75,10 +87,14 @@ export default function MobileDrawerSheet({
   // Captions tab state
   const [scriptMode, setScriptMode] = useState<ScriptMode>("hinglish");
   const [activeCaptionId, setActiveCaptionId] = useState<string>("study-hormozi-style");
+  const [captionPlacement, setCaptionPlacement] = useState<"top" | "center" | "bottom">("bottom");
+  const [captionAlign, setCaptionAlign] = useState<"left" | "center" | "right">("center");
+  const [captionSize, setCaptionSize] = useState<"sm" | "md" | "lg">("md");
 
   // Audio tab state
   const [audioCategory, setAudioCategory] = useState<string>("All");
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [sfxAlignment, setSfxAlignment] = useState<"playhead" | "nearest_cut" | "caption">("playhead");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // B-Roll tab state
@@ -87,6 +103,8 @@ export default function MobileDrawerSheet({
     { id: string; thumbnail: string; videoUrl: string; duration: number; creatorName: string }[]
   >([]);
   const [brollBusy, setBrollBusy] = useState(false);
+  const [brollDurationPreset, setBrollDurationPreset] = useState<"cut" | "scene" | "full">("cut");
+  const [brollFraming, setBrollFraming] = useState<"cover" | "pip">("cover");
 
   // Media upload state
   const [uploading, setUploading] = useState(false);
@@ -160,20 +178,30 @@ export default function MobileDrawerSheet({
     dragStartYRef.current = null;
   };
 
-  // Apply Caption Preset immediately on preview
+  // Apply Caption Preset immediately on preview with placement compliance
   const handleSelectCaptionPreset = (templateId: string) => {
     setActiveCaptionId(templateId);
     navigator.vibrate?.(8);
     const tpl = studioTemplate(templateId) || captionCatalog.find((c) => c.id === templateId);
     if (!tpl) return;
 
+    const yPercent = captionPlacement === "top" ? 16 : captionPlacement === "bottom" ? 76 : 48;
+    const fontSize = captionSize === "sm" ? 44 : captionSize === "lg" ? 68 : 56;
+    const mergedStyle = {
+      ...tpl.style,
+      position: captionPlacement,
+      positionYPercent: yPercent,
+      alignment: captionAlign,
+      fontSize,
+    };
+
     const existing = studioCaptions(project).filter(
       (s) => !project.tracks[project.clips[s.id]?.trackId]?.locked
     );
 
     if (existing.length > 0) {
-      run((p) => applyStudioStyle(p, existing.map((c) => c.id), tpl.style));
-      notify(`Applied "${tpl.name}" style.`);
+      run((p) => applyStudioStyle(p, existing.map((c) => c.id), mergedStyle));
+      notify(`Applied "${tpl.name}" style at ${captionPlacement}.`);
     } else {
       // Insert a quick live preview caption at playhead so user sees immediate canvas update
       const sampleText =
@@ -193,9 +221,89 @@ export default function MobileDrawerSheet({
         const before = p;
         const added = addCaption(p, sampleText, time, dur, {}, words);
         const newClipId = Object.keys(added.clips).find((id) => !before.clips[id]);
-        return newClipId ? applyStudioStyle(added, [newClipId], tpl.style) : added;
+        return newClipId ? applyStudioStyle(added, [newClipId], mergedStyle) : added;
       });
-      notify(`Added "${tpl.name}" caption preview at playhead.`);
+      notify(`Added "${tpl.name}" caption preview at ${captionPlacement}.`);
+    }
+  };
+
+  const applyCaptionPlacement = (pos: "top" | "center" | "bottom") => {
+    setCaptionPlacement(pos);
+    navigator.vibrate?.(6);
+    const yPercent = pos === "top" ? 16 : pos === "bottom" ? 76 : 48;
+    const existing = studioCaptions(project).filter(
+      (s) => !project.tracks[project.clips[s.id]?.trackId]?.locked
+    );
+    if (existing.length > 0) {
+      run((p) => {
+        let next = p;
+        for (const s of existing) {
+          const cap = p.captions[s.id];
+          const curStyle = cap?.studioStyle;
+          if (curStyle) {
+            next = applyStudioStyle(next, [s.id], {
+              ...curStyle,
+              position: pos,
+              positionYPercent: yPercent,
+            });
+          }
+        }
+        return next;
+      });
+      notify(`Captions placed at ${pos === "center" ? "middle (eye-level)" : pos}.`);
+    } else {
+      notify(`Caption placement set to ${pos}. Tap a preset below to insert.`);
+    }
+  };
+
+  const applyCaptionAlignment = (align: "left" | "center" | "right") => {
+    setCaptionAlign(align);
+    navigator.vibrate?.(6);
+    const existing = studioCaptions(project).filter(
+      (s) => !project.tracks[project.clips[s.id]?.trackId]?.locked
+    );
+    if (existing.length > 0) {
+      run((p) => {
+        let next = p;
+        for (const s of existing) {
+          const cap = p.captions[s.id];
+          const curStyle = cap?.studioStyle;
+          if (curStyle) {
+            next = applyStudioStyle(next, [s.id], {
+              ...curStyle,
+              alignment: align,
+            });
+          }
+        }
+        return next;
+      });
+      notify(`Caption text aligned ${align}.`);
+    }
+  };
+
+  const applyCaptionSize = (size: "sm" | "md" | "lg") => {
+    setCaptionSize(size);
+    navigator.vibrate?.(6);
+    const fontSize = size === "sm" ? 44 : size === "lg" ? 68 : 56;
+    const existing = studioCaptions(project).filter(
+      (s) => !project.tracks[project.clips[s.id]?.trackId]?.locked
+    );
+    if (existing.length > 0) {
+      run((p) => {
+        let next = p;
+        for (const s of existing) {
+          const cap = p.captions[s.id];
+          const curStyle = cap?.studioStyle;
+          if (curStyle) {
+            next = applyStudioStyle(next, [s.id], {
+              ...curStyle,
+              fontSize,
+            });
+          }
+        }
+        return next;
+      });
+      notify(`Caption size set to ${size.toUpperCase()}.`);
     }
   };
 
@@ -249,13 +357,26 @@ export default function MobileDrawerSheet({
   };
 
   const handleAddSfx = (sfx: (typeof BUILTIN_SFX)[number]) => {
-    const audioTrack = project.trackOrder
-      .map((id) => project.tracks[id])
-      .find((t) => t && t.kind === "audio" && !t.locked);
-    if (!audioTrack) {
-      notify("Unlock an audio track first.");
-      return;
+    let targetTime = playback.getSnapshot().time;
+
+    if (sfxAlignment === "caption") {
+      const caps = studioCaptions(project);
+      const activeCap =
+        caps.find((c) => time >= c.start && time <= c.end) || caps[0];
+      if (activeCap) targetTime = activeCap.start;
+    } else if (sfxAlignment === "nearest_cut") {
+      const edges = [0];
+      for (const c of Object.values(project.clips)) {
+        edges.push(Number(c.startTime.toFixed(2)));
+        edges.push(Number((c.startTime + c.duration).toFixed(2)));
+      }
+      const nearest = edges.reduce(
+        (prev, curr) => (Math.abs(curr - time) < Math.abs(prev - time) ? curr : prev),
+        time
+      );
+      targetTime = nearest;
     }
+
     const assetId = `sfx-${sfx.id}`;
     const asset: MediaAsset = {
       id: assetId,
@@ -268,25 +389,35 @@ export default function MobileDrawerSheet({
       height: 0,
       url: sfx.url,
     };
-    run((p) =>
-      addClip(addAsset(p, asset), assetId, audioTrack.id, playback.getSnapshot().time, {
+    const clipId = uid();
+    run((p) => {
+      let audioTrack = p.trackOrder
+        .map((id) => p.tracks[id])
+        .find((t) => t && t.kind === "audio" && !t.locked);
+      let nextP = p;
+      if (!audioTrack) {
+        nextP = addTrack(nextP, "audio");
+        const newTrackId = nextP.trackOrder[nextP.trackOrder.length - 1];
+        audioTrack = nextP.tracks[newTrackId];
+      }
+      return addClip(addAsset(nextP, asset), assetId, audioTrack.id, targetTime, {
+        id: clipId,
         name: sfx.name,
         duration: sfx.duration,
         audioRole: "sfx",
-      })
-    );
+        volume: 0.75,
+      });
+    });
+    select([clipId]);
     navigator.vibrate?.(10);
-    notify(`Added "${sfx.name}" at playhead.`);
+    notify(`Added "${sfx.name}" aligned at ${targetTime.toFixed(2)}s.`);
   };
 
   const handleAddMusicTrack = (track: MusicTrackItem) => {
     const audioTrack = project.trackOrder
       .map((id) => project.tracks[id])
       .find((t) => t && t.kind === "audio" && !t.locked);
-    if (!audioTrack) {
-      notify("Unlock an audio track first.");
-      return;
-    }
+    let nextTrackId = audioTrack?.id;
     const assetId = `bgm-${track.id}`;
     const asset: MediaAsset = {
       id: assetId,
@@ -299,14 +430,23 @@ export default function MobileDrawerSheet({
       height: 0,
       url: track.audioUrl,
     };
-    run((p) =>
-      addClip(addAsset(p, asset), assetId, audioTrack.id, playback.getSnapshot().time, {
+    run((p) => {
+      let trackObj = p.trackOrder
+        .map((id) => p.tracks[id])
+        .find((t) => t && t.kind === "audio" && !t.locked);
+      let nextP = p;
+      if (!trackObj) {
+        nextP = addTrack(nextP, "audio");
+        const newId = nextP.trackOrder[nextP.trackOrder.length - 1];
+        trackObj = nextP.tracks[newId];
+      }
+      return addClip(addAsset(nextP, asset), assetId, trackObj.id, playback.getSnapshot().time, {
         name: track.title,
         duration: Math.min(track.duration, 30),
         volume: track.defaultVolume,
         audioRole: "background",
-      })
-    );
+      });
+    });
     navigator.vibrate?.(10);
     notify(`Added "${track.title}" background track.`);
   };
@@ -360,24 +500,46 @@ export default function MobileDrawerSheet({
       });
       await linkAsset(project.id, "broll_assets", saved.id);
       const asset: MediaAsset = { ...imported, libraryId: saved.id, url: saved.url };
-      const overlayTrack =
-        project.trackOrder
-          .map((id) => project.tracks[id])
-          .find((t) => t && t.kind === "overlay" && !t.locked) ||
-        project.trackOrder
-          .map((id) => project.tracks[id])
-          .find((t) => t && !t.locked && canPlace(t.kind, "video"));
-      if (!overlayTrack) throw new Error("Unlock an overlay track to insert B-roll.");
       const clipId = uid();
-      run((p) =>
-        addClip(addAsset(p, asset), asset.id, overlayTrack.id, playback.getSnapshot().time, {
-          id: clipId,
-          volume: 0,
-        })
-      );
+      const clipDuration =
+        brollDurationPreset === "cut"
+          ? Math.min(imported.duration || 2.5, 2.5)
+          : brollDurationPreset === "scene"
+          ? Math.min(imported.duration || 4.0, 4.0)
+          : imported.duration || 5;
+
+      const visualTreatment =
+        brollFraming === "pip"
+          ? { card: { width: 0.88, radius: 16, shadow: 14 } }
+          : undefined;
+
+      run((p) => {
+        let overlayTrack =
+          p.trackOrder
+            .map((id) => p.tracks[id])
+            .find((t) => t && t.kind === "overlay" && !t.locked);
+        let nextP = p;
+        if (!overlayTrack) {
+          nextP = addTrack(nextP, "overlay");
+          const newTrackId = nextP.trackOrder[nextP.trackOrder.length - 1];
+          overlayTrack = nextP.tracks[newTrackId];
+        }
+        return addClip(
+          addAsset(nextP, asset),
+          asset.id,
+          overlayTrack.id,
+          playback.getSnapshot().time,
+          {
+            id: clipId,
+            duration: clipDuration,
+            volume: 0,
+            visualTreatment,
+          }
+        );
+      });
       select([clipId]);
       navigator.vibrate?.(10);
-      notify("B-roll inserted onto overlay track.");
+      notify(`B-roll inserted (${clipDuration.toFixed(1)}s cutaway).`);
     } catch (e) {
       notify(e instanceof Error ? e.message : "Failed to insert B-roll.");
     } finally {
@@ -390,6 +552,7 @@ export default function MobileDrawerSheet({
     captions: "Caption Studio",
     broll: "B-Roll Footage (9:16)",
     audio: "Audio & Sound FX",
+    silence: "Silence Trimmer Studio",
   };
 
   return (
@@ -489,6 +652,124 @@ export default function MobileDrawerSheet({
                 </div>
               </div>
 
+              {/* Caption Placement & Alignment Controls */}
+              <div className="space-y-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                    <Shield size={12} className="text-blue-600" />
+                    <span>9:16 Safe Placement</span>
+                  </span>
+                  <span className="text-[10px] font-mono text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    Safe-Zone Compliant
+                  </span>
+                </div>
+
+                {/* Vertical Position */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-medium text-slate-500">Vertical Position</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => applyCaptionPlacement("top")}
+                      className={`min-h-[40px] px-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center transition-all ${
+                        captionPlacement === "top"
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "bg-white border border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      <span>⬆️ Top</span>
+                      <span className="text-[9px] font-mono opacity-80">16% Hook</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyCaptionPlacement("center")}
+                      className={`min-h-[40px] px-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center transition-all ${
+                        captionPlacement === "center"
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "bg-white border border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      <span>🎯 Middle</span>
+                      <span className="text-[9px] font-mono opacity-80">48% Viral</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyCaptionPlacement("bottom")}
+                      className={`min-h-[40px] px-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center transition-all ${
+                        captionPlacement === "bottom"
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "bg-white border border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      <span>⬇️ Safe Bot</span>
+                      <span className="text-[9px] font-mono opacity-80">76% Lower</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Horizontal Alignment & Font Size */}
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/80">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-medium text-slate-500">Alignment</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => applyCaptionAlignment("left")}
+                        className={`min-h-[34px] rounded-lg text-xs font-semibold flex items-center justify-center ${
+                          captionAlign === "left"
+                            ? "bg-blue-600 text-white"
+                            : "bg-white border border-slate-200 text-slate-600"
+                        }`}
+                      >
+                        <AlignLeft size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyCaptionAlignment("center")}
+                        className={`min-h-[34px] rounded-lg text-xs font-semibold flex items-center justify-center ${
+                          captionAlign === "center"
+                            ? "bg-blue-600 text-white"
+                            : "bg-white border border-slate-200 text-slate-600"
+                        }`}
+                      >
+                        <AlignCenter size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyCaptionAlignment("right")}
+                        className={`min-h-[34px] rounded-lg text-xs font-semibold flex items-center justify-center ${
+                          captionAlign === "right"
+                            ? "bg-blue-600 text-white"
+                            : "bg-white border border-slate-200 text-slate-600"
+                        }`}
+                      >
+                        <AlignRight size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-medium text-slate-500">Size</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      {(["sm", "md", "lg"] as const).map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => applyCaptionSize(s)}
+                          className={`min-h-[34px] rounded-lg text-[11px] font-mono font-semibold uppercase ${
+                            captionSize === s
+                              ? "bg-blue-600 text-white"
+                              : "bg-white border border-slate-200 text-slate-600"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Horizontal Swipeable Carousel of Caption Studio Presets */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -546,9 +827,73 @@ export default function MobileDrawerSheet({
             </div>
           )}
 
+          {/* ======================= TAB: SILENCE TRIMMER ======================= */}
+          {activeTab === "silence" && (
+            <div className="space-y-4">
+              <SilenceTrimmerControls compact />
+            </div>
+          )}
+
           {/* ======================= TAB: EDIT & MEDIA ======================= */}
           {activeTab === "edit" && (
             <div className="space-y-4">
+              {/* Silence Trimmer Studio Card */}
+              <div className="p-3 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                <SilenceTrimmerControls compact />
+              </div>
+
+              {/* 1-Click 9:16 Smart Reframing Card */}
+              <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-800 flex items-center gap-1.5 text-xs">
+                    <Sparkles size={14} className="text-blue-600" /> 1-Click 9:16 Reframe
+                  </span>
+                  <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                    Smart Fit
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      run((p) => reframeProject(p, "fit-with-blur"));
+                      notify("Applied 1-Click Fit with Blur (9:16)");
+                    }}
+                    className="p-2 rounded-xl bg-slate-50 border border-slate-200 hover:border-blue-300 text-center flex flex-col items-center gap-1 active:scale-95 transition-all"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                    <span className="text-[11px] font-semibold text-slate-800">Fit + Blur</span>
+                    <span className="text-[9px] text-slate-500">Blurred wings</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      run((p) => reframeProject(p, "center-crop"));
+                      notify("Applied 1-Click Center Crop (1.77x Eye-Line)");
+                    }}
+                    className="p-2 rounded-xl bg-slate-50 border border-slate-200 hover:border-indigo-300 text-center flex flex-col items-center gap-1 active:scale-95 transition-all"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                    <span className="text-[11px] font-semibold text-slate-800">Center Crop</span>
+                    <span className="text-[9px] text-slate-500">1.77x eye-line</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      run((p) => reframeProject(p, "split-screen"));
+                      notify("Applied 1-Click Split Screen (A-Roll + B-Roll)");
+                    }}
+                    className="p-2 rounded-xl bg-slate-50 border border-slate-200 hover:border-emerald-300 text-center flex flex-col items-center gap-1 active:scale-95 transition-all"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    <span className="text-[11px] font-semibold text-slate-800">Split Screen</span>
+                    <span className="text-[9px] text-slate-500">A-roll + B-roll</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Upload Media Button */}
               <input
                 ref={fileInputRef}
@@ -582,6 +927,186 @@ export default function MobileDrawerSheet({
                     <span className="text-[10px] font-mono text-slate-500">
                       {activeClip.duration.toFixed(1)}s
                     </span>
+                  </div>
+
+                  {/* Precision Timing & Timeline Alignment */}
+                  <div className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-slate-700 flex items-center gap-1">
+                        <Target size={12} className="text-blue-600" />
+                        <span>Timeline Alignment</span>
+                      </span>
+                      <span className="font-mono text-blue-600 font-medium">
+                        {activeClip.startTime.toFixed(2)}s → {(activeClip.startTime + activeClip.duration).toFixed(2)}s
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextStart = Math.max(0, activeClip.startTime - 0.5);
+                          run((p) => moveClip(p, activeClip.id, nextStart));
+                          navigator.vibrate?.(6);
+                        }}
+                        className="flex-1 min-h-[36px] rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-xs font-mono font-medium"
+                      >
+                        -0.5s
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextStart = Math.max(0, activeClip.startTime - 0.1);
+                          run((p) => moveClip(p, activeClip.id, nextStart));
+                          navigator.vibrate?.(6);
+                        }}
+                        className="flex-1 min-h-[36px] rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-xs font-mono font-medium"
+                      >
+                        -0.1s
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          run((p) => moveClip(p, activeClip.id, time));
+                          navigator.vibrate?.(8);
+                          notify("Aligned start to playhead.");
+                        }}
+                        className="flex-1 min-h-[36px] px-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-semibold flex items-center justify-center gap-1"
+                      >
+                        <Target size={11} />
+                        <span>Playhead</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextStart = activeClip.startTime + 0.1;
+                          run((p) => moveClip(p, activeClip.id, nextStart));
+                          navigator.vibrate?.(6);
+                        }}
+                        className="flex-1 min-h-[36px] rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-xs font-mono font-medium"
+                      >
+                        +0.1s
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextStart = activeClip.startTime + 0.5;
+                          run((p) => moveClip(p, activeClip.id, nextStart));
+                          navigator.vibrate?.(6);
+                        }}
+                        className="flex-1 min-h-[36px] rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-xs font-mono font-medium"
+                      >
+                        +0.5s
+                      </button>
+                    </div>
+
+                    {/* If visual clip (B-roll, caption, video), add safe placement buttons */}
+                    {project.tracks[activeClip.trackId]?.kind !== "audio" && (
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1">
+                        <span className="text-[10px] text-slate-500 font-medium">Placement:</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              run((p) => {
+                                const clip = p.clips[activeClip.id];
+                                if (!clip) return p;
+                                if (clip.contentId && p.captions[clip.contentId]) {
+                                  const cap = p.captions[clip.contentId];
+                                  const baseStyle = cap.studioStyle || DEFAULT_CAPTION_TEMPLATES[0].style;
+                                  return applyStudioStyle(p, [clip.id], {
+                                    ...baseStyle,
+                                    position: "top",
+                                    positionYPercent: 16,
+                                  });
+                                }
+                                return changeClipProperty(p, clip.id, {
+                                  transform: { ...clip.transform, y: -0.32 },
+                                });
+                              });
+                              notify("Aligned to top (16% hook).");
+                            }}
+                            className="min-h-[32px] px-2 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-medium text-slate-700"
+                          >
+                            Top
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              run((p) => {
+                                const clip = p.clips[activeClip.id];
+                                if (!clip) return p;
+                                if (clip.contentId && p.captions[clip.contentId]) {
+                                  const cap = p.captions[clip.contentId];
+                                  const baseStyle = cap.studioStyle || DEFAULT_CAPTION_TEMPLATES[0].style;
+                                  return applyStudioStyle(p, [clip.id], {
+                                    ...baseStyle,
+                                    position: "center",
+                                    positionYPercent: 48,
+                                  });
+                                }
+                                return changeClipProperty(p, clip.id, {
+                                  transform: { ...clip.transform, y: 0 },
+                                });
+                              });
+                              notify("Aligned to middle eye-level (48%).");
+                            }}
+                            className="min-h-[32px] px-2 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-semibold text-amber-700"
+                          >
+                            🎯 Middle
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              run((p) => {
+                                const clip = p.clips[activeClip.id];
+                                if (!clip) return p;
+                                if (clip.contentId && p.captions[clip.contentId]) {
+                                  const cap = p.captions[clip.contentId];
+                                  const baseStyle = cap.studioStyle || DEFAULT_CAPTION_TEMPLATES[0].style;
+                                  return applyStudioStyle(p, [clip.id], {
+                                    ...baseStyle,
+                                    position: "bottom",
+                                    positionYPercent: 76,
+                                  });
+                                }
+                                return changeClipProperty(p, clip.id, {
+                                  transform: { ...clip.transform, y: 0.26 },
+                                });
+                              });
+                              notify("Aligned to safe lower third (76%).");
+                            }}
+                            className="min-h-[32px] px-2 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-medium text-slate-700"
+                          >
+                            Safe Bot
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              run((p) => {
+                                const clip = p.clips[activeClip.id];
+                                if (!clip) return p;
+                                if (clip.contentId && p.captions[clip.contentId]) {
+                                  const cap = p.captions[clip.contentId];
+                                  const baseStyle = cap.studioStyle || DEFAULT_CAPTION_TEMPLATES[0].style;
+                                  return applyStudioStyle(p, [clip.id], {
+                                    ...baseStyle,
+                                    studio: { ...baseStyle.studio, positionXPercent: 50 },
+                                  });
+                                }
+                                return changeClipProperty(p, clip.id, {
+                                  transform: { ...clip.transform, x: 0 },
+                                });
+                              });
+                              notify("Centered horizontally.");
+                            }}
+                            className="min-h-[32px] px-2 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-medium text-slate-700"
+                          >
+                            Center X
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Quick Actions: Split / Duplicate / Delete */}
@@ -779,6 +1304,103 @@ export default function MobileDrawerSheet({
                 )}
               </div>
 
+              {/* B-Roll Placement, Duration & Framing Presets */}
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-slate-700 flex items-center gap-1">
+                    <Layers size={12} className="text-cyan-600" />
+                    <span>Insert Cutaway Preset</span>
+                  </span>
+                  <span className="font-mono text-cyan-700 text-[10px] bg-cyan-100 px-1.5 py-0.5 rounded">
+                    Overlay Track
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-medium text-slate-500">Duration</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBrollDurationPreset("cut");
+                          navigator.vibrate?.(6);
+                        }}
+                        className={`min-h-[32px] rounded-lg text-[10px] font-semibold transition-all ${
+                          brollDurationPreset === "cut"
+                            ? "bg-cyan-600 text-white shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        2.5s Cut
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBrollDurationPreset("scene");
+                          navigator.vibrate?.(6);
+                        }}
+                        className={`min-h-[32px] rounded-lg text-[10px] font-semibold transition-all ${
+                          brollDurationPreset === "scene"
+                            ? "bg-cyan-600 text-white shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        4.0s Scene
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBrollDurationPreset("full");
+                          navigator.vibrate?.(6);
+                        }}
+                        className={`min-h-[32px] rounded-lg text-[10px] font-semibold transition-all ${
+                          brollDurationPreset === "full"
+                            ? "bg-cyan-600 text-white shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        Full
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-medium text-slate-500">Framing</span>
+                    <div className="grid grid-cols-2 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBrollFraming("cover");
+                          navigator.vibrate?.(6);
+                        }}
+                        className={`min-h-[32px] rounded-lg text-[10px] font-semibold transition-all ${
+                          brollFraming === "cover"
+                            ? "bg-cyan-600 text-white shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        Full Screen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBrollFraming("pip");
+                          navigator.vibrate?.(6);
+                        }}
+                        className={`min-h-[32px] rounded-lg text-[10px] font-semibold transition-all ${
+                          brollFraming === "pip"
+                            ? "bg-cyan-600 text-white shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        PiP Card
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Search Results */}
               {brollResults.length > 0 ? (
                 <div className="grid grid-cols-2 gap-2.5">
@@ -853,6 +1475,66 @@ export default function MobileDrawerSheet({
                   <span>Import</span>
                 </button>
               </div>
+
+              {/* SFX Alignment & Timing Mode */}
+              {audioCategory !== "Music" && (
+                <div className="p-2.5 rounded-xl bg-violet-50/70 border border-violet-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-semibold text-violet-900 flex items-center gap-1">
+                      <Target size={12} className="text-violet-600" />
+                      <span>SFX Sync &amp; Alignment</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded font-medium">
+                      Vol: 75%
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSfxAlignment("playhead");
+                        navigator.vibrate?.(6);
+                      }}
+                      className={`min-h-[34px] px-1 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition-all ${
+                        sfxAlignment === "playhead"
+                          ? "bg-violet-600 text-white shadow-xs"
+                          : "bg-white border border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      <span>🎯 Playhead</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSfxAlignment("nearest_cut");
+                        navigator.vibrate?.(6);
+                      }}
+                      className={`min-h-[34px] px-1 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition-all ${
+                        sfxAlignment === "nearest_cut"
+                          ? "bg-violet-600 text-white shadow-xs"
+                          : "bg-white border border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      <span>✂️ Snap Cut</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSfxAlignment("caption");
+                        navigator.vibrate?.(6);
+                      }}
+                      className={`min-h-[34px] px-1 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition-all ${
+                        sfxAlignment === "caption"
+                          ? "bg-violet-600 text-white shadow-xs"
+                          : "bg-white border border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      <span>💬 To Caption</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {audioCategory === "Music" ? (
                 <div className="space-y-2">

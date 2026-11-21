@@ -1,29 +1,29 @@
-# BRIEFING — 2026-11-07T11:56:00Z
+# BRIEFING — 2026-11-12T15:22:03Z
 
 ## Mission
-Implement Kreovar AI Editor Intelligent Custom Editing System and repair existing preset flows per docs/superpowers/specs/2026-11-07-intelligent-custom-editing-and-preset-repair-design.md.
+Fix critical regressions, state mutations, pipeline routing, undo stack, TypeScript/ESLint errors, wire real editor controls into desktop and mobile UI, and fix export audio sync, compositor rendering, billing leaks, and AI vision in the Kreovar video editor.
 
 ## 🔒 My Identity
 - Archetype: orchestrator
 - Roles: orchestrator, user_liaison, human_reporter, successor
-- Working directory: c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code\.agents\teamwork\orchestrator\
-- Original parent: sentinel
-- Original parent conversation ID: 34254c2f-8193-4ab3-8257-46a2b1f0b6e8
+- Working directory: c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code
+- State folder: c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code\.agents\teamwork\orchestrator\
+- Original parent: caller (id: 44115417-ab11-4fdd-851d-d48d76969a7b)
+- Original parent conversation ID: 44115417-ab11-4fdd-851d-d48d76969a7b
 
 ## 🔒 My Workflow
 - **Pattern**: Project
 - **Scope document**: c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code\.agents\teamwork\orchestrator\PROJECT.md
 - **Work items**:
-  1. Phase 0: Survey codebase with 3 Explorers [done]
-  2. Phase 1: PROJECT.md & TEST_INFRA.md decomposition [done]
-  3. Phase 2: Dual Track Parallel Execution:
-     - E2E Test Suite: test_writer_e2e_1 [done, TEST_READY.md published]
-     - M1: Model Architecture & Fallback Integration: worker_m1_1 [done, APPROVED]
-     - M2: Preset Flow Repair & Resilience: worker_m2_2 [done, APPROVED]
-     - M3: Intelligent Custom AI Editing & Clarification: worker_m3_1 [done, APPROVED]
-  4. Phase 3: Final E2E Milestone & Adversarial Hardening [done, 100% pass across all suites]
-- **Current phase**: Complete
-- **Current focus**: Final Human Report & Handoff to Sentinel
+  1. Survey & R1 Investigation: Survey target files and map R1 requirements [pending]
+  2. R1 Execution: State mutations, pipeline routing, undo stack, TS/ESLint fixes [pending]
+  3. R1 Gate Check: tsc, lint, test:chat-routing, test:e2e [pending]
+  4. R2 Execution: Desktop & Mobile UI controls, AssetDrawer, Timeline, Canvas [pending]
+  5. R2 Gate Check: build & integration verification [pending]
+  6. R3 Execution: Export audio sync, compositor, billing leaks, AI vision [pending]
+  7. Final Verification & Full Acceptance Suite [pending]
+- **Current phase**: 1 - R1 Survey & Investigation
+- **Current focus**: Surveying R1 files and preparing worker dispatch
 
 ## 🔒 Key Constraints
 - NEVER write, modify, or create source code files directly.
@@ -34,49 +34,50 @@ Implement Kreovar AI Editor Intelligent Custom Editing System and repair existin
 - Mandatory integrity warning in Worker dispatch prompts.
 - Hard audit veto: If Forensic Auditor reports INTEGRITY VIOLATION, milestone fails unconditionally.
 - Never reuse a subagent after it has delivered its handoff — always spawn fresh.
+- Execute strictly in 3 sequential phases (R1 -> Gate Check -> R2 -> R3 -> Final Verify).
 
 ## Current Parent
-- Conversation ID: 34254c2f-8193-4ab3-8257-46a2b1f0b6e8
-- Updated: 2026-11-07T10:16:00Z
+- Conversation ID: 44115417-ab11-4fdd-851d-d48d76969a7b
+- Updated: 2026-11-12T15:22:03Z
 
 ## Key Decisions Made
-- All milestones M1, M2, M3, and M4 are completed, fully reviewed, challenged, and audited CLEAN.
-- Full system verification complete: `scripts/test-custom-ai-editing.mjs` (32/32 pass), `scripts/test-sequential-edit.mjs` (14/14 pass), `scripts/test-e2e-error-and-recovery.mjs` (5/5 pass), `scripts/test-chat-tool-routing.mjs` (14/14 pass), `npx tsc --noEmit` (0 errors), `npm run build:cloudflare` (clean build).
+- Decomposing the mission into 3 sequential phases per user instructions: R1 (with mandatory Gate Check), R2, R3, followed by Final Verify.
+- For R1: Dispatch 3 parallel Explorers to survey the R1 codebase modules, tests, and lint errors.
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
 |-------|------|-----------|--------|---------|
-| spec_miner_survey_1 | teamwork_spec_miner | Survey | completed | 85a80114-f48b-48c5-9134-ce1de2c40b49 |
-| explorer_editor_survey_1 | teamwork_explorer | Survey | completed | 413a61aa-1e88-45f7-9a5a-3a6b984152e3 |
-| explorer_presets_survey_1 | teamwork_explorer | Survey | completed | 60d98165-d073-438b-9fb5-5f1ddf9a4363 |
-| test_writer_e2e_1 | teamwork_test_writer | E2E Test Suite | completed | 04047c1a-bc8d-4420-b1ea-b90783827611 |
-| worker_m1_1 | teamwork_worker | M1 Worker | completed | 510e7982-8f43-4935-b802-8f5485aba4d9 |
-| worker_m2_1 | teamwork_worker | M2 Worker | completed | 8bb8c42e-ad44-4ac6-98f2-e5ec08971fb7 |
-| reviewer_m1_m2_1 | teamwork_reviewer | Gate M1+M2 Review 1 | completed (APPROVE) | b281f523-d496-485d-b7a4-6b66f0d2ff16 |
-| reviewer_m1_m2_2 | teamwork_reviewer | Gate M1+M2 Review 2 | completed (APPROVE) | 52222ec9-e913-45b1-9823-871f9c44b889 |
-| challenger_m1_m2_1 | teamwork_challenger | Gate M1+M2 Challenger 1 | completed (REQUEST_CHANGES) | ad0682b6-d712-4e2f-9b5b-2f492ea62639 |
-| challenger_m1_m2_2 | teamwork_challenger | Gate M1+M2 Challenger 2 | completed (APPROVE) | 26b08c78-cc0b-4e06-b087-826829ffa8a6 |
-| auditor_m1_m2_1 | teamwork_auditor | Gate M1+M2 Forensic Audit | completed (CLEAN) | 4fcc6345-5710-4e66-908f-0d0f46c932af |
-| worker_m2_2 | teamwork_worker | M2 Remediation | completed | 73fbe939-632b-469c-9a75-6943ffc537fd |
-| challenger_m2_recheck_1 | teamwork_challenger | Gate M2 Challenger Re-check | completed (APPROVE) | c3d9df2f-503b-4f76-9a35-fcc66988e254 |
-| auditor_m2_recheck_1 | teamwork_auditor | Gate M2 Forensic Audit Re-check | completed (CLEAN) | 38b61d99-8e9c-4a67-ae61-2b7dcb357cd1 |
-| worker_m3_1 | teamwork_worker | M3 Implementation | completed | 926dbd5f-dbd6-4084-a598-fab1bc5150a3 |
-| reviewer_m3_1 | teamwork_reviewer | Gate M3 Review 1 | completed (APPROVE) | 49290b82-c194-420b-833a-61ccad3a6995 |
-| reviewer_m3_2 | teamwork_reviewer | Gate M3 Review 2 | completed (APPROVE) | b17b1893-a1a2-4bb3-ac9a-8488a5adfd84 |
-| challenger_m3_1 | teamwork_challenger | Gate M3 Challenger 1 | completed (APPROVE) | 99d7ae87-fdb3-471a-9b31-9dc7bbaf98d1 |
-| challenger_m3_2 | teamwork_challenger | Gate M3 Challenger 2 | completed (APPROVE) | 2c004dff-376d-4f68-a46d-fb2e9506f8b6 |
-| auditor_m3_1 | teamwork_auditor | Gate M3 Forensic Audit | completed (CLEAN) | 2f67bfac-7a73-4163-b410-94f429793ca4 |
+| explorer_r1_1 | teamwork_explorer | R1.1 TS Signature & R1.6 ESLint | completed | 669b18e2-bd1f-4ef1-a24a-38a144649d09 |
+| explorer_r1_2 | teamwork_explorer | R1.2 Mutations, R1.3 Pipeline, R1.4 Reconciler | completed | 2e4e513d-2f61-4a46-9500-94c553cdf0a8 |
+| explorer_r1_3 | teamwork_explorer | R1.5 Undo, Locks, DOM Alignment | completed | f830cbe5-02c5-446b-bfb8-665d24692a17 |
+| worker_r1_1 | teamwork_worker | Implement R1 Requirements | completed | 0f5e61b3-7bde-41f8-8658-e053a93b6045 |
+| reviewer_r1_1 | teamwork_reviewer | R1 Gate Review (TS & Lint) | completed (APPROVE) | be781f11-78e7-466a-833f-217c246d16d8 |
+| reviewer_r1_2 | teamwork_reviewer | R1 Gate Review (Test Suites) | completed (APPROVE) | e4ae5880-42fc-4d97-9c3a-c8b6907d76ca |
+| challenger_r1_1 | teamwork_challenger | R1 Stress Test (Mutations & Expansion) | completed (REQUEST_CHANGES) | b08bf35d-1d33-4c56-b0ee-418e8911025b |
+| challenger_r1_2 | teamwork_challenger | R1 Stress Test (Locks & Reconciler) | completed (REQUEST_CHANGES) | c3cceb11-30e4-4d66-b1eb-104c5fde4e1b |
+| auditor_r1_1 | teamwork_auditor | R1 Forensic Integrity Audit | in-progress | 283223f3-6bc5-4d40-918c-9807d8000530 |
+
+| worker_r1_2 | teamwork_worker | R1 Challenger Findings Remediation | completed | 6e7d8de0-5b63-44bf-a765-0e78d882ef9b |
+| reviewer_r1_3 | teamwork_reviewer | R1 Gate Re-Check (TS & Lint) | completed (APPROVE) | bbe051f4-e0e1-4bd1-bf63-6a21e13748a3 |
+| reviewer_r1_4 | teamwork_reviewer | R1 Gate Re-Check (Test Suites) | completed (APPROVE) | 5c92fcf1-4d00-459a-b72a-8a476c8e71c7 |
+| challenger_r1_3 | teamwork_challenger | R1 Gate Re-Check (Mutations & Expansion) | completed (APPROVE) | 5e0121f5-9b6f-413e-b99f-08019020d73b |
+| challenger_r1_4 | teamwork_challenger | R1 Gate Re-Check (Locks & Visibility) | completed (APPROVE) | d5c8cabd-6b90-44d5-b946-1bd7f0329feb |
+| auditor_r1_2 | teamwork_auditor | R1 Forensic Integrity Audit 2 | completed (CLEAN) | a345d71e-aeb1-4984-8146-f9e88eb751f0 |
+
+| explorer_r2_1 | teamwork_explorer | R2 UI Controls & Mobile Investigation | completed | 3e427a76-2a35-4763-ad67-61cde4e54984 |
 
 ## Succession Status
-- Succession required: no (all milestones complete)
-- Spawn count: 20 / 16
+- Succession required: yes (spawning orchestrator_gen2)
+- Spawn count: 16 / 16
 - Pending subagents: none
 - Predecessor: none
-- Successor: none (task complete)
+- Successor spawned: eee234d7-9b6b-47e0-8304-e15af3e91490
+- Successor generation: gen2
+- Successor state folder: c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code\.agents\teamwork\orchestrator_gen2\
 
 ## Active Timers
-- Heartbeat cron: killed
-- Safety timer: none
+- Heartbeat cron: 0a2936a9-a1bf-4a7b-bbdf-047f680e5410/task-238
+- Safety timer: 0a2936a9-a1bf-4a7b-bbdf-047f680e5410/task-404
 
 ## Artifact Index
 - .agents/teamwork/ORIGINAL_REQUEST.md — Original user request
@@ -84,7 +85,5 @@ Implement Kreovar AI Editor Intelligent Custom Editing System and repair existin
 - .agents/teamwork/orchestrator/BRIEFING.md — Persistent working memory index
 - .agents/teamwork/orchestrator/progress.md — Execution heartbeat and progress tracking
 - .agents/teamwork/orchestrator/PROJECT.md — Global architecture, milestones & feature inventory
-- .agents/teamwork/orchestrator/TEST_INFRA.md — E2E Test infrastructure specification
-- .agents/teamwork/orchestrator/TEST_READY.md — E2E Test suite ready signal
 - .agents/teamwork/orchestrator/GATE_STATUS.md — Gate status ledger
-- .agents/teamwork/orchestrator/handoff.md — Final orchestrator handoff report
+- .agents/teamwork/orchestrator/handoff.md — Orchestrator handoff report

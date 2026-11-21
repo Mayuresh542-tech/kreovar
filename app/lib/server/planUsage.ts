@@ -47,7 +47,7 @@ export function withUsage(handler:Handler,kind:'content'|'voice'|'ai'|'stock'|'s
    if(isJson||kind==='ai'){
     const result=await response.clone().json().catch(()=>null);
     if(!result||typeof result!=='object'||result.error||result.success===false||result.isDevelopmentMode===true)throw new PlanLimitError('Generation did not return a usable result. Please retry.',502);
-    if(kind==='ai'&&!(Array.isArray(result.list?.decisions)&&result.list.decisions.length||Array.isArray(result.toolRequests)&&result.toolRequests.length)){
+    if(kind==='ai'&&!result.usageConsumed&&!(Array.isArray(result.list?.decisions)&&result.list.decisions.length||Array.isArray(result.toolRequests)&&result.toolRequests.length)){
      await finishUsage(user,id,false);done=true;return response;
     }
    }

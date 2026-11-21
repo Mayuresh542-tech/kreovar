@@ -1,5 +1,6 @@
 import { withSafeResponse } from "@/app/lib/server/safeResponse";
 import { NextRequest, NextResponse } from "next/server";
+import { searchCuratedBroll, BrollNiche } from "@/app/lib/assets/curatedBrollCatalog";
 
 export const dynamic = "force-dynamic";
 
@@ -13,30 +14,42 @@ export interface BRollVideoItem {
   height: number;
   creatorName: string;
   creatorUrl: string;
-  source: "pexels" | "upload";
+  source: "pexels" | "upload" | "curated";
 }
 
 async function getHandler(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const query = searchParams.get("query") || "business technology";
-    const page = searchParams.get("page") || "1";
-    const perPage = searchParams.get("per_page") || "12";
-    const orientation = searchParams.get("orientation") || "portrait";
+    const rawQuery = searchParams.get("query") || "business technology";
+    const query = typeof rawQuery === "string" ? rawQuery.slice(0, 100).trim() : "business technology";
+    const category = searchParams.get("category") as BrollNiche | null;
+    const pageNum = Math.max(1, Math.min(100, parseInt(searchParams.get("page") || "1", 10) || 1));
+    const perPageNum = Math.max(1, Math.min(50, parseInt(searchParams.get("per_page") || "12", 10) || 12));
+    const orientation = (searchParams.get("orientation") === "landscape" ? "landscape" : "portrait") as "portrait" | "landscape";
 
-    const pexelsKey =
-      process.env.PEXELS_API_KEY;
+    const pexelsKey = process.env.PEXELS_API_KEY;
 
+    // If external Pexels API key is not configured, seamlessly return curated B-roll library
     if (!pexelsKey) {
-      return NextResponse.json(
-        { error: "Stock footage search is temporarily unavailable.", videos: [] },
-        { status: 503 }
-      );
+      const curated = searchCuratedBroll(query, {
+        category: category || undefined,
+        orientation,
+        limit: perPageNum,
+      });
+
+      return NextResponse.json({
+        success: true,
+        videos: curated,
+        totalResults: curated.length,
+        page: pageNum,
+        perPage: perPageNum,
+        source: "curated",
+      });
     }
 
     const pexelsUrl = `https://api.pexels.com/videos/search?query=${encodeURIComponent(
       query
-    )}&orientation=${orientation}&per_page=${perPage}&page=${page}`;
+    )}&orientation=${orientation}&per_page=${perPageNum}&page=${pageNum}`;
 
     const res = await fetch(pexelsUrl, {
       headers: {
@@ -48,14 +61,40 @@ async function getHandler(req: NextRequest) {
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
       console.warn("[Pexels API] Request error:", res.status, errText);
-      return NextResponse.json(
-        { error: "Stock footage search could not complete. Please retry.", videos: [] },
-        { status: res.status }
-      );
+      // Fallback to curated catalog rather than returning an error to user
+      const curated = searchCuratedBroll(query, {
+        category: category || undefined,
+        orientation,
+        limit: perPageNum,
+      });
+      return NextResponse.json({
+        success: true,
+        videos: curated,
+        totalResults: curated.length,
+        page: pageNum,
+        perPage: perPageNum,
+        source: "curated",
+      });
     }
 
     const data = await res.json();
     const rawVideos = data.videos || [];
+
+    if (!rawVideos.length) {
+      const curated = searchCuratedBroll(query, {
+        category: category || undefined,
+        orientation,
+        limit: perPageNum,
+      });
+      return NextResponse.json({
+        success: true,
+        videos: curated,
+        totalResults: curated.length,
+        page: pageNum,
+        perPage: perPageNum,
+        source: "curated",
+      });
+    }
 
     const videos: BRollVideoItem[] = rawVideos.map((v: any) => {
       // Find the best quality video file matching orientation (prefer 720p/1080p MP4)
@@ -68,7 +107,6 @@ async function getHandler(req: NextRequest) {
         : files.find((f) => f.width < f.height && (f.quality === "hd" || f.height >= 720)) ||
           files.find((f) => f.width < f.height) ||
           files[0];
-
 
       return {
         id: String(v.id),
@@ -88,15 +126,22 @@ async function getHandler(req: NextRequest) {
       success: true,
       videos,
       totalResults: data.total_results || 0,
-      page: Number(page),
-      perPage: Number(perPage),
+      page: pageNum,
+      perPage: perPageNum,
+      source: "pexels",
     });
   } catch (err: any) {
     console.error("[Pexels API] Unexpected error:", err);
-    return NextResponse.json(
-      { error: err?.message || "Failed to search stock videos.", videos: [] },
-      { status: 500 }
-    );
+    // Graceful fallback to curated catalog
+    const curated = searchCuratedBroll("", { limit: 12 });
+    return NextResponse.json({
+      success: true,
+      videos: curated,
+      totalResults: curated.length,
+      page: 1,
+      perPage: 12,
+      source: "curated",
+    });
   }
 }
 

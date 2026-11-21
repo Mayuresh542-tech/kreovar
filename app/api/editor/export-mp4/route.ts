@@ -16,6 +16,7 @@ export const POST=withSafeResponse(withBoundedRequest(withUsage(async(req:NextRe
   if(!(file instanceof File)||!file.size||file.size>100*1048576||typeof metadata!=="string"||metadata.length>256*1024)return NextResponse.json({error:"Invalid or oversized export."},{status:400});
   const fps=Number(form.get("fps")||30);if(![24,30,60].includes(fps))return NextResponse.json({error:"Invalid export frame rate."},{status:400});
   let project;try{project=JSON.parse(metadata);}catch{return NextResponse.json({error:"Invalid project."},{status:400});}
+  if(!project||typeof project!=="object"||!project.id||typeof project.id!=="string"||!/^[0-9a-f-]{36}$/i.test(project.id))return NextResponse.json({error:"Invalid project."},{status:400});
   try{await requireOwnedProject(getAdminClient(),userId,project.id);}catch{return NextResponse.json({error:"Project unavailable."},{status:404});}
   const bytes=await finalizeEditorMp4(userId,project,Buffer.from(await file.arrayBuffer()),AbortSignal.any([req.signal,AbortSignal.timeout(165000)]),fps);
   return new Response(new Uint8Array(bytes),{headers:{"Content-Type":"video/mp4","Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"}});

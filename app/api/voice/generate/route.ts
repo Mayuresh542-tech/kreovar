@@ -87,7 +87,7 @@ async function postHandler(req: NextRequest) {
       );
     }
 
-    try { await requireOwnedProject(adminDb, userId, projectId); }
+    try { await requireOwnedProject(adminDb, userId, projectId, { optional: true }); }
     catch { return NextResponse.json({error:"This project is unavailable."},{status:404}); }
 
     // 2. Validate credits and atomically deduct server-side

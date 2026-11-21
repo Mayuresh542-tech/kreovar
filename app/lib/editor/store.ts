@@ -32,15 +32,51 @@ export class EditorStore {
   cancel(){if(this.transaction){this.project=this.transaction;this.transaction=null;this.notify();}}
   undo(){this.cancel();const previous=this.past.at(-1);if(!previous)return;this.past=this.past.slice(0,-1);this.future=[this.project,...this.future];this.project=this.stamp(previous);this.notify();}
   redo(){this.cancel();const next=this.future[0];if(!next)return;this.future=this.future.slice(1);this.past=[...this.past,this.project];this.project=this.stamp(next);this.notify();}
+  rollbackToRevision(targetRevision: number): boolean {
+    this.cancel();
+    if (this.project.revision === targetRevision) return true;
+    let index = this.past.findLastIndex((p) => p.revision === targetRevision);
+    if (index === -1) {
+      index = this.past.findIndex((p) => p.revision >= targetRevision);
+    }
+    if (index === -1) {
+      index = this.past.findLastIndex((p) => p.revision <= targetRevision);
+    }
+    if (index === -1) return false;
+    const targetProject = this.past[index];
+    const undone = [this.project, ...this.past.slice(index + 1)];
+    this.past = this.past.slice(0, index);
+    this.future = [...undone, ...this.future];
+    this.project = this.stamp(targetProject);
+    this.notify();
+    return true;
+  }
   get canUndo(){return this.past.length>0;}get canRedo(){return this.future.length>0;}get interacting(){return !!this.transaction;}
 }
 export function useProject(store:EditorStore){return useSyncExternalStore(store.subscribe,store.getSnapshot,store.getSnapshot);}
 export function useEditorSelector<T>(store:EditorStore,select:(p:EditorProject)=>T){return useSyncExternalStore(store.subscribe,()=>select(store.getSnapshot()),()=>select(store.getSnapshot()));}
 /** Frame-rate updates have separate subscribers; the library/inspector/clip list do not rerender. */
+export interface PlaybackState {
+  time: number;
+  playing: boolean;
+  speed?: number;
+}
 export class PlaybackStore {
-  private state={time:0,playing:false};private listeners=new Set<()=>void>();
-  subscribe=(fn:()=>void)=>{this.listeners.add(fn);return()=>{this.listeners.delete(fn);};};
-  getSnapshot=()=>this.state;
-  set(time:number,playing=this.state.playing){time=Number.isFinite(time)?Math.max(0,time):this.state.time;if(time===this.state.time&&playing===this.state.playing)return;this.state={time,playing};this.listeners.forEach(fn=>fn());}
+  private state: PlaybackState = { time: 0, playing: false, speed: 1 };
+  private listeners = new Set<() => void>();
+  subscribe = (fn: () => void) => {
+    this.listeners.add(fn);
+    return () => {
+      this.listeners.delete(fn);
+    };
+  };
+  getSnapshot = () => this.state;
+  set(time: number, playing = this.state.playing, speed = this.state.speed ?? 1) {
+    time = Number.isFinite(time) ? Math.max(0, time) : this.state.time;
+    const safeSpeed = Number.isFinite(speed) ? speed : 1;
+    if (time === this.state.time && playing === this.state.playing && safeSpeed === (this.state.speed ?? 1)) return;
+    this.state = { time, playing, speed: safeSpeed };
+    this.listeners.forEach((fn) => fn());
+  }
 }
 export function usePlayback(store:PlaybackStore){return useSyncExternalStore(store.subscribe,store.getSnapshot,store.getSnapshot);}

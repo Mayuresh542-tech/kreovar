@@ -320,10 +320,14 @@ export async function renderTimelineWithFFmpeg(
       let filterChain = `[${i}:v]trim=duration=${dur},setpts=${(1 / speed).toFixed(4)}*(PTS-STARTPTS),scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}:(in_w-${width})/2:(in_h-${height})/2,setsar=1,fps=${fps}`;
 
       // Ken Burns Motion Animation
-      if (clip.animation === "slow_zoom_in") {
-        filterChain += `,zoompan=z='min(zoom+0.0012,1.12)':d=${Math.round(dur * fps)}:s=${width}x${height}:fps=${fps}`;
-      } else if (clip.animation === "slow_zoom_out") {
-        filterChain += `,zoompan=z='max(1.12-0.0012*on,1.0)':d=${Math.round(dur * fps)}:s=${width}x${height}:fps=${fps}`;
+      if (clip.animation === "slow_zoom_in" || clip.animation === "ken-burns-push") {
+        filterChain += `,zoompan=z='min(zoom+0.0012,1.08)':d=${Math.round(dur * fps)}:s=${width}x${height}:fps=${fps}`;
+      } else if (clip.animation === "slow_zoom_out" || clip.animation === "ken-burns-pull") {
+        filterChain += `,zoompan=z='max(1.08-0.0012*on,1.0)':d=${Math.round(dur * fps)}:s=${width}x${height}:fps=${fps}`;
+      } else if (clip.animation === "ken-burns-pan-left") {
+        filterChain += `,zoompan=z='1.05':x='if(lte(on,1),(iw-iw/zoom)*0.75,max(0,x-1))':d=${Math.round(dur * fps)}:s=${width}x${height}:fps=${fps}`;
+      } else if (clip.animation === "ken-burns-pan-right") {
+        filterChain += `,zoompan=z='1.05':x='if(lte(on,1),(iw-iw/zoom)*0.25,min(iw-iw/zoom,x+1))':d=${Math.round(dur * fps)}:s=${width}x${height}:fps=${fps}`;
       }
 
       // Color Adjustments (Brightness, Contrast, Saturation)

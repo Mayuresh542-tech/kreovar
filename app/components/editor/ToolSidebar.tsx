@@ -12,6 +12,7 @@ import {
   Keyboard,
   PanelLeftClose,
   PanelLeftOpen,
+  Scissors,
 } from "lucide-react";
 
 export type EditorToolTab =
@@ -19,6 +20,7 @@ export type EditorToolTab =
   | "captions"
   | "broll"
   | "audio"
+  | "silence"
   | "effects"
   | "settings"
   | "inspector";
@@ -63,6 +65,12 @@ const TOOLS: ToolItem[] = [
     label: "Audio & SFX",
     icon: AudioLines,
     description: "Sound effects, background music, voice",
+  },
+  {
+    id: "silence",
+    label: "Silence Trimmer",
+    icon: Scissors,
+    description: "Acoustic detection & ripple cut silence removal",
   },
   {
     id: "effects",

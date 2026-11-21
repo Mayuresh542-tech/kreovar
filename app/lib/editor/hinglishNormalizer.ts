@@ -310,11 +310,14 @@ export function normalizeHinglishText(text: string): string {
   return normalizedWords.join(' ');
 }
 
-export interface TimedSpeechWord {
+export interface BaseTimedWord {
   word?: string;
   text?: string;
   start: number;
   end: number;
+}
+
+export interface TimedSpeechWord extends BaseTimedWord {
   [key: string]: unknown;
 }
 
@@ -324,7 +327,7 @@ export interface TimedSpeechWord {
  * - Converts Devanagari to clean Roman Hindi
  * - Cleans phoneme merges & standardizes popular Hinglish terms
  */
-export function normalizeHinglishWords<T extends TimedSpeechWord>(words: T[]): T[] {
+export function normalizeHinglishWords<T extends BaseTimedWord>(words: T[]): T[] {
   if (!Array.isArray(words) || words.length === 0) return words;
 
   const result: T[] = [];
@@ -352,8 +355,8 @@ export function normalizeHinglishWords<T extends TimedSpeechWord>(words: T[]): T
     result.push({
       ...item,
       word: normalized,
-      text: normalized
-    });
+      ...(item.text !== undefined ? { text: normalized } : {})
+    } as T);
   }
 
   return result;

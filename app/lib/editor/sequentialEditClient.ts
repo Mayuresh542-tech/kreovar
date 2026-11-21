@@ -16,8 +16,10 @@ import {buildStageProject,assertStagePlan,stageInstruction,validateCompletedJob,
 import {loadEditorStudioFonts} from './editorCaptionStudio';
 import {Compositor} from './compositor';
 import {extractEditingConstraints} from './editingIntent';
+import {createAutoSfxDecisions} from './autoSfx';
 
 function canSkipSupportingStage(stage:EditStage,project:EditorProject,output?:StageOutput,job?:EditingJob):boolean{
+ if(job?.faultTolerant!==false)return true;
  if(projectDuration(project)<4.0)return true;
  const isPreset=!!(job?.presetId||project.editingJob?.presetId);
  if(isPreset)return true;
@@ -74,181 +76,436 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
    case 'analyzeFootage':{
     const footage=analysisFootage(project,job.selection);if(!footage.length&&job.presetId)throw Error('Add original footage to the timeline first.');
     if(!frames)await readFrames(project,job.selection);
-    const isCustomRequested=job.stages.some(s=>s.id==='applyRequestedEdits');
-    const operations=isCustomRequested?['requestedEdits' as const]:(PIPELINE_PRESETS.find(p=>p.id===job.presetId)?.operations||(footage.length?explicitOperations(job.instructions):undefined));
+    const operations=PIPELINE_PRESETS.find(p=>p.id===job.presetId)?.operations||(footage.length?explicitOperations(job.instructions):undefined);
     const result=operations?{summary:`Analyzed ${footage.length} source clip(s), ${projectDuration(project).toFixed(2)} seconds, ${frames?.length||0} sampled frames and ${speechContext(project).length} available speech segments. Planned ${operations.join(', ')}.`,operations}:await plan(stage,project,job,signal);
     return {...result,analysis:{duration:projectDuration(project),footageIds:footage.map(c=>c.id),speechSegments:speechContext(project).length,sampledFrames:frames?.length||0,assetIds:Object.keys(project.assets)}};
    }
    case 'applyCaptions':{
-    const footage=analysisFootage(project,job.selection),existing=Object.values(project.clips).filter(c=>c.contentId&&project.captions[c.contentId]&&footage.some(v=>c.startTime>=v.startTime-.01&&c.startTime+c.duration<=v.startTime+v.duration+.01));
-    if(existing.some(c=>project.tracks[c.trackId].locked||project.tracks[c.trackId].hidden))throw Error('Unlock and show caption tracks before applying captions.');
-    const normalizedTemplate = normalizeCaptionPresetId(job.captionTemplate || 'study-hormozi-style');
-    const requests=footage.filter(c=>!existing.some(cap=>cap.startTime<c.startTime+c.duration&&cap.startTime+cap.duration>c.startTime)).map(c=>({type:'captions' as const,clipId:c.id,templateId:normalizedTemplate}));
     try{
-     return await prepare(saved||{summary:'Apply timed speech captions with '+normalizedTemplate,animateCaptions:/animat|engaging|punchy/i.test(job.instructions)||['engaging','punchy'].includes(job.presetId||''),decisions:existing.length?[{op:'applyCaptionTemplate',clipIds:existing.map(c=>c.id),templateId:normalizedTemplate}]:[],requests},project,checkpoint,signal);
+     const footage=analysisFootage(project,job.selection),existing=Object.values(project.clips).filter(c=>c.contentId&&project.captions[c.contentId]&&footage.some(v=>c.startTime>=v.startTime-.01&&c.startTime+c.duration<=v.startTime+v.duration+.01));
+     if(existing.some(c=>project.tracks[c.trackId].locked||project.tracks[c.trackId].hidden))throw Error('Unlock and show caption tracks before applying captions.');
+     const normalizedTemplate = normalizeCaptionPresetId(job.captionTemplate || 'study-hormozi-style');
+     const requests=footage.filter(c=>!existing.some(cap=>cap.startTime<c.startTime+c.duration&&cap.startTime+cap.duration>c.startTime)).map(c=>({type:'captions' as const,clipId:c.id,templateId:normalizedTemplate}));
+     return await prepare(saved||{summary:'Apply timed speech captions using Caption Studio template '+normalizedTemplate,animateCaptions:/animat|engaging|punchy|caption|subtitle|studio/i.test(job.instructions)||['engaging','punchy'].includes(job.presetId||''),decisions:existing.length?[{op:'applyCaptionTemplate',clipIds:existing.map(c=>c.id),templateId:normalizedTemplate}]:[],requests},project,checkpoint,signal);
     }catch(err){
-     const isPreset=!!(job.presetId||project.editingJob?.presetId);
-     if(isPreset){
-      return {summary:'Timed speech captions could not be generated; skipped captions and preserved original audio.',decisions:[],skipRationale:'Captions skipped: '+(err instanceof Error?err.message:'transcription failed')};
-     }
-     throw err;
-    }
-   }
-   case 'planMotionGraphics':{
-    const isPreset=!!(job.presetId||project.editingJob?.presetId);
-    try{
-     const output=saved||await plan(stage,project,job,signal);
-     if(!output.decisions?.length&&!canSkipSupportingStage(stage,project,output,job))throw Error('AI did not plan any requested motion graphics.');
-     return {...output,summary:output.summary||'No motion graphics planned; moving to next step.',decisions:output.decisions||[],skipRationale:output.skipRationale||(isPreset&&!output.decisions?.length?'No motion graphics planned':undefined)};
-    }catch(err){
-     if(isPreset)return {summary:'Motion graphics skipped; moving to next step.',decisions:[],skipRationale:'Motion graphics skipped: '+(err instanceof Error?err.message:'plan failed')};
-     throw err;
-    }
-   }
-   case 'applyMotionGraphics':{
-    const output=job.stages.find(s=>s.id==='planMotionGraphics')?.output;
-    if(!output?.decisions?.length){
-     if(!canSkipSupportingStage(stage,project,output,job))throw Error('Motion graphics plan is missing.');
-     return {...output,summary:output?.summary||'Motion graphics skipped; preserved original visuals.',decisions:[],skipRationale:output?.skipRationale||'Motion graphics skipped'};
-    }
-    return {...output,summary:'Apply planned motion graphics',decisions:output?.decisions||[]};
-   }
-   case 'findBroll':{
-    const isPreset=!!(job.presetId||project.editingJob?.presetId);
-    try{
-     const output=saved||await plan(stage,project,job,signal);await checkpoint(output);
-     if(!output.decisions?.length&&!output.requests?.length){
-      if(!canSkipSupportingStage(stage,project,output,job))throw Error('No relevant B-roll candidates were found.');
-      return {...output,summary:output.summary||'No B-roll needed for this footage.',decisions:[],skipRationale:output.skipRationale||'No B-roll requested or candidates found'};
-     }
-     const ready=await prepare(output,project,checkpoint,signal);
-     if(!ready.decisions?.length&&isPreset){
-      return {...ready,summary:'No matching B-roll footage was found; moving to next step.',decisions:[],skipRationale:'No matching B-roll candidates available'};
-     }
-     return ready;
-    }catch(err){
-     if(isPreset)return {summary:'B-roll was unavailable or skipped for this footage; moving to next step.',decisions:[],skipRationale:'B-roll unavailable: '+(err instanceof Error?err.message:'tool failed')};
-     throw err;
-    }
-   }
-   case 'applyBroll':{
-    const output=job.stages.find(s=>s.id==='findBroll')?.output;
-    if(!output?.decisions?.length){
-     if(!canSkipSupportingStage(stage,project,output,job))throw Error('No selected B-roll is available.');
-     return {...output,summary:output?.summary||'B-roll skipped; preserved original footage.',decisions:[],skipRationale:output?.skipRationale||'B-roll skipped'};
-    }
-    return {...output,summary:'Insert selected B-roll with original dialogue preserved',decisions:output.decisions.map(d=>d.op==='addClip'?{...d,volume:0,audioRole:'background' as const}:d)};
-   }
-   case 'applyRequestedEdits':{
-    let output=saved||await plan(stage,project,job,signal);
-    const constraints = extractEditingConstraints(job.instructions);
-
-    // Zero-hallucination guardrail: Block arbitrary floating summary text
-    if (constraints.requestedFloatingSummaryText) {
-     const cleanDecisions = (output.decisions || []).filter(d => d.op !== 'addText');
-     const existingCaptions = Object.values(project.clips).filter(c => c.contentId && project.captions[c.contentId]);
-     if (existingCaptions.length > 0) {
-      if (!cleanDecisions.some(d => d.op === 'applyCaptionTemplate')) {
-       cleanDecisions.unshift({
-        op: 'applyCaptionTemplate',
-        clipIds: existingCaptions.map(c => c.id),
-        templateId: 'study-hormozi-style'
-       });
-      }
-     } else if (!output.requests?.some(r => r.type === 'captions')) {
-      const firstFootage = Object.values(project.clips).find(c => c.assetId && project.assets[c.assetId]?.kind === 'video');
-      if (firstFootage) {
-       output.requests = [...(output.requests || []), { type: 'captions', clipId: firstFootage.id, templateId: 'study-hormozi-style' }];
-      }
-     }
-     output.decisions = cleanDecisions;
+     if(signal.aborted)throw err;
      const notice: PipelineDegradationNotice = {
       stage: 'applyCaptions',
       status: 'skipped',
-      reason: 'Zero-hallucination guardrail active: Floating summary or explanatory text is blocked. Spoken dialogue was bound to caption template instead.',
-      suggestedAction: 'Spoken dialogue captions are displayed with engaging typography.',
+      reason: 'Captions: ' + (err instanceof Error ? err.message : 'transcription failed'),
+      suggestedAction: 'Spoken dialogue captions were skipped; verify audio track or retry captions.',
       timestamp: Date.now()
      };
-     output.degradationNotices = [...(output.degradationNotices || []), notice];
-     output.summary = "Applied spoken dialogue captions with 'study-hormozi-style'. Floating summary text was skipped under zero-hallucination guardrail.";
-    }
-
-    // Caption style switch without altering timestamps or duplicating tracks
-    if (constraints.requestedCaptionPreset) {
-     const matched = constraints.requestedCaptionPreset;
-     const existingCaptions = Object.values(project.clips).filter(c => c.contentId && project.captions[c.contentId]);
-     if (existingCaptions.length > 0) {
-      const cleanDecisions: import('./ai').EditDecision[] = (output.decisions || []).filter(d => d.op !== 'applyCaptionTemplate' && d.op !== 'addCaption');
-      cleanDecisions.unshift({
-       op: 'applyCaptionTemplate' as const,
-       clipIds: existingCaptions.map(c => c.id),
-       templateId: matched
-      });
-      output.decisions = cleanDecisions;
-      output.summary = `Updated caption style to ${matched} without altering word timestamps.`;
-     }
-    }
-    if(!output.decisions?.length&&!output.requests?.length&&!output.questions?.length)throw Error(output.summary||'AI did not return any actionable requested edits.');
-    if(output.sourceDecisionCount===undefined)output.sourceDecisionCount=output.decisions?.length||0;
-    await checkpoint(output);
-    const toolProject=output.preparedApplied?project:buildStageProject(project,{summary:output.summary,decisions:(output.decisions||[]).slice(0,output.sourceDecisionCount)});
-    return prepare(output,toolProject,checkpoint,signal);
-   }
-   case 'applyZooms':{
-    const isPreset=!!(job.presetId||project.editingJob?.presetId);
-    try{
-     const output=saved||await plan(stage,project,job,signal);
-     if(!output.decisions?.length&&!canSkipSupportingStage(stage,project,output,job))throw Error('No zoom keyframes planned.');
-     return {...output,summary:output.summary||'No zooms needed; preserved framing.',decisions:output.decisions||[],skipRationale:output.skipRationale||(isPreset&&!output.decisions?.length?'No zooms planned':undefined)};
-    }catch(err){
-     if(isPreset)return {summary:'Zooms skipped; preserved framing and moving to next step.',decisions:[],skipRationale:'Zooms skipped: '+(err instanceof Error?err.message:'plan failed')};
-     throw err;
-    }
-   }
-   case 'applyEffects':{
-    const output=saved||await plan(stage,project,job,signal);
-    const footageClips=analysisFootage(project,job.selection);
-    const hasTransitions=(output.decisions||[]).some(d=>d.op==='addTransition');
-    if(footageClips.length<=1&&!hasTransitions&&!output.decisions?.length){
      return {
-      ...output,
-      summary:output.summary||'Preserved continuous footage without artificial transitions.',
-      skipRationale:output.skipRationale||'Single continuous uncut clip',
-      decisions:[{op:'setAudioDucking',enabled:true}]
+      summary:'Timed speech captions could not be generated; skipped captions and preserved original audio.',
+      decisions:[],
+      skipRationale:'Captions skipped: '+(err instanceof Error?err.message:'transcription failed'),
+      degradationNotices: [notice]
      };
     }
-    return output;
    }
-   case 'applySoundEffects':{
-    const isPreset=!!(job.presetId||project.editingJob?.presetId);
+   case 'planMotionGraphics':{
+    try{
+     const output=saved||await plan(stage,project,job,signal);
+     if(!output.decisions?.length&&!canSkipSupportingStage(stage,project,output,job)){
+      const notice: PipelineDegradationNotice = {
+       stage: 'planMotionGraphics',
+       status: 'skipped',
+       reason: 'Motion Graphics: AI did not plan any requested motion graphics.',
+       suggestedAction: 'Visual clutter avoided; graphics were bypassed.',
+       timestamp: Date.now()
+      };
+      return {
+       ...output,
+       summary: output.summary || 'No motion graphics planned; moving to next step.',
+       decisions: [],
+       skipRationale: 'No motion graphics planned',
+       degradationNotices: [...(output.degradationNotices || []), notice]
+      };
+     }
+     return {...output,summary:output.summary||'No motion graphics planned; moving to next step.',decisions:output.decisions||[],skipRationale:output.skipRationale||(!output.decisions?.length?'No motion graphics planned':undefined)};
+    }catch(err){
+     if(signal.aborted)throw err;
+     const notice: PipelineDegradationNotice = {
+      stage: 'planMotionGraphics',
+      status: 'skipped',
+      reason: 'Motion Graphics: ' + (err instanceof Error ? err.message : 'plan failed'),
+      suggestedAction: 'Visual clutter avoided; graphics were bypassed.',
+      timestamp: Date.now()
+     };
+     return {
+      summary:'Motion graphics skipped; moving to next step.',
+      decisions:[],
+      skipRationale:'Motion graphics skipped: '+(err instanceof Error?err.message:'plan failed'),
+      degradationNotices: [notice]
+     };
+    }
+   }
+   case 'applyMotionGraphics':{
+    try {
+     const output=job.stages.find(s=>s.id==='planMotionGraphics')?.output;
+     if(!output?.decisions?.length){
+      const notice: PipelineDegradationNotice = {
+       stage: 'applyMotionGraphics',
+       status: 'skipped',
+       reason: 'Motion Graphics: Motion graphics plan was empty or skipped.',
+       suggestedAction: 'Visual clutter avoided; graphics were bypassed.',
+       timestamp: Date.now()
+      };
+      return {
+       ...output,
+       summary:output?.summary||'Motion graphics skipped; preserved original visuals.',
+       decisions:[],
+       skipRationale:output?.skipRationale||'Motion graphics skipped',
+       degradationNotices: [...(output?.degradationNotices || []), notice]
+      };
+     }
+     return {...output,summary:'Apply planned motion graphics',decisions:output?.decisions||[]};
+    } catch (err) {
+     if(signal.aborted)throw err;
+     const notice: PipelineDegradationNotice = {
+      stage: 'applyMotionGraphics',
+      status: 'skipped',
+      reason: 'Motion Graphics: ' + (err instanceof Error ? err.message : 'apply failed'),
+      suggestedAction: 'Visual clutter avoided; graphics were bypassed.',
+      timestamp: Date.now()
+     };
+     return {
+      summary: 'Motion graphics skipped; preserved original visuals.',
+      decisions: [],
+      skipRationale: 'Motion graphics skipped: ' + (err instanceof Error ? err.message : 'apply failed'),
+      degradationNotices: [notice]
+     };
+    }
+   }
+   case 'findBroll':{
     try{
      const output=saved||await plan(stage,project,job,signal);await checkpoint(output);
      if(!output.decisions?.length&&!output.requests?.length){
-      if(!canSkipSupportingStage(stage,project,output,job))throw Error('No sound effects planned.');
-      return {...output,summary:output.summary||'No sound effects needed; preserved original audio.',decisions:[],skipRationale:output.skipRationale||'No SFX planned'};
+      const notice: PipelineDegradationNotice = {
+       stage: 'findBroll',
+       status: 'skipped',
+       reason: 'B-roll: No relevant B-roll candidates were found.',
+       suggestedAction: 'Check stock footage query or manually upload B-roll media.',
+       timestamp: Date.now()
+      };
+      return {
+       ...output,
+       summary:output.summary||'No B-roll needed for this footage.',
+       decisions:[],
+       skipRationale:output.skipRationale||'No B-roll requested or candidates found',
+       degradationNotices: [...(output.degradationNotices || []), notice]
+      };
      }
      const ready=await prepare(output,project,checkpoint,signal);
-     ready.decisions=ready.decisions?.map(d=>d.op==='addClip'?{...d,audioRole:'sfx',volume:Math.min(.25,d.volume??.15)}:d);
-     if(!ready.decisions?.length&&isPreset){
-      return {...ready,summary:'No sound effects found; preserved original audio.',decisions:[],skipRationale:'No SFX prepared'};
+     if(!ready.decisions?.length){
+      const notice: PipelineDegradationNotice = {
+       stage: 'findBroll',
+       status: 'skipped',
+       reason: 'B-roll: No matching B-roll footage could be prepared.',
+       suggestedAction: 'Check stock footage query or manually upload B-roll media.',
+       timestamp: Date.now()
+      };
+      return {
+       ...ready,
+       summary:'No matching B-roll footage was found; moving to next step.',
+       decisions:[],
+       skipRationale:'No matching B-roll candidates available',
+       degradationNotices: [...(ready.degradationNotices || []), notice]
+      };
      }
      return ready;
     }catch(err){
-     if(isPreset)return {summary:'Sound effects were unavailable or skipped; preserved original audio and moving to next step.',decisions:[],skipRationale:'SFX unavailable: '+(err instanceof Error?err.message:'tool failed')};
-     throw err;
+     if(signal.aborted)throw err;
+     const notice: PipelineDegradationNotice = {
+      stage: 'findBroll',
+      status: 'skipped',
+      reason: 'B-roll: ' + (err instanceof Error ? err.message : 'tool failed'),
+      suggestedAction: 'Check stock footage query or manually upload B-roll media.',
+      timestamp: Date.now()
+     };
+     return {
+      summary:'B-roll was unavailable or skipped for this footage; moving to next step.',
+      decisions:[],
+      skipRationale:'B-roll unavailable: '+(err instanceof Error?err.message:'tool failed'),
+      degradationNotices: [notice]
+     };
+    }
+   }
+   case 'applyBroll':{
+    try {
+     const output=job.stages.find(s=>s.id==='findBroll')?.output;
+     if(!output?.decisions?.length){
+      const notice: PipelineDegradationNotice = {
+       stage: 'applyBroll',
+       status: 'skipped',
+       reason: 'B-roll: No selected B-roll is available to apply.',
+       suggestedAction: 'Check stock footage query or manually upload B-roll media.',
+       timestamp: Date.now()
+      };
+      return {
+       ...output,
+       summary:output?.summary||'B-roll skipped; preserved original footage.',
+       decisions:[],
+       skipRationale:output?.skipRationale||'B-roll skipped',
+       degradationNotices: [...(output?.degradationNotices || []), notice]
+      };
+     }
+     return {...output,summary:'Insert selected B-roll with original dialogue preserved',decisions:output.decisions.map(d=>d.op==='addClip'?{...d,volume:0,audioRole:'background' as const}:d)};
+    } catch (err) {
+     if(signal.aborted)throw err;
+     const notice: PipelineDegradationNotice = {
+      stage: 'applyBroll',
+      status: 'skipped',
+      reason: 'B-roll: ' + (err instanceof Error ? err.message : 'apply failed'),
+      suggestedAction: 'Check stock footage query or manually upload B-roll media.',
+      timestamp: Date.now()
+     };
+     return {
+      summary: 'B-roll skipped; preserved original footage.',
+      decisions: [],
+      skipRationale: 'B-roll skipped: ' + (err instanceof Error ? err.message : 'apply failed'),
+      degradationNotices: [notice]
+     };
+    }
+   }
+   case 'applyRequestedEdits':{
+    try {
+     let output=saved||await plan(stage,project,job,signal);
+     const constraints = extractEditingConstraints(job.instructions);
+
+     // Zero-hallucination guardrail: Block arbitrary floating summary text
+     if (constraints.requestedFloatingSummaryText) {
+      const cleanDecisions = (output.decisions || []).filter(d => d.op !== 'addText');
+      const existingCaptions = Object.values(project.clips).filter(c => c.contentId && project.captions[c.contentId]);
+      if (existingCaptions.length > 0) {
+       if (!cleanDecisions.some(d => d.op === 'applyCaptionTemplate')) {
+        cleanDecisions.unshift({
+         op: 'applyCaptionTemplate',
+         clipIds: existingCaptions.map(c => c.id),
+         templateId: 'study-hormozi-style'
+        });
+       }
+      } else if (!output.requests?.some(r => r.type === 'captions')) {
+       const firstFootage = Object.values(project.clips).find(c => c.assetId && project.assets[c.assetId]?.kind === 'video');
+       if (firstFootage) {
+        output.requests = [...(output.requests || []), { type: 'captions', clipId: firstFootage.id, templateId: 'study-hormozi-style' }];
+       }
+      }
+      output.decisions = cleanDecisions;
+      const notice: PipelineDegradationNotice = {
+       stage: 'applyCaptions',
+       status: 'skipped',
+       reason: 'Zero-hallucination guardrail active: Floating summary or explanatory text is blocked. Spoken dialogue was bound to caption template instead.',
+       suggestedAction: 'Spoken dialogue captions are displayed with engaging typography.',
+       timestamp: Date.now()
+      };
+      output.degradationNotices = [...(output.degradationNotices || []), notice];
+      output.summary = "Applied spoken dialogue captions with 'study-hormozi-style'. Floating summary text was skipped under zero-hallucination guardrail.";
+     }
+
+     // Caption style switch without altering timestamps or duplicating tracks
+     if (constraints.requestedCaptionPreset || constraints.requestedCaptionStudio) {
+      const matched = constraints.requestedCaptionPreset || normalizeCaptionPresetId(job.captionTemplate || 'study-hormozi-style');
+      const existingCaptions = Object.values(project.clips).filter(c => c.contentId && project.captions[c.contentId]);
+      if (existingCaptions.length > 0) {
+       const cleanDecisions: import('./ai').EditDecision[] = (output.decisions || []).filter(d => d.op !== 'applyCaptionTemplate' && d.op !== 'addCaption');
+       cleanDecisions.unshift({
+        op: 'applyCaptionTemplate' as const,
+        clipIds: existingCaptions.map(c => c.id),
+        templateId: matched
+       });
+       output.decisions = cleanDecisions;
+       output.summary = `Updated caption style to ${matched} without altering word timestamps.`;
+      }
+     }
+     if (constraints.requestedAudioDucking || /\b(?:duck\s+(?:the\s+)?music|audio\s+ducking)\b/i.test(job.instructions)) {
+      if (!(output.decisions || []).some(d => d.op === 'setAudioDucking')) {
+       output.decisions = [...(output.decisions || []), { op: 'setAudioDucking', enabled: true }];
+       output.summary = (output.summary ? output.summary + ' ' : '') + 'Enabled background music auto-ducking under speech.';
+      }
+     }
+     if (/\b(?:add\s+)?(?:subtle\s+)?sound\s*effects?(?:\s+automatically)?|auto\s*sfx\b/i.test(job.instructions)) {
+      const sfxPlan = createAutoSfxDecisions(project);
+      if (sfxPlan.decisions.length > 0) {
+       output.decisions = [...(output.decisions || []), ...sfxPlan.decisions];
+       output.assets = [...(output.assets || []), ...sfxPlan.assets];
+       output.summary = (output.summary ? output.summary + ' ' : '') + `Inserted ${sfxPlan.suggestions.length} subtle contextual sound effects.`;
+      }
+     }
+     if(!output.decisions?.length&&!output.requests?.length&&!output.questions?.length){
+      output.questions = [output.summary || 'No actionable edits needed for this timeline.'];
+     }
+     if(output.sourceDecisionCount===undefined)output.sourceDecisionCount=output.decisions?.length||0;
+     await checkpoint(output);
+     const toolProject=output.preparedApplied?project:buildStageProject(project,{summary:output.summary,decisions:(output.decisions||[]).slice(0,output.sourceDecisionCount)});
+     return await prepare(output,toolProject,checkpoint,signal);
+    } catch (err) {
+     if(signal.aborted)throw err;
+     if(err instanceof Error && /link failure/i.test(err.message)) throw err;
+     const notice: PipelineDegradationNotice = {
+      stage: 'applyRequestedEdits',
+      status: 'skipped',
+      reason: 'Requested Edits: ' + (err instanceof Error ? err.message : 'requested edit failed'),
+      suggestedAction: 'Review user instructions or retry conversational edit.',
+      timestamp: Date.now()
+     };
+     return {
+      summary: 'Requested edits could not be completed; preserved current timeline.',
+      decisions: [],
+      skipRationale: 'Requested edits skipped: ' + (err instanceof Error ? err.message : 'requested edit failed'),
+      degradationNotices: [notice]
+     };
+    }
+   }
+   case 'applyZooms':{
+    try{
+     const output=saved||await plan(stage,project,job,signal);
+     if(!output.decisions?.length&&!canSkipSupportingStage(stage,project,output,job)){
+      const notice: PipelineDegradationNotice = {
+       stage: 'applyZooms',
+       status: 'skipped',
+       reason: 'Zooms: No zoom keyframes planned; preserved natural framing.',
+       suggestedAction: 'Framing change skip kiya gaya taaki natural balance bana rahe.',
+       timestamp: Date.now()
+      };
+      return {
+       ...output,
+       summary: output.summary || 'No zooms needed; preserved framing.',
+       decisions: [],
+       skipRationale: 'No zooms planned',
+       degradationNotices: [...(output.degradationNotices || []), notice]
+      };
+     }
+     return {...output,summary:output.summary||'No zooms needed; preserved framing.',decisions:output.decisions||[],skipRationale:output.skipRationale||(!output.decisions?.length?'No zooms planned':undefined)};
+    }catch(err){
+     if(signal.aborted)throw err;
+     const notice: PipelineDegradationNotice = {
+      stage: 'applyZooms',
+      status: 'skipped',
+      reason: 'Zooms: ' + (err instanceof Error ? err.message : 'plan failed'),
+      suggestedAction: 'Framing preserved; verify clip boundaries or retry zooms.',
+      timestamp: Date.now()
+     };
+     return {
+      summary:'Zooms skipped; preserved framing and moving to next step.',
+      decisions:[],
+      skipRationale:'Zooms skipped: '+(err instanceof Error?err.message:'plan failed'),
+      degradationNotices: [notice]
+     };
+    }
+   }
+   case 'applyEffects':{
+    try {
+     const output=saved||await plan(stage,project,job,signal);
+     if(/\b(?:duck|ducking|audio\s*ducking)\b/i.test(job.instructions)&&!(output.decisions||[]).some(d=>d.op==='setAudioDucking')){
+      output.decisions=[...(output.decisions||[]),{op:'setAudioDucking',enabled:true}];
+      output.summary=(output.summary?output.summary+' ':'')+'Enabled background music auto-ducking under speech.';
+     }
+     const footageClips=analysisFootage(project,job.selection);
+     const hasTransitions=(output.decisions||[]).some(d=>d.op==='addTransition');
+     if(footageClips.length<=1&&!hasTransitions&&!output.decisions?.length){
+      return {
+       ...output,
+       summary:output.summary||'Preserved continuous footage without artificial transitions.',
+       skipRationale:output.skipRationale||'Single continuous uncut clip',
+       decisions:[{op:'setAudioDucking',enabled:true}]
+      };
+     }
+     return output;
+    } catch (err) {
+     if(signal.aborted)throw err;
+     const notice: PipelineDegradationNotice = {
+      stage: 'applyEffects',
+      status: 'skipped',
+      reason: 'Effects: ' + (err instanceof Error ? err.message : 'effects planning failed'),
+      suggestedAction: 'Review footage properties or retry stage.',
+      timestamp: Date.now()
+     };
+     return {
+      summary: 'Effects skipped; preserved original footage.',
+      decisions: [{op:'setAudioDucking',enabled:true}],
+      skipRationale: 'Effects skipped: ' + (err instanceof Error ? err.message : 'effects planning failed'),
+      degradationNotices: [notice]
+     };
+    }
+   }
+   case 'applySoundEffects':{
+    try{
+     const output=saved||await plan(stage,project,job,signal);await checkpoint(output);
+     if(!output.decisions?.length&&!output.requests?.length){
+      const sfxPlan = createAutoSfxDecisions(project);
+      if (sfxPlan.decisions.length > 0) {
+       return {
+        ...output,
+        summary: `Automatically inserted ${sfxPlan.suggestions.length} subtle contextual sound effects (whoosh on cuts/transitions, pop on graphics, riser before climaxes).`,
+        decisions: sfxPlan.decisions,
+        assets: sfxPlan.assets,
+       };
+      }
+      const notice: PipelineDegradationNotice = {
+       stage: 'applySoundEffects',
+       status: 'skipped',
+       reason: 'Sound Effects: No sound effects planned.',
+       suggestedAction: 'Check SFX audio availability in project assets.',
+       timestamp: Date.now()
+      };
+      return {
+       ...output,
+       summary:output.summary||'No sound effects needed; preserved original audio.',
+       decisions:[],
+       skipRationale:output.skipRationale||'No SFX planned',
+       degradationNotices: [...(output.degradationNotices || []), notice]
+      };
+     }
+     const ready=await prepare(output,project,checkpoint,signal);
+     ready.decisions=ready.decisions?.map(d=>d.op==='addClip'?{...d,audioRole:'sfx',volume:Math.min(.25,d.volume??.15)}:d);
+     if(!ready.decisions?.length){
+      const notice: PipelineDegradationNotice = {
+       stage: 'applySoundEffects',
+       status: 'skipped',
+       reason: 'Sound Effects: No sound effects found or prepared; preserved original audio.',
+       suggestedAction: 'Check SFX audio availability in project assets.',
+       timestamp: Date.now()
+      };
+      return {
+       ...ready,
+       summary:'No sound effects found; preserved original audio.',
+       decisions:[],
+       skipRationale:'No SFX prepared',
+       degradationNotices: [...(ready.degradationNotices || []), notice]
+      };
+     }
+     return ready;
+    }catch(err){
+     if(signal.aborted)throw err;
+     const notice: PipelineDegradationNotice = {
+      stage: 'applySoundEffects',
+      status: 'skipped',
+      reason: 'Sound Effects: ' + (err instanceof Error ? err.message : 'tool failed'),
+      suggestedAction: 'Check SFX audio availability in project assets.',
+      timestamp: Date.now()
+     };
+     return {
+      summary:'Sound effects were unavailable or skipped; preserved original audio and moving to next step.',
+      decisions:[],
+      skipRationale:'SFX unavailable: '+(err instanceof Error?err.message:'tool failed'),
+      degradationNotices: [notice]
+     };
     }
    }
    case 'validateEdit':{
     const result=validateCompletedJob(project,job);
+    const validatedProject = result.project || project;
     // Exercise the same compositor used by preview and offline MP4 export at edited timestamps.
-    await loadEditorStudioFonts(project);await document.fonts.ready;
+    await loadEditorStudioFonts(validatedProject);await document.fonts.ready;
     let decodeError:Error|undefined;
     const compositor=new Compositor(repository,error=>{decodeError=error;}),canvas=document.createElement('canvas');canvas.width=360;canvas.height=640;
     try{
-     const times=[...new Set(job.stages.flatMap(s=>(s.output?.evidence||[]).flatMap(e=>{const c=project.clips[e.clipId];return c?[c.startTime+Math.min(c.duration/2,.6)]:[];})))];
+     const times=[...new Set(job.stages.flatMap(s=>(s.output?.evidence||[]).flatMap(e=>{const c=validatedProject.clips[e.clipId];return c?[c.startTime+Math.min(c.duration/2,.6)]:[];})))];
      for(const time of times){
-      const deadline=Date.now()+20000;while(!compositor.sync(project,time,false)){signal.throwIfAborted();if(decodeError)throw decodeError;if(Date.now()>deadline)throw Error('Edited media could not be decoded for preview. Retry or relink the asset.');await new Promise(resolve=>setTimeout(resolve,40));}
-      compositor.render(canvas,project,time);
+      const deadline=Date.now()+20000;while(!compositor.sync(validatedProject,time,false)){signal.throwIfAborted();if(decodeError)throw decodeError;if(Date.now()>deadline)throw Error('Edited media could not be decoded for preview. Retry or relink the asset.');await new Promise(resolve=>setTimeout(resolve,40));}
+      compositor.render(canvas,validatedProject,time);
      }
     }finally{compositor.dispose();}
     return result;

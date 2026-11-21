@@ -61,6 +61,7 @@ scratch/
 !/docs/reference-presets.md
 !/docs/video-editor.md
 !/docs/google-sign-in.md
+!/docs/CAPCUT_EDITOR_SPECIFICATION.md
 /supabase/.temp/
 /audit-check.json
 /lint-results.json

@@ -5,7 +5,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {createRequire} from 'node:module';
 const root=process.cwd(),require=createRequire(path.join(root,'package.json')),ts=require('typescript');
-function loader(mocks={}){mocks={"../editor/exportAllowance":{withExportAllowance:async(_o,_s,render)=>render(),getUsageStatus:async()=>({maxResolution:720})},...mocks};const cache=new Map();function load(file){const full=path.resolve(root,file.endsWith('.ts')?file:file+'.ts');if(cache.has(full))return cache.get(full);const module={exports:{}};cache.set(full,module.exports);const code=ts.transpileModule(fs.readFileSync(full,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const localRequire=specifier=>mocks[specifier]||(specifier.startsWith('.')?load(path.resolve(path.dirname(full),specifier)):require(specifier));new vm.Script(`(function(require,module,exports){${code}\n})`).runInThisContext()(localRequire,module,module.exports);cache.set(full,module.exports);return module.exports;}return load;}
+function loader(mocks={}){mocks={"../editor/exportAllowance":{withExportAllowance:async(_o,_s,render)=>render(),getUsageStatus:async()=>({maxResolution:720})},...mocks};const cache=new Map();function load(file){const full=path.resolve(root,file.endsWith('.ts')?file:file+'.ts');if(cache.has(full))return cache.get(full);const mod={exports:{}};cache.set(full,mod.exports);const code=ts.transpileModule(fs.readFileSync(full,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const localRequire=specifier=>mocks[specifier]||(specifier.startsWith('.')?load(path.resolve(path.dirname(full),specifier)):require(specifier));new vm.Script(`(function(require,module,exports){${code}\n})`).runInThisContext()(localRequire,mod,mod.exports);cache.set(full,mod.exports);return mod.exports;}return load;}
 const load=loader(),{drawCaptions}=load('app/lib/captions/canvasCaptions'),{DEFAULT_CAPTION_TEMPLATES}=load('app/lib/captions/templates');
 function canvas(){const words=[];return {words,ctx:{measureText:text=>({width:text.length*12}),save(){},restore(){},translate(){},scale(){},fillRect(){},strokeText(){},fillText(text){words.push(text);},clearRect(){},drawImage(){}}};}
 const captions=[{id:'s',text:'Hello world',start:0,end:1,words:[{word:'Hello',start:0,end:.5},{word:'world',start:.5,end:1}]}];
@@ -13,8 +13,8 @@ test('captions never burn outside their active interval',()=>{const c=canvas();d
 test('every selectable caption template draws readable content at different video ratios',()=>{for(const template of DEFAULT_CAPTION_TEMPLATES){for(const [w,h] of [[720,1280],[1280,720],[720,720]]){const c=canvas();drawCaptions(c.ctx,captions,template.style,.3,w,h);assert.ok(c.words.some(word=>word.length),template.id);}}});
 test('edited captions without word timestamps are displayed and timed',()=>{const c=canvas();drawCaptions(c.ctx,[{...captions[0],text:'Updated text',words:[]}],DEFAULT_CAPTION_TEMPLATES[0].style,.3,720,1280);assert.ok(c.words.some(word=>/updated/i.test(word)));});
 function fixture(duration=1,audio=true){
- const frames=[],audioCalls=[],draws=[],state={cancelled:false,disposed:false};let current;
- class Input{constructor(){current=this;}async getPrimaryVideoTrack(){return {canDecode:async()=>true,computeDuration:async()=>duration,displayWidth:1280,displayHeight:720};}async getPrimaryAudioTrack(){return audio?{canDecode:async()=>true}:null;}dispose(){state.disposed=true;}}
+ const frames=[],audioCalls=[],draws=[],state={cancelled:false,disposed:false,current:null};
+ class Input{constructor(){state.current=this;}async getPrimaryVideoTrack(){return {canDecode:async()=>true,computeDuration:async()=>duration,displayWidth:1280,displayHeight:720};}async getPrimaryAudioTrack(){return audio?{canDecode:async()=>true}:null;}dispose(){state.disposed=true;}}
  class CanvasSink{async *canvasesAtTimestamps(times){for(const t of times)yield {canvas:{timestamp:t}};}}
  class AudioBufferSink{async *buffers(){yield {timestamp:.1,buffer:{duration:.9}};}}
  class Output{constructor({target,format}){this.target=target;state.format=format.constructor.name;}addVideoTrack(){}addAudioTrack(){}async start(){}async finalize(){this.target.buffer=new Uint8Array([1,2,3]).buffer;}async cancel(){state.cancelled=true;}}
@@ -23,7 +23,7 @@ function fixture(duration=1,audio=true){
  class OfflineAudioContext{constructor() {this.destination={};}createBufferSource(){return {connect(){},start(...args){audioCalls.push(args);}};}async startRendering(){return {};}}
  const mocks={mediabunny:{Input,BlobSource:class{},ALL_FORMATS:[],CanvasSink,AudioBufferSink,Output,WebMOutputFormat:class WebMOutputFormat{},Mp4OutputFormat:class Mp4OutputFormat{},BufferTarget:class{},CanvasSource,AudioBufferSource,Quality:class{},canEncodeVideo:async()=>true,canEncodeAudio:async()=>true},'../editor/offlineExport':{frameSchedule:(d,f)=>Array.from({length:Math.ceil(d*f)},(_,i)=>({time:i/f,duration:Math.min(1/f,d-i/f)}))},'./canvasCaptions':{drawCaptions:(_ctx,_segments,_style,time)=>draws.push(time)}};
  const exportVideo=loader(mocks)('app/lib/captions/videoExport').exportCaptionedVideo;
- return {exportVideo,frames,audioCalls,draws,state,OfflineAudioContext,current};
+ return {exportVideo,frames,audioCalls,draws,state,OfflineAudioContext,get current(){return state.current;}};
 }
 test('caption-only export encodes every frame and preserves source audio offsets',async()=>{
  const f=fixture();globalThis.document={fonts:{load:async()=>{},ready:Promise.resolve()},createElement:()=>({getContext:()=>canvas().ctx})};globalThis.OfflineAudioContext=f.OfflineAudioContext;

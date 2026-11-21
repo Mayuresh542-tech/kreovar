@@ -1,8 +1,19 @@
 const MAX_BYTES = 100 * 1024 * 1024;
-const STOCK_HOSTS = new Set(["videos.pexels.com", "images.pexels.com", "images.unsplash.com", "image.pollinations.ai", "cdn.freesound.org"]);
+const STOCK_HOSTS = new Set([
+  "videos.pexels.com",
+  "images.pexels.com",
+  "images.unsplash.com",
+  "image.pollinations.ai",
+  "cdn.freesound.org",
+  "interactive-examples.mdn.mozilla.net",
+  "www.w3schools.com",
+  "raw.githubusercontent.com",
+  "archive.org"
+]);
 export function trustedRenderMediaUrl(value: string): URL {
   const url = new URL(value);
   if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) throw new Error("Unsupported render media URL.");
+  if (/%(?:2e|2f|5c)/i.test(value) || value.includes("..")) throw new Error("Unsupported render media URL.");
   const configured = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const ownStorage = configured && url.origin === new URL(configured).origin && /^\/storage\/v1\/object\/(?:public|sign)\/(?:videos|voiceovers|images|editor-media)\//.test(url.pathname);
   if (!STOCK_HOSTS.has(url.hostname) && !ownStorage) throw new Error("Use imported media or supported stock media for server rendering.");

@@ -23,7 +23,7 @@ export type EditDecision =
   | {op:'animate';clipId:string;preset:MotionPreset}
   | {op:'addGraphic';kind:GraphicKind;text:string;startTime:number;duration:number;accent?:string;motion?:MotionPreset}
   | {op:'addOverlay';assetId:string;trackId:string;startTime:number;duration:number;motion?:MotionPreset}
-  | {op:"addZoom";clipId:string;startTime:number;endTime:number;fromScale:number;toScale:number;returnToStart?:boolean;easing?:"linear"|"smooth";focusX?:number;focusY?:number}
+  | {op:"addZoom";clipId:string;startTime:number;endTime:number;fromScale:number;toScale:number;returnToStart?:boolean;easing?:"linear"|"smooth";focusX?:number;focusY?:number;style?:import('./zoom').ZoomStyle}
   | {op:"clearZooms";clipId:string}
   | {op:"rippleCut";ranges:CutRange[]}
   | {op:"applyTextPlacement";clipIds:string[];placementId:TextPlacementId}
@@ -43,7 +43,7 @@ export type EditDecision =
   | {op:"mergeCaptions";clipIds:string[]}
   | {op:"changeTrack";trackId:string;hidden?:boolean;muted?:boolean}
   | {op:"setAspectRatio";aspectRatio:Ratio}
-  | {op:"changeClipProperty";clipId:string;changes:Partial<Pick<Clip,"transform"|"volume"|"speed"|"fadeIn"|"fadeOut"|"effects"|"audioRole"|"ducking"|"surface">>};
+  | {op:"changeClipProperty";clipId:string;changes:Partial<Pick<Clip,"transform"|"volume"|"speed"|"preservePitch"|"fadeIn"|"fadeOut"|"effects"|"audioRole"|"ducking"|"surface"|"mediaAnimation"|"kenBurns">>};
 export interface EditDecisionList {version:1;projectId:string;baseRevision:number;decisions:EditDecision[];transcriptionId?:string}
 /** Validate against a revision and apply atomically in one EditorStore.execute transaction. */
 export function applyEditDecisionList(p:EditorProject,list:EditDecisionList):EditorProject {
@@ -58,7 +58,7 @@ export function applyEditDecisionList(p:EditorProject,list:EditDecisionList):Edi
       case'addShape':{const next=addShape(project,d.kind,d.startTime,d.duration,d.style,d.transform);if(!d.motion)return next;const id=Object.keys(next.clips).find(id=>!project.clips[id])!;return applyMotionPreset(next,id,d.motion);}
       case'addGraphic':return addMotionGraphic(project,d.kind,d.text,d.startTime,d.duration,d.accent,d.motion);
       case'addOverlay':return addAnimatedOverlay(project,d.assetId,d.trackId,d.startTime,d.duration,d.motion);
-      case"addZoom":return addZoom(project,d.clipId,d.startTime,d.endTime,d.fromScale,d.toScale,d.returnToStart,d.easing,d.focusX,d.focusY);
+      case"addZoom":return addZoom(project,d.clipId,d.startTime,d.endTime,d.fromScale,d.toScale,d.returnToStart,d.easing,d.focusX,d.focusY,d.style);
       case"clearZooms":return clearZooms(project,d.clipId);
       case"rippleCut":return rippleCut(project,d.ranges);
       case"applyTextPlacement":return applyTextPlacement(project,d.clipIds,d.placementId);

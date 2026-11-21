@@ -29,6 +29,10 @@
 .vx-editor .vx-media-animation-option:is(:hover,:focus-visible) [data-motion=float]>span,.vx-editor .vx-media-animation-option:is(:hover,:focus-visible) [data-motion=orbit]>span{animation-name:vx-ma-float}
 .vx-editor .vx-media-animation-option:is(:hover,:focus-visible) [data-motion=pulse]>span{animation-name:vx-ma-pulse}
 .vx-editor .vx-media-animation-option:is(:hover,:focus-visible) [data-motion=sway]>span{animation-name:vx-ma-sway}
+.vx-editor .vx-media-animation-option:is(:hover,:focus-visible) [data-motion=ken-burns-push]>span{animation-name:vx-ma-kb-push}
+.vx-editor .vx-media-animation-option:is(:hover,:focus-visible) [data-motion=ken-burns-pull]>span{animation-name:vx-ma-kb-pull}
+.vx-editor .vx-media-animation-option:is(:hover,:focus-visible) [data-motion=ken-burns-pan-left]>span{animation-name:vx-ma-kb-pan-left}
+.vx-editor .vx-media-animation-option:is(:hover,:focus-visible) [data-motion=ken-burns-pan-right]>span{animation-name:vx-ma-kb-pan-right}
 .vx-editor .vx-media-animation-duration{margin-top:14px}
 .vx-editor .vx-media-animation-duration>span{display:flex;align-items:center;justify-content:space-between}
 .vx-editor .vx-media-animation-duration output{font-variant-numeric:tabular-nums;color:#2563eb}
@@ -53,4 +57,8 @@
 @keyframes vx-ma-float{0%,100%{transform:none}50%{transform:translateY(-5px)}}
 @keyframes vx-ma-pulse{0%,100%{transform:none}50%{transform:scale(1.15)}}
 @keyframes vx-ma-sway{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
+@keyframes vx-ma-kb-push{0%{transform:scale(0.96)}100%{transform:scale(1.12)}}
+@keyframes vx-ma-kb-pull{0%{transform:scale(1.12)}100%{transform:scale(0.96)}}
+@keyframes vx-ma-kb-pan-left{0%{transform:translateX(5px)}100%{transform:translateX(-5px)}}
+@keyframes vx-ma-kb-pan-right{0%{transform:translateX(-5px)}100%{transform:translateX(5px)}}
 @media(prefers-reduced-motion:reduce){.vx-editor .vx-media-animation-option .vx-media-animation-demo>span{animation:none!important}.vx-editor .vx-media-animation-option{transition:none}}

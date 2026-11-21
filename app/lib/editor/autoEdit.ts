@@ -6,6 +6,7 @@ import {projectDuration,type EditorProject,type MediaAsset,type Clip} from './mo
 import {addAsset} from './operations';
 import {editorialBeats} from './editorialSense';
 import {AI_EDIT_STYLE_RECIPES} from '../captions/aiEditStyles';
+import {createAutoSfxDecisions} from './autoSfx';
 
 export const AUTO_EDIT_STYLES=[
  {id:'ai-choice',name:'Let AI choose',description:'Understand the clip, match captions and find supporting footage',templateId:'clean-sub',scale:1.08},
@@ -18,8 +19,9 @@ export const AUTO_EDIT_STYLES=[
 export interface AutoEditOptions {
  styleId:string;intensity:'subtle'|'balanced'|'punchy';captions:boolean;zooms:boolean;
  transitions:boolean;removeFillers:boolean;broll?:boolean;motionGraphics?:boolean;animateOverlays?:boolean;surfaces?:boolean;captionColor:string;musicAssetId:string;cutawayAssetId:string;
+ soundEffects?:boolean;audioDucking?:boolean;
 }
-export const DEFAULT_AUTO_EDIT:AutoEditOptions={styleId:'ai-choice',broll:true,intensity:'balanced',captions:true,zooms:true,transitions:false,removeFillers:false,motionGraphics:true,animateOverlays:true,surfaces:true,captionColor:'',musicAssetId:'',cutawayAssetId:''};
+export const DEFAULT_AUTO_EDIT:AutoEditOptions={styleId:'ai-choice',broll:true,intensity:'balanced',captions:true,zooms:true,transitions:false,removeFillers:false,motionGraphics:true,animateOverlays:true,surfaces:true,captionColor:'',musicAssetId:'',cutawayAssetId:'',soundEffects:false,audioDucking:false};
 export interface AutoCut {key:string;word:string;start:number;end:number}
 const overlaps=(a:Clip,b:Clip)=>a.startTime<b.startTime+b.duration-1e-6&&a.startTime+a.duration>b.startTime+1e-6;
 function styleFor(options:AutoEditOptions){const style=AUTO_EDIT_STYLES.find(s=>s.id===options.styleId);if(!style)throw Error('Choose an edit style.');if(!['subtle','balanced','punchy'].includes(options.intensity))throw Error('Choose an edit intensity.');if(options.captionColor&&!/^#[0-9a-f]{6}$/i.test(options.captionColor))throw Error('Choose a valid caption text color.');return style;}
@@ -114,9 +116,10 @@ export function finishAutoEditPlan(snapshot:EditorProject,baseList:EditDecisionL
    // Without a transcript, one opening zoom is based on clip timing, never inferred content.
    if(!beats.length){beats.push(c.startTime);notes.push(speech.length?'A single opening push-in is used where no emphasis cue was found.':'Opening zooms without word timing use clip timing, not scene detection.');}
    for(const beat of beats){
-    const start=Math.ceil((beat-1e-7)*fps)/fps,end=Math.floor((Math.min(start+(options.styleId==='cinema'?2.5:1.2),c.startTime+c.duration)+1e-7)*fps)/fps;
+    const hold=options.styleId==='cinema'?3.5:2.2;
+    const start=Math.ceil((beat-1e-7)*fps)/fps,end=Math.floor((Math.min(start+hold,c.startTime+c.duration)+1e-7)*fps)/fps;
     if(start-last<spacing||end-start<.5||total>=8)continue;
-    decisions.push({op:'addZoom',clipId:c.id,startTime:start,endTime:end,fromScale:1,toScale:scale,easing:'smooth',returnToStart:true,focusX:0,focusY:0});last=start;total++;
+    decisions.push({op:'addZoom',clipId:c.id,startTime:start,endTime:end,fromScale:1,toScale:scale,easing:'smooth',returnToStart:true,focusX:0,focusY:-0.14,style:'punch-in'});last=start;total++;
    }
   }
  }
@@ -147,12 +150,26 @@ export function finishAutoEditPlan(snapshot:EditorProject,baseList:EditDecisionL
   else decisions.push({op:'addClip',assetId:a.id,trackId:track.id,startTime:at,duration,volume:0});
   notes.push(cue?'Your chosen media is timed to a transcript cue. Relevance still comes from your media choice.':'Custom cutaway placement uses clip timing. Relevance comes from your media choice.');
  }
+ if(options.audioDucking&&!decisions.some(d=>d.op==='setAudioDucking')){
+  decisions.push({op:'setAudioDucking',enabled:true});
+  notes.push('Background music auto-ducking enabled with smooth envelopes.');
+ }
+ let targetProject=staged;
+ if(options.soundEffects){
+  const sfxPlan=createAutoSfxDecisions(staged,{intensity:options.intensity});
+  for(const a of sfxPlan.assets){
+   assets.push(a);
+   targetProject=addAsset(targetProject,a);
+  }
+  for(const d of sfxPlan.decisions)decisions.push(d);
+  if(sfxPlan.suggestions.length)notes.push(`Added ${sfxPlan.suggestions.length} subtle contextual sound effects.`);
+ }
  const candidates=options.removeFillers?autoEditCutCandidates(staged,selection):[];
  const ranges=candidates.filter(c=>approvedCuts.has(c.key)).map(({start,end})=>({start,end}));
  if(ranges.length)decisions.push({op:'rippleCut',ranges});
  if(options.removeFillers&&!candidates.length)notes.push('No safe, timed hesitation words found. No silence or speech was guessed.');
- const validated=validateAiPlan({summary:`${style.name} · ${options.intensity}`,decisions},staged);
- const reviewed=applyEditDecisionList(staged,validated.list);
+ const validated=validateAiPlan({summary:`${style.name} · ${options.intensity}`,decisions},targetProject);
+ const reviewed=applyEditDecisionList(targetProject,validated.list);
  if(prefix.length+decisions.length>100)throw Error('This edit has too many steps. Select fewer clips.');
  return {reviewed,candidates,notes:[...new Set(notes)],prepared:{assets,list:listFor(snapshot,[...prefix,...validated.list.decisions])}};
 }

@@ -23,29 +23,54 @@ import {
 
 const REQUIREMENT_CATEGORIES = [
   {
-    category: "Viral Hooks & Interrupts",
+    category: "Gaming & Esports",
+    icon: "🎮",
+    queries: ["Esports arena", "Pro gamer controller", "Streamer battlestation", "Retro arcade neon"],
+  },
+  {
+    category: "Memes & Reactions",
+    icon: "😂",
+    queries: ["Shocked reaction zoom", "Facepalm disappointment", "Mind blown brain explosion", "Awkward silence blink"],
+  },
+  {
+    category: "Productivity & Focus",
     icon: "⚡",
-    queries: ["Shocked reaction", "Money falling cash", "Fast zoom explosion", "Broken glass crash"],
+    queries: ["Deep work typing", "Daily planner calendar", "Morning coffee desk", "Pomodoro timer focus"],
+  },
+  {
+    category: "Finance & Wealth",
+    icon: "📈",
+    queries: ["Stock market chart", "Crypto bitcoin trading", "Counting cash dollars", "Bank vault door"],
   },
   {
     category: "AI & Technology",
     icon: "💻",
-    queries: ["Hacker coding terminal", "Artificial intelligence neural", "Futuristic neon city", "Cyberpunk data"],
+    queries: ["Matrix code rain", "Terminal command line", "AI neural network", "Datacenter server racks"],
   },
   {
-    category: "Finance & Crypto",
-    icon: "📈",
-    queries: ["Stock market crash red", "Crypto trading chart", "Luxury sports car", "Gold vault wealth"],
+    category: "Fitness & Health",
+    icon: "🏋️",
+    queries: ["Barbell deadlift gym", "Athlete running sunrise", "Dumbbell curls workout", "Heavy punching bag"],
   },
   {
-    category: "Creator & Lifestyle",
+    category: "Podcast & Audio",
     icon: "🎙️",
-    queries: ["Podcast studio microphone", "Aesthetic coffee desk", "Modern office meeting", "Fitness training gym"],
+    queries: ["Broadcast microphone", "Sound engineer headphones", "Audio waveform meters", "Interview two-shot"],
+  },
+  {
+    category: "Luxury & Lifestyle",
+    icon: "✨",
+    queries: ["Exotic supercar highway", "Penthouse city skyline", "Luxury watch macro", "Champagne crystal pouring"],
+  },
+  {
+    category: "Education & Science",
+    icon: "🎓",
+    queries: ["University lecture hall", "Chalkboard math formula", "Microscope biology lab", "Library books pages"],
   },
   {
     category: "Cinematic Drone & Travel",
-    icon: "🌆",
-    queries: ["Drone skyline sunset", "Moody mountain fog", "Highway traffic neon", "Ocean waves aerial"],
+    icon: "✈️",
+    queries: ["Mountain drone aerial", "Tropical beach turquoise", "Airplane sunset clouds", "Desert sand dunes"],
   },
 ];
 
@@ -188,8 +213,30 @@ export default function BRollPage() {
               </div>
             </form>
 
+            {/* 10 Niches Browser Pills */}
+            <div className="mt-4 flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
+              <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider mr-1 shrink-0">
+                10 Niches:
+              </span>
+              {REQUIREMENT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.category}
+                  type="button"
+                  onClick={() => {
+                    const firstQuery = cat.queries[0];
+                    setRequirementQuery(firstQuery);
+                    fetchBRoll(firstQuery, orientation);
+                  }}
+                  className="px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                >
+                  <span>{cat.icon}</span>
+                  <span>{cat.category.split(" ")[0]}</span>
+                </button>
+              ))}
+            </div>
+
             {/* Quick Requirement Chips */}
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider mr-1">
                 Suggested:
               </span>

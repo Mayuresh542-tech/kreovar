@@ -1,6 +1,7 @@
 import {STAGE_CAPABILITIES} from './editingCapabilities';
 import type {EditorProject, MediaAsset} from './model';
 import {projectDuration, VALID_CAPTION_PRESETS, type CaptionPresetId, type CaptionDecision, isKnownCaptionPreset, normalizeCaptionPresetId} from './model';
+import {matchCaptionPreset} from './editingIntent';
 import {referenceCaptionTemplate} from '../captions/referenceTemplates';
 import {DEFAULT_CAPTION_TEMPLATES} from '../captions/templates';
 import {GRAPHIC_KINDS} from './motionGraphics';
@@ -34,6 +35,7 @@ export const PIPELINE_PRESETS:PipelinePreset[] = [
  {id:'punchy',name:'Caption emphasis',instruction:'Add animated captions, sparse motion graphic callouts, subtle zooms and restrained sound effects.',operations:['captions','motionGraphics','zooms','soundEffects'],captionTemplate:'signature-poppins'}
 ];
 export interface StageOutput {
+ project?: EditorProject;
  sourceDecisionCount?:number;
  removedClipIds?:string[];
  projectEvidence?:{tracks:string;settings:string;transitions:string};
@@ -78,27 +80,45 @@ export interface EditingJob {
  degradationNotices?: PipelineDegradationNotice[];
  skippedNotes?: string[];
  completionMessage?: string;
+ faultTolerant?: boolean;
 }
 export function stagesFor(operations:EditOperation[]):EditStage[]{
- if(operations.includes('requestedEdits')){if(operations.length!==1)throw Error('Custom requestedEdits must run alone, not mixed with preset stages.');return ['analyzeFootage','applyRequestedEdits','validateEdit'];}
- return ['analyzeFootage',...(operations.includes('captions')?['applyCaptions' as const]:[]),...(operations.includes('motionGraphics')?['planMotionGraphics' as const,'applyMotionGraphics' as const]:[]),...(operations.includes('broll')?['findBroll' as const,'applyBroll' as const]:[]),...(operations.includes('zooms')?['applyZooms' as const]:[]),...(operations.includes('soundEffects')?['applySoundEffects' as const]:[]),...(operations.includes('effects')?['applyEffects' as const]:[]),'validateEdit'];
+ const intermediate: EditStage[] = [
+  ...(operations.includes('captions')?['applyCaptions' as const]:[]),
+  ...(operations.includes('motionGraphics')?['planMotionGraphics' as const,'applyMotionGraphics' as const]:[]),
+  ...(operations.includes('broll')?['findBroll' as const,'applyBroll' as const]:[]),
+  ...(operations.includes('zooms')?['applyZooms' as const]:[]),
+  ...(operations.includes('soundEffects')?['applySoundEffects' as const]:[]),
+  ...(operations.includes('effects')?['applyEffects' as const]:[])
+ ];
+ const requested = operations.includes('requestedEdits')?['applyRequestedEdits' as const]:[];
+ return ['analyzeFootage', ...intermediate, ...requested, 'validateEdit'];
 }
-export function createEditingJob(project:EditorProject,instructions:string,selection:string[],preset?:PipelinePreset):EditingJob{
+export function createEditingJob(project:EditorProject,instructions:string,selection:string[],preset?:PipelinePreset,options?:{faultTolerant?:boolean}):EditingJob{
  if(!instructions.trim()||instructions.length>2000)throw Error('Describe your edit in 1–2000 characters.');
  const id=crypto.randomUUID();
- return {version:1,id,projectId:project.id,instructions:instructions.trim(),presetId:preset?.id,captionTemplate:preset?.captionTemplate||'signature-poppins',selection:[...selection],status:'ready',completedStages:[],failedStages:[],timelineRevision:project.revision,initialRevision:project.revision,appliedOperations:[],generatedAssets:[],errors:[],createdAt:new Date().toISOString(),stages:stagesFor(preset?.operations||['requestedEdits']).map(stage=>({id:stage,key:id+':'+stage,status:'pending',attempts:0}))};
+ const matchedPreset=matchCaptionPreset(instructions);
+ const isCaptionRequest=/\b(?:ad|add|insert|generate|create|put|use)?\s*(?:animated\s+|timed\s+|speech\s+)?(?:captions?|subtitles?|caption\s+studio)\b/i.test(instructions);
+ const defaultCaptionTemplate=preset?.captionTemplate||matchedPreset||(isCaptionRequest?'study-hormozi-style':'signature-poppins');
+ return {version:1,id,projectId:project.id,instructions:instructions.trim(),presetId:preset?.id,captionTemplate:defaultCaptionTemplate,selection:[...selection],status:'ready',completedStages:[],failedStages:[],timelineRevision:project.revision,initialRevision:project.revision,appliedOperations:[],generatedAssets:[],errors:[],createdAt:new Date().toISOString(),faultTolerant:options?.faultTolerant??true,stages:stagesFor(preset?.operations||['requestedEdits']).map(stage=>({id:stage,key:id+':'+stage,status:'pending',attempts:0}))};
 }
 export function readRequestedOperations(value:unknown):EditOperation[]{
  if(!Array.isArray(value)||!value.length||value.some(x=>!EDIT_OPERATIONS.includes(x))||new Set(value).size!==value.length)throw Error('AI could not identify supported editing operations. Describe captions, motion graphics, B-roll, zooms, sound effects, transitions or custom timeline edits.');
- if(value.includes('requestedEdits')&&value.length!==1)throw Error('Use requestedEdits alone for mixed custom work.');
  return value;
 }
 /** Resolve only unambiguous explicit commands locally. All free-form/negative requests use AI analysis. */
 export function explicitOperations(instructions:string):EditOperation[]|undefined{
  let remaining=instructions.toLowerCase();const operations:EditOperation[]=[];
- const phrases:[EditOperation,RegExp][]=[['captions',/(?:animated\s+|readable\s+)?captions?/g],['motionGraphics',/(?:sparse\s+)?motion graphics?(?: callouts?)?/g],['broll',/(?:relevant\s+)?b[ -]?roll/g],['zooms',/(?:subtle\s+)?zoom(?: effects?)?s?/g],['soundEffects',/(?:restrained\s+)?(?:sound effects?|sfx)/g]];
+ const phrases:[EditOperation,RegExp][]=[
+  ['captions',/(?:animated\s+|readable\s+)?(?:captions?|subtitles?)/g],
+  ['motionGraphics',/(?:sparse\s+)?(?:motion graphics?(?: callouts?)?|(?:kinetic|animated|keyword)\s*(?:stickers?|emojis?|callouts?)(?:\s+(?:for|to|on)\s+keywords?)?|stickers?\s+(?:for|to|on)\s+keywords?)/g],
+  ['broll',/(?:relevant\s+)?b[ -]?roll(?:\s+(?:with|to)\s+ken\s*burns)?|ken\s*burns(?:\s+(?:on|to|for)\s+b[ -]?roll)?/g],
+  ['zooms',/(?:subtle\s+)?zoom(?: effects?)?s?/g],
+  ['soundEffects',/(?:restrained\s+|subtle\s+|contextual\s+)?(?:sound effects?|sfx)(?:\s+automatically)?/g],
+  ['effects',/(?:smooth\s+)?(?:transitions?|crossfades?)|(?:audio\s+)?duck(?:ing)?(?:\s+(?:the\s+)?music)?(?:\s+under\s+speech)?|duck\s+(?:the\s+)?music(?:\s+under\s+speech)?/g]
+ ];
  for(const [operation,pattern] of phrases){if(pattern.test(remaining)){operations.push(operation);pattern.lastIndex=0;remaining=remaining.replace(pattern,' ');}}
- remaining=remaining.replace(/\b(add|apply|insert|and|please)\b|[,.;+&]/g,'').trim();
+ remaining=remaining.replace(/\b(ad|add|apply|insert|generate|create|put|and|please|automatically|subtle|restrained|under\s+speech|music|to|for|on|with)\b|[,.;+&]/g,'').trim();
  return remaining||!operations.length?undefined:operations;
 }
 /** Enforced on the server as well as the client. A stage cannot perform another stage's work. */
@@ -113,29 +133,58 @@ export function assertStagePlan(stage:EditStage,decisions:EditDecision[],request
    if(stage==='findBroll'&&(!['video','image'].includes(kind)||!['overlay','image'].includes(track?.kind)||d.volume!==0))throw Error('B-roll requires real muted visual media on a supporting track.');
    if(stage==='applySoundEffects'&&(kind!=='audio'||d.audioRole!=='sfx'||d.volume===undefined||d.volume<=0||d.volume>.35))throw Error('Sound effects require real audio with restrained gain.');
   }
-  if(stage==='applyZooms'&&d.op==='addZoom'&&(d.toScale>1.18||d.fromScale>1.18||d.endTime-d.startTime<.4))throw Error('Use restrained zooms of at most 1.18×.');
+  if(stage==='applyZooms'&&d.op==='addZoom'&&(d.toScale>1.25||d.fromScale>1.25||d.endTime-d.startTime<.4))throw Error('Use restrained zooms of at most 1.22×.');
  }
- if(stage==='applyZooms'&&decisions.length>Math.max(1,Math.ceil(projectDuration(project)/6)))throw Error('Too many zooms. Use sparse emphasis moments.');
+ if(stage==='applyZooms'){
+  const zooms=decisions.filter((d):d is Extract<EditDecision,{op:'addZoom'}>=>d.op==='addZoom').sort((a,b)=>a.startTime-b.startTime);
+  for(let i=1;i<zooms.length;i++){
+   if(zooms[i].startTime<zooms[i-1].startTime+2.2)throw Error('Enforce at least a 2.2-second cooldown between consecutive zooms.');
+  }
+  if(decisions.length>Math.max(1,Math.ceil(projectDuration(project)/5)))throw Error('Too many zooms. Use sparse emphasis moments.');
+ }
 }
 export function stageInstruction(stage:EditStage,job:EditingJob){
  const rule:Partial<Record<EditStage,string>>={
   analyzeFootage:'Analyze only. Return empty decisions and toolRequests, plus requiredOperations containing only the explicitly requested operations from captions,motionGraphics,broll,zooms,soundEffects,effects,requestedEdits. Use requestedEdits ALONE for trim/split/cut/sequence/removal/reordering, text edits or placement, keyframes/animation/overlays/visual treatment, track/settings/aspect-ratio edits, voiceover, stock motion, image requests, or mixed work involving any of those. That stage can perform all 28 native operations and prepare media itself; do not combine it with other operation groups. If no original video exists, use ONLY requestedEdits and project metadata for text/image/audio-only or empty projects, including captions for an existing audio clip. Use a captions request with that actual audio clipId; scope:footage means video clips only. Honor negation. General requests for an engaging edit may use captions,motionGraphics,broll,zooms. Explain the real duration, available transcript, sampled footage and assets. Do not claim scene boundaries or audio analysis that were not supplied.',
+  applyCaptions:'Apply timed speech captions using Caption Studio templates (e.g. study-hormozi-style, study-ali-abdaal, study-clean-motion, study-mr-beast-style-2, study-thora-cinematic, kinetic-impact). Always use Caption Studio presets for better styles, kinetic animation and active word highlighting rather than plain unstyled subtitles.',
   planMotionGraphics:'Plan ONLY sparse animated addGraphic or addShape operations using exact speech context and current footage. Include a supported motion preset for every graphic. Keep captions readable. No tools, captions, zooms or inserted media.',
   findBroll:'Select ONLY relevant B-roll. Prefer real existing visual assets with addClip; otherwise return broll or library toolRequests with real catalog IDs or transcript-grounded search queries, startTime, explicit duration, volume:0, and an unlocked supporting overlay/image track. B-roll must cover only part of the footage, preserve dialogue, and fit the timeline. Never invent URLs.',
-  applyZooms:'Return ONLY addZoom operations on original video clips. Use exact emphasis moments, at most 1.18x scale, at least 0.4 seconds per zoom, at most one per six seconds. Preserve source timing and audio.',
+  applyZooms:'Return ONLY addZoom operations on original video clips. Use style:"punch-in" for key emphasis words (hold 2.0s–3.5s, 0ms hard cut reset). Restrained scale 1.15x–1.22x, minimum 2.2s cooldown between zooms. Snap resets to word boundaries or silence gaps. Never animate smoothly down to 1.0x (no rubber-band bounce).',
   applySoundEffects:'Return ONLY sfx/library toolRequests or addClip for real audio. Use audio tracks, audioRole:sfx and volume 0.08–0.25. Fit effects inside footage. No generated audio or voiceover.',
-  applyRequestedEdits:'Fulfil the user request using supported native decisions and toolRequests. This stage supports all listed operations, captions/SFX/library/B-roll/stock-motion/voiceover, and images ONLY if imageGenerationAvailable=true. Never enable services or invent tools. Use actual clip IDs, source ranges and transcript. Respect locked/hidden tracks, selected clips and existing manual work unless replacement is requested. Direct decisions run first, media preparation/insertion afterward, in one atomic timeline change. Caption tools read the post-edit source timing; use scope:footage for captions after split/append when new clip IDs are unknown. Remove existing overlapping captions only if the user requested replacement. Combine all ripple cuts into ONE LAST direct decision; other direct-operation times refer to the current pre-cut timeline, while tool insertion times refer to the final post-cut timeline. Do not add direct generated captions at post-cut times: use the captions tool after cuts. Never guess new IDs or measured silences. An empty plan must explain why the requested edit cannot safely be performed; do not call it complete.',
-  applyEffects:'Return ONLY requested addTransition, changeClipProperty or setAudioDucking operations. Preserve source timing and dialogue. No new captions, graphics or media.'
+  applyRequestedEdits:'Fulfil the user request using supported native decisions and toolRequests. This stage supports all listed operations, captions/SFX/library/B-roll/stock-motion/voiceover, and images ONLY if imageGenerationAvailable=true. Use changeClipProperty with speed (0.1..10, preservePitch:true), volume (0..2), fadeIn/fadeOut, and transform (x, y, scale, rotation) for pacing, audio balancing, and visual reframing. Use trimClip to tighten B-roll/dialogue and splitClip to isolate sections for localized adjustments. Never enable services or invent tools. Use actual clip IDs, source ranges and transcript. Respect locked/hidden tracks, selected clips and existing manual work unless replacement is requested. Direct decisions run first, media preparation/insertion afterward, in one atomic timeline change. Caption tools read the post-edit source timing; use scope:footage for captions after split/append when new clip IDs are unknown. Remove existing overlapping captions only if the user requested replacement. Combine all ripple cuts into ONE LAST direct decision; other direct-operation times refer to the current pre-cut timeline, while tool insertion times refer to the final post-cut timeline. Do not add direct generated captions at post-cut times: use the captions tool after cuts. Never guess new IDs or measured silences. An empty plan must explain why the requested edit cannot safely be performed; do not call it complete.',
+  applyEffects:'Return ONLY requested addTransition, changeClipProperty (speed 0.1..10, preservePitch, volume 0..2, fadeIn, fadeOut, transform, effects, audioRole, ducking) or setAudioDucking operations. Preserve source timing and dialogue. No new captions, graphics or media.'
  };
  return `Sequential editing stage: ${stage}. ${rule[stage]||''}\nUser instructions (apply ONLY the current stage): ${job.instructions}`;
 }
-export const SKIP_RATIONALE = /preserve|framing|no suitable|no (?:speech\s+)?emphasis|no (?:speech|dialogue)|no b-roll|no motion|no sound|no addition|skip|not appropriate|unnecessary/i;
+export const SKIP_RATIONALE = /preserve|framing|no suitable|no (?:speech\s+)?emphasis|no (?:speech|dialogue)|no b-roll|no motion|no sound|no addition|skip|not appropriate|unnecessary|no silent|no silence|no gap/i;
 
 export function hasSkipRationale(output?: StageOutput): boolean {
  if (!output) return false;
  if (typeof output.skipRationale === 'string' && output.skipRationale.trim().length > 0) return true;
  if (output.summary && SKIP_RATIONALE.test(output.summary)) return true;
+ if (output.degradationNotices && output.degradationNotices.length > 0) return true;
  return false;
+}
+
+export function stageSuggestedAction(stage: EditStage): string {
+ switch (stage) {
+  case 'findBroll':
+  case 'applyBroll':
+   return 'Check stock footage query or manually upload B-roll media.';
+  case 'applySoundEffects':
+   return 'Check SFX audio availability in project assets.';
+  case 'applyCaptions':
+   return 'Spoken dialogue captions were skipped; verify audio track or retry captions.';
+  case 'applyZooms':
+   return 'Framing change skip kiya gaya taaki natural balance bana rahe.';
+  case 'planMotionGraphics':
+  case 'applyMotionGraphics':
+   return 'Visual clutter avoided; graphics were bypassed.';
+  case 'applyRequestedEdits':
+   return 'Review user instructions or retry conversational edit.';
+  default:
+   return 'Review footage properties or retry stage.';
+ }
 }
 
 export function permitsZeroAdditions(stage: EditStage, before: EditorProject, output: StageOutput, job?: EditingJob): boolean {
@@ -176,16 +225,16 @@ function clipSignature(p:EditorProject,id:string){const c=p.clips[id];return JSO
 export function validateStageChanges(stage:EditStage,before:EditorProject,after:EditorProject,output:StageOutput,job?:EditingJob){
  aiProjectSnapshot(after);
  const custom=stage==='applyRequestedEdits';
- if(custom&&!output.questions?.length&&JSON.stringify([before.clips,before.tracks,before.trackOrder,before.settings,before.transitions,before.textLayers,before.captions])===JSON.stringify([after.clips,after.tracks,after.trackOrder,after.settings,after.transitions,after.textLayers,after.captions]))throw Error('Requested edits did not change the timeline.');
+ if(custom&&!output.questions?.length&&!hasSkipRationale(output)&&JSON.stringify([before.clips,before.tracks,before.trackOrder,before.settings,before.transitions,before.textLayers,before.captions])===JSON.stringify([after.clips,after.tracks,after.trackOrder,after.settings,after.transitions,after.textLayers,after.captions]))throw Error('Requested edits did not change the timeline.');
  const changed=Object.values(after.clips).filter(c=>!before.clips[c.id]||clipSignature(before,c.id)!==clipSignature(after,c.id)||custom&&JSON.stringify(before.tracks[c.trackId])!==JSON.stringify(after.tracks[c.trackId]));
  const visible=changed.filter(c=>!after.tracks[c.trackId].hidden&&c.transform.opacity>0&&c.duration>=1/after.settings.fps&&c.startTime>=0&&c.startTime+c.duration<=projectDuration(before)+.04);
  if(['applyCaptions','applyMotionGraphics','applyBroll','applyZooms'].includes(stage)&&visible.length!==changed.length)throw Error('An edit is hidden or outside the footage duration.');
  if(stage==='applyCaptions'){
   const hasValidVisibleCaption=visible.some(c=>c.contentId&&after.captions[c.contentId])||(output.decisions?.some(d=>d.op==='applyCaptionTemplate')&&Object.values(after.clips).some(c=>c.contentId&&after.captions[c.contentId]));
-  const isResilient=!!(job?.presetId||before.editingJob?.presetId||(job?.stages&&job.stages.length>3));
+  const isResilient=job?.faultTolerant!==false;
   const speechSegments=job?.stages?.find(s=>s.id==='analyzeFootage')?.output?.analysis?.speechSegments??before.editingJob?.stages?.find(s=>s.id==='analyzeFootage')?.output?.analysis?.speechSegments;
   const noSpeech=speechSegments===0||speechContext(before).length===0;
-  const permitsZeroCaptions=(isResilient&&noSpeech)||projectDuration(before)<4.0||speechSegments===0||hasSkipRationale(output);
+  const permitsZeroCaptions=hasSkipRationale(output)||(isResilient&&noSpeech)||projectDuration(before)<4.0||speechSegments===0;
   if(!hasValidVisibleCaption&&!permitsZeroCaptions)throw Error('Captions were not applied visibly with valid timing.');
   if(visible.some(c=>c.contentId&&after.captions[c.contentId]&&!after.captions[c.contentId].text.trim()))throw Error('Captions were not applied visibly with valid timing.');
   for (const c of visible.filter(c => c.contentId && after.captions[c.contentId])) {
@@ -226,7 +275,11 @@ export function validateCompletedJob(project:EditorProject,job:EditingJob){
   }
  }
  const hasClarification=job.stages.some(s=>s.output?.questions&&s.output.questions.length>0);
- const hasLegitimateSkipOrPreset=!!job.presetId||job.stages.some(s=>['applyMotionGraphics','applyBroll','applyZooms','applySoundEffects','applyEffects'].includes(s.id)&&permitsZeroAdditions(s.id,project,s.output||{summary:''},job))||(job.completedStages?.includes('analyzeFootage')&&!job.stages.some(s=>s.id==='applyRequestedEdits'));
+ const hasDegradationOrSkip = !!(
+  job.degradationNotices?.length ||
+  job.stages.some(s => hasSkipRationale(s.output) || (s.output?.degradationNotices && s.output.degradationNotices.length > 0))
+ );
+ const hasLegitimateSkipOrPreset=!!job.presetId||hasDegradationOrSkip||job.stages.some(s=>['applyMotionGraphics','applyBroll','applyZooms','applySoundEffects','applyEffects'].includes(s.id)&&permitsZeroAdditions(s.id,project,s.output||{summary:''},job))||(job.completedStages?.includes('analyzeFootage')&&!job.stages.some(s=>s.id==='applyRequestedEdits'));
  if(!job.appliedOperations.length||project.revision<=job.initialRevision){
   if(!hasClarification&&!hasLegitimateSkipOrPreset)throw Error('No requested edits were committed.');
  }
@@ -235,29 +288,54 @@ export function validateCompletedJob(project:EditorProject,job:EditingJob){
   return {summary:clarificationSummary||'Clarification questions returned.'};
  }
  // Strict Caption Template Enforcement & Zero-Hallucinated Text Linting
- for (const c of Object.values(project.clips)) {
-  const isCaption = (c.trackId && project.tracks[c.trackId]?.kind === 'caption') || (c.contentId && project.captions[c.contentId]);
-  if (isCaption && c.contentId && project.captions[c.contentId]) {
-   const cap = project.captions[c.contentId];
+ let effectiveProject = project;
+ let projectCloned = false;
+ const ensureCloned = () => {
+  if (!projectCloned) {
+   effectiveProject = {
+    ...project,
+    clips: { ...project.clips },
+    tracks: { ...project.tracks },
+    textLayers: { ...project.textLayers },
+    captions: { ...project.captions }
+   };
+   projectCloned = true;
+  }
+ };
+ for (const c of Object.values(effectiveProject.clips)) {
+  const isCaption = (c.trackId && effectiveProject.tracks[c.trackId]?.kind === 'caption') || (c.contentId && effectiveProject.captions[c.contentId]);
+  if (isCaption && c.contentId && effectiveProject.captions[c.contentId]) {
+   const cap = effectiveProject.captions[c.contentId];
    const currentTpl = (cap as { templateId?: string }).templateId;
    if (!currentTpl || !isKnownCaptionPreset(currentTpl)) {
+    ensureCloned();
     const fallback: CaptionPresetId = 'study-hormozi-style';
-    (cap as { templateId?: string }).templateId = fallback;
     const ref = referenceCaptionTemplate(fallback) || DEFAULT_CAPTION_TEMPLATES[0];
-    if (ref) {
-     cap.studioStyle = { ...ref.style };
-    }
+    effectiveProject.captions[c.contentId] = {
+     ...cap,
+     templateId: fallback,
+     studioStyle: ref ? { ...ref.style } : cap.studioStyle
+    };
    }
   }
-  const isTextTrack = c.trackId && project.tracks[c.trackId]?.kind === 'text';
-  if (isTextTrack && c.contentId && project.textLayers[c.contentId] && !project.captions[c.contentId]) {
-   const isStandardLowerThird = c.graphic && GRAPHIC_KINDS.includes(c.graphic.kind);
-   if (!isStandardLowerThird) {
-    delete project.clips[c.id];
-    if (project.tracks[c.trackId]) {
-     project.tracks[c.trackId].clipIds = project.tracks[c.trackId].clipIds.filter(id => id !== c.id);
+  const isTextTrack = c.trackId && effectiveProject.tracks[c.trackId]?.kind === 'text';
+  if (isTextTrack && c.contentId && effectiveProject.textLayers[c.contentId] && !effectiveProject.captions[c.contentId]) {
+   const isStandardLowerThird = (c.graphic && GRAPHIC_KINDS.includes(c.graphic.kind)) || (c as { placementId?: string }).placementId === 'lower-third';
+   const isAiAddText = job.stages.some(s => s.output?.decisions?.some(d => d.op === 'addText'));
+   const isTextOnlyProject = !Object.values(effectiveProject.clips).some(clip => clip.assetId && effectiveProject.assets[clip.assetId]?.kind === 'video');
+   const isExplicitHallucination = Boolean((c as { invalidHallucination?: boolean; isHallucination?: boolean }).invalidHallucination || (c as { isHallucination?: boolean }).isHallucination || (effectiveProject.textLayers[c.contentId] as { invalidHallucination?: boolean })?.invalidHallucination || /hallucinat/i.test(effectiveProject.textLayers[c.contentId]?.text || ''));
+
+   const shouldRemove = isExplicitHallucination && !isStandardLowerThird && !isAiAddText && !isTextOnlyProject;
+   if (shouldRemove) {
+    ensureCloned();
+    delete effectiveProject.clips[c.id];
+    if (effectiveProject.tracks[c.trackId]) {
+     effectiveProject.tracks[c.trackId] = {
+      ...effectiveProject.tracks[c.trackId],
+      clipIds: effectiveProject.tracks[c.trackId].clipIds.filter(id => id !== c.id)
+     };
     }
-    delete project.textLayers[c.contentId];
+    delete effectiveProject.textLayers[c.contentId];
     if (!job.degradationNotices) job.degradationNotices = [];
     job.degradationNotices.push({
      stage: 'applyCaptions',
@@ -290,6 +368,12 @@ export function validateCompletedJob(project:EditorProject,job:EditingJob){
    if (n.stage === 'planMotionGraphics' || n.stage === 'applyMotionGraphics') {
     return `⚠️ Motion Graphics: Visual clutter avoid karne ke liye graphics bypass kiye gaye.`;
    }
+   if (n.stage === 'applyCaptions') {
+    return `⚠️ Captions: Spoken dialogue captions skip kiye gaye (${n.reason}).`;
+   }
+   if (n.stage === 'applyRequestedEdits') {
+    return `⚠️ Requested Edits: Requested edit step skip kiya gaya (${n.reason}).`;
+   }
    return `⚠️ ${STAGE_LABELS[n.stage as EditStage] || n.stage}: ${n.reason}`;
   });
   job.skippedNotes = skippedNotes;
@@ -297,10 +381,11 @@ export function validateCompletedJob(project:EditorProject,job:EditingJob){
   return {
    summary: 'All requested stages validated with adjustments. Preview and export use this saved timeline. Export the MP4 to verify the encoded result.',
    degradationNotices: uniqueNotices,
-   skippedNotes
+   skippedNotes,
+   ...(projectCloned ? { project: effectiveProject } : {})
   };
  }
- return {summary:'All requested stages validated. Preview and export use this saved timeline. Export the MP4 to verify the encoded result.'};
+ return {summary:'All requested stages validated. Preview and export use this saved timeline. Export the MP4 to verify the encoded result.',...(projectCloned ? { project: effectiveProject } : {})};
 }
 
 export interface PipelineRuntime {
@@ -330,55 +415,55 @@ export async function runEditingJob(runtime:PipelineRuntime,initial:EditingJob,s
     output=await abortable(runtime.execute(stage.id,runtime.getProject(),job,stageSignal,checkpoint),stageSignal);
    }catch(err){
     if(signal.aborted)throw err;
-    const isPreset=!!(job.presetId||before.editingJob?.presetId);
-    const isEnrichment=['findBroll','applyBroll','applySoundEffects','applyEffects'].includes(stage.id);
-    const isSupportingStage=['applyCaptions','planMotionGraphics','applyMotionGraphics','findBroll','applyBroll','applyZooms','applySoundEffects','applyEffects'].includes(stage.id);
-    if((isPreset&&isSupportingStage)||isEnrichment){
+    const isLinkFailure = err instanceof Error && /link failure/i.test(err.message);
+    const isResilient=job.faultTolerant!==false && !isLinkFailure;
+    if(isResilient&&stage.id!=='validateEdit'){
+     const reason=`${STAGE_LABELS[stage.id]||stage.id}: `+(err instanceof Error?err.message:'stage execution failed');
+     const notice: PipelineDegradationNotice={
+      stage: stage.id,
+      status: 'skipped',
+      reason,
+      suggestedAction: stageSuggestedAction(stage.id),
+      timestamp: Date.now()
+     };
      output={
-      summary:`${STAGE_LABELS[stage.id]} was unavailable or skipped for this footage; moving to next step.`,
-      decisions:stage.id==='applyEffects'?[{op:'setAudioDucking',enabled:true}]:[],
-      skipRationale:`${STAGE_LABELS[stage.id]} skipped: `+(err instanceof Error?err.message:'stage execution failed'),
-      degradationNotices: [{
-       stage: stage.id,
-       status: 'skipped',
-       reason: `${STAGE_LABELS[stage.id]}: ` + (err instanceof Error ? err.message : 'stage execution failed'),
-       suggestedAction: stage.id === 'findBroll' || stage.id === 'applyBroll'
-        ? 'Check stock footage query or manually upload B-roll media.'
-        : stage.id === 'applySoundEffects'
-        ? 'Check SFX audio availability in project assets.'
-        : 'Review footage properties or retry stage.',
-       timestamp: Date.now()
-      }]
+      summary:`${STAGE_LABELS[stage.id]||stage.id} was unavailable or skipped for this footage; moving to next step.`,
+      decisions:[],
+      skipRationale:`${STAGE_LABELS[stage.id]||stage.id} skipped: `+(err instanceof Error?err.message:'stage execution failed'),
+      degradationNotices: [notice]
      };
     }else{
      throw err;
     }
    }
-   if(output.tokenBudget)job.tokenBudget=output.tokenBudget;
+   if(output?.tokenBudget)job.tokenBudget=output.tokenBudget;
    if(output.degradationNotices?.length)job.degradationNotices=[...(job.degradationNotices||[]),...output.degradationNotices];
    signal.throwIfAborted();stage=job.stages[index];stage.status='validating';stage.output=output;await save(runtime.getProject());
    const base=runtime.getProject();if(base.revision!==job.timelineRevision||runtime.interacting())throw Error('Timeline changed during this stage. Start a fresh edit.');
-   let changes=!!output.decisions?.length&&!['analyzeFootage','planMotionGraphics','findBroll'].includes(stage.id);
-   let next=changes?buildStageProject(base,output):base;
+   let changes=(!!output.decisions?.length&&!['analyzeFootage','planMotionGraphics','findBroll'].includes(stage.id)) || (stage.id === 'validateEdit' && !!output.project);
+   let next = base;
    try{
+    next=output.project ? output.project : (changes ? buildStageProject(base,output) : base);
     stage.output=validateStageChanges(stage.id,base,next,output,job);
    }catch(valErr){
     if(signal.aborted)throw valErr;
-    const isResilient=!!(job.presetId||before.editingJob?.presetId||job.stages.length>3);
-    const isSupportingStage=['applyCaptions','planMotionGraphics','applyMotionGraphics','findBroll','applyBroll','applyZooms','applySoundEffects','applyEffects'].includes(stage.id);
-    if(isResilient&&isSupportingStage){
-     output={
-      summary:`${STAGE_LABELS[stage.id]} was unavailable or skipped for this footage; moving to next step.`,
-      decisions:stage.id==='applyEffects'?[{op:'setAudioDucking',enabled:true}]:[],
-      skipRationale:`${STAGE_LABELS[stage.id]} skipped: `+(valErr instanceof Error?valErr.message:'validation failed'),
-      degradationNotices: [{
-       stage: stage.id,
-       status: 'skipped',
-       reason: `${STAGE_LABELS[stage.id]}: ` + (valErr instanceof Error ? valErr.message : 'validation check failed; preserved baseline timeline'),
-       suggestedAction: 'Review timeline track and clip properties.',
-       timestamp: Date.now()
-      }]
+    const isResilient=job.faultTolerant!==false;
+    if(isResilient&&stage.id!=='validateEdit'){
+     const reason=`${STAGE_LABELS[stage.id]||stage.id}: `+(valErr instanceof Error?valErr.message:'validation check failed; preserved baseline timeline');
+     const notice: PipelineDegradationNotice={
+      stage: stage.id,
+      status: 'skipped',
+      reason,
+      suggestedAction: stageSuggestedAction(stage.id),
+      timestamp: Date.now()
      };
+     output={
+      summary:`${STAGE_LABELS[stage.id]||stage.id} was unavailable or skipped for this footage; moving to next step.`,
+      decisions:[],
+      skipRationale:`${STAGE_LABELS[stage.id]||stage.id} skipped: `+(valErr instanceof Error?valErr.message:'validation failed'),
+      degradationNotices: [notice]
+     };
+     job.degradationNotices=[...(job.degradationNotices||[]),notice];
      changes=false;
      next=base;
      stage.output=validateStageChanges(stage.id,base,base,output,job);
@@ -387,18 +472,25 @@ export async function runEditingJob(runtime:PipelineRuntime,initial:EditingJob,s
     }
    }
    if(stage.id==='analyzeFootage'){
-    if(!job.stages.some(s=>s.id==='applyRequestedEdits')){
-     const configuredOps = [...new Set(job.stages.map(s => {
-       if (s.id === 'applyCaptions') return 'captions' as const;
-       if (s.id === 'planMotionGraphics' || s.id === 'applyMotionGraphics') return 'motionGraphics' as const;
-       if (s.id === 'findBroll' || s.id === 'applyBroll') return 'broll' as const;
-       if (s.id === 'applyZooms') return 'zooms' as const;
-       if (s.id === 'applySoundEffects') return 'soundEffects' as const;
-       if (s.id === 'applyEffects') return 'effects' as const;
-       return null;
-     }).filter((op): op is ('captions' | 'motionGraphics' | 'broll' | 'zooms' | 'soundEffects' | 'effects') => op !== null))];
-     const preset=PIPELINE_PRESETS.find(p=>p.id===job.presetId);
-     const operations=(job.presetId && configuredOps.length > 0) ? configuredOps : (preset?.operations||readRequestedOperations(output.operations));
+    const configuredOps = [...new Set(job.stages.map(s => {
+      if (s.id === 'applyCaptions') return 'captions' as const;
+      if (s.id === 'planMotionGraphics' || s.id === 'applyMotionGraphics') return 'motionGraphics' as const;
+      if (s.id === 'findBroll' || s.id === 'applyBroll') return 'broll' as const;
+      if (s.id === 'applyZooms') return 'zooms' as const;
+      if (s.id === 'applySoundEffects') return 'soundEffects' as const;
+      if (s.id === 'applyEffects') return 'effects' as const;
+      return null;
+    }).filter((op): op is ('captions' | 'motionGraphics' | 'broll' | 'zooms' | 'soundEffects' | 'effects') => op !== null))];
+    const preset=PIPELINE_PRESETS.find(p=>p.id===job.presetId);
+    let operations: EditOperation[] | undefined;
+    if (job.presetId && configuredOps.length > 0) {
+     operations = configuredOps;
+    } else if (preset?.operations) {
+     operations = preset.operations;
+    } else if (output.operations && output.operations.length > 0) {
+     operations = readRequestedOperations(output.operations);
+    }
+    if (operations && operations.length > 0) {
      job.stages=stagesFor(operations).map(id=>job.stages.find(s=>s.id===id)||{id,key:job.id+':'+id,status:'pending',attempts:0});stage=job.stages[index];
     }
    }

@@ -1,24 +1,30 @@
 # Progress
 
 ## Current Status
-Last visited: 2026-11-07T11:55:00Z
-- [x] Phase 0: Survey codebase with 3 parallel Explorers (Complete)
-- [x] Phase 1: PROJECT.md & TEST_INFRA.md decomposition (Complete)
-- [x] E2E Test Suite Creation: test_writer_e2e_1 (TEST_READY.md published: 32 tests passing 100%)
-- [x] M1: Model Architecture & Fallback Integration: APPROVED & Gated PASS
-- [x] M2: Preset Flow Repair & Resilience: APPROVED & Gated PASS
-- [x] M3: Intelligent Custom AI Editing & Clarification: APPROVED & Gated PASS
-- [x] Phase 3: Final Milestone — E2E Test Suite verification (100% pass)
-- [x] Phase 4: Adversarial Coverage Hardening (Tier 5 passed across 4 dedicated challenger suites)
+Last visited: 2026-11-13T11:32:00Z
+- [x] Phase 1: R1 Implementation & Gate Check (PASSED 100% UNANIMOUS)
+  - [x] R1.1: TypeScript Signature Alignment (verified CLEAN, 0 tsc errors)
+  - [x] R1.2: Eliminate In-Place State Mutation & Text Deletion (verified CLEAN, frozen object safe)
+  - [x] R1.3: Multi-Stage Pipeline Expansion (verified CLEAN, mixed operations supported)
+  - [x] R1.4: Reconciler Invariant (verified CLEAN, ripple cuts trailing & chronologically sorted)
+  - [x] R1.5: Atomic Multi-Stage Undo & UI Visibility (verified CLEAN, locks safe, actions visible)
+  - [x] R1.6: ESLint Cleanup (verified CLEAN, 0 lint errors)
+  - [x] R1 Gate Check: Iteration 2 (Unanimous APPROVE across Reviewers & Challengers, CLEAN audit)
+- [ ] Phase 2: R2 Wire Real Editor Controls into Desktop & Mobile UI
+  - [x] R2 Survey & Exploration (`explorer_r2_1` completed 842-line handoff report)
+  - [ ] R2.1: Full Clip & Caption Inspector (`AssetDrawer.tsx`)
+  - [ ] R2.2: Real Tool Integrations & Track Caps (`AssetDrawer.tsx`, `TimelinePanel.tsx`, `operations.ts`)
+  - [ ] R2.3: Canvas & Keyboard Shortcuts (`CanvasStage.tsx`, `EditorLayout.tsx`)
+  - [ ] R2.4: Mobile UI Polish (`MobileEditorLayout.tsx`, `MobileCanvasStage.tsx`, `MobileTimeline.tsx`)
+  - [ ] R2 Gate Check
+- [ ] Phase 3: R3 Fix Export Audio Sync, Compositor Rendering, Billing/Token Leaks & AI Vision
+  - [ ] R3.1: Timeline & Caption Slicing Operations (`operations.ts`, `rippleCut.ts`)
+  - [ ] R3.2: Export & Compositor Rendering (`offlineExport.ts`, `compositor.ts`, `studioCanvas.ts`, `canvasCaptions.ts`, `aiValidation.ts`)
+  - [ ] R3.3: Billing, Rate-Limit & Provider Fixes (`broll-choice/route.ts`, `planUsage.ts`, `generate-image/route.ts`, `groqEditorTransport.ts`, `editorProvider.ts`)
+- [ ] Phase 4: Final Verification across all suites and full AC sign-off
 
 ## Iteration Status
-Current iteration: 3 / 32
+Current iteration: 1 / 32
 
 ## Retrospective Notes
-- Initial codebase survey mapped all 28 native timeline operations, model routing, preset pipelines, and test patterns accurately.
-- E2E test-writer generated a comprehensive 32-test matrix across Tiers 1-4 with synthetic project fixtures and in-memory TS transpilation.
-- M1 successfully implemented Groq Qwen 3.7 27B primary and Gemini 3.8 Flash fallback on 429/503/timeouts with sticky routing and token lease tracking.
-- M2 Gate challenger caught an edge case in speech-free footage preset runs, which was remediated by worker_m2_2 and re-audited clean.
-- M3 successfully implemented custom stages routing, multi-turn history extraction/transmission, zero-decision clarification tolerance, temporal bounds, negative constraints, in-place refinement, single rippleCut speech gap trimming, and UI question rendering.
-- All 5 subagent verdicts on Gate 3 (2 Reviewers, 2 Challengers, 1 Auditor) were unanimous APPROVE and CLEAN.
-- Full system verification complete: zero type errors (`tsc --noEmit`), clean Cloudflare production build (`build:cloudflare`), all test suites passing.
+- Initialized execution protocol for R1 -> Gate Check -> R2 -> R3 -> Final Verify.

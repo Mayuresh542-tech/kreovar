@@ -1,46 +1,64 @@
-# Final Orchestrator Handoff Report
+# Orchestrator Soft Handoff: Gen 1 -> Gen 2
 
 ## Milestone State
-- **Phase 0: Architecture & Codebase Survey**: DONE (3 parallel explorers mapped all 28 operations, model routing, preset pipelines, and test patterns).
-- **Phase 1: PROJECT.md & TEST_INFRA.md Decomposition**: DONE (All 26 features cataloged and assigned with zero unassigned features).
-- **Milestone 1: Model Architecture & Fallback Integration (R3)**: DONE (Groq Qwen 3.7 27B primary with automatic fallback on 429/timeouts/5xx to Gemini 3.8 Flash via `geminiService.ts`, sticky provider routing, token leases, and telemetry).
-- **Milestone 2: Preset Flow Repair & Resilience (R2)**: DONE (Zero-decision tolerance on short (<4s), silent, or explicit skip rationale footage for supporting stages; speech-free caption tolerance; dynamic caption restyling & animations).
-- **Milestone 3: Intelligent Custom AI Editing & Clarification (R1)**: DONE (Free-form custom edits routing, wire contract `conversationHistory`, clarification lifecycle preservation without throwing errors, in-place multi-turn refinements, section bounds, negative constraints, silence trimming rippleCut, and UI question rendering).
-- **Milestone 4 / E2E Track: 100% E2E Pass & Adversarial Hardening**: DONE (32/32 tests in `scripts/test-custom-ai-editing.mjs` passing, 100% pass across all regression and adversarial test suites).
+- **Phase 1 (R1)**: COMPLETED & 100% UNANIMOUSLY PASSED GATE CHECK (Iteration 2).
+  - R1.1 (TypeScript Signature Alignment): Added `BaseTimedWord` without index signature in `hinglishNormalizer.ts`; generic `normalizeHinglishWords` preserves exact input array type; `app/captions/page.tsx` default `words: []`. `npx tsc --noEmit` verified 0 errors.
+  - R1.2 (State Mutation & Text Deletion): Cloned `effectiveProject` on demand in `validateCompletedJob` so `project.clips !== current.clips` triggers `store.execute()`. Preserved manual titles and `addText` on `text` track unless explicitly `invalidHallucination`.
+  - R1.3 (Pipeline Stage Expansion): Ordered intermediate stages before `applyRequestedEdits` right before `validateEdit` in `stagesFor`. Removed single-operation restriction in `readRequestedOperations`.
+  - R1.4 (Reconciler Invariant): `rippleCut` decisions sorted chronologically and appended at the very end of `reconciledDecisions`.
+  - R1.5 (Atomic Multi-Stage Undo, Lock Race & DOM Alignment): Multi-tier fallback in `store.rollbackToRevision(target.preRevision)` in `useConversationalAiChat.ts`; tracked and awaited `currentExecutionPromiseRef` in `stopExecution()`; guarded manual edits in `Workspace.tsx` during `isExecuting`; decoupled action buttons in `AiResponseBubble.tsx`; aligned `scripts/test-sequential-edit.mjs` test selectors with `EditorLayout.tsx` and `AssetDrawer.tsx`.
+  - R1.6 (ESLint Fixes): Replaced `const module` with `const mod` and aliased `state.current = this` with getter `get current()`. 0 ESLint errors.
+  - All test suites passing: `tsc --noEmit` (0 errors), `npm run lint` (0 errors), `test:chat-routing` (28/28), `test:e2e` (6/6), core regressions (50/50), challenger stress tests (46/46).
+  - Unanimous Gate clearance: Reviewers 3 & 4 (APPROVE), Challengers 3 & 4 (APPROVE), Forensic Auditor 2 (CLEAN, 0 violations/stubs/facades).
+- **Phase 2 (R2)**: IN_PROGRESS.
+  - Investigation completed by `explorer_r2_1` (`3e427a76-2a35-4763-ad67-61cde4e54984`). Detailed 842-line report published at `.agents/teamwork/explorer_r2_1/handoff.md`.
+  - Next step for Gen 2 is to dispatch `worker_r2_1` to implement the 4 R2 requirement areas.
+- **Phase 3 (R3)**: PLANNED.
+- **Phase 4 (Final Verify)**: PLANNED.
 
 ## Active Subagents
-- None. All 20 spawned subagents have completed their tasks, delivered their handoffs, and been retired.
+None. All 16 subagents have completed and delivered their handoffs.
+Spawn count reached 16 / 16.
 
-## Pending Decisions
-- None. All requirements R1, R2, R3, and R4 have been implemented and verified.
-
-## Remaining Work
-- Project implementation and verification are 100% complete. Ready for final presentation and delivery to Sentinel.
+## Pending Decisions & Concrete Next Steps for Successor (Gen 2)
+1. **Dispatch `worker_r2_1` (teamwork_worker)**:
+   - Provide `worker_r2_1` with `.agents/teamwork/explorer_r2_1/handoff.md`, `PROJECT.md`, and `ORIGINAL_REQUEST.md`.
+   - Include the **MANDATORY INTEGRITY WARNING** verbatim in the worker prompt.
+   - Require implementation of the 4 areas:
+     - **R2.1 (Full Clip & Caption Inspector in `AssetDrawer.tsx`)**:
+       - Transform & Layout: Position X/Y (%), Opacity (%), Fit/Fill frame quick actions.
+       - Timing & Playback: Editable Start and Duration inputs, Speed (0.25x-4x), Fade In/Out, Replace clip media dropdown.
+       - Visual FX: Brightness, Contrast, Saturation, Blur sliders; chromatic `rgbOffset`; MediaAnimationControls (Entrance, Exit, Loop).
+       - Caption & Text Editing: Textarea with `changeText` / `editCaption`, font family, size, weight, alignment, stroke, shadow, studio template switcher (`applyCaptionTemplate`).
+       - Audio Controls: `audioRole` dropdown (`speech | background | sfx`), ducking toggle, Mute/Unmute quick toggle.
+     - **R2.2 (Tools & Track Caps)**:
+       - Wire B-Roll search to `/api/editor/broll-choice` and insert clips onto `overlay` track via `addClip`.
+       - Map Transitions buttons strictly to `TransitionKind` (`"fade" | "dissolve" | "slide" | "zoom"`) and call `addTransition`.
+       - Enable drag-and-drop on media cards with `application/veelox-asset` payload; wire local file uploads to `uploadAssetFile` and `linkAsset`.
+       - Caption Studio presets count matching `ALL_CAPTION_TEMPLATES`; bidirectional Hinglish revert restoring previous template on toggle off.
+       - Add `shrink-0` to `h-[56px]` track header row in `TimelinePanel.tsx`.
+       - Enforce 30-track maximum cap in `addTrack` (`operations.ts`).
+     - **R2.3 (Canvas & Keyboard Shortcuts)**:
+       - Remove `isLooping` from `CanvasStage.tsx` Compositor `useEffect` dependency array using `isLoopingRef` to prevent reloading media buffers.
+       - Fix scale/rotate handles to calculate 2D Euclidean distance and `atan2` relative to clip center and rotation angle.
+       - Render dynamic Safe Area guides for `9:16`, `4:5`, `1:1`, and `16:9`, and wrap zoomed canvas (`>100%`) in scrollable/pannable container.
+       - Wire keyboard shortcuts in `EditorLayout.tsx`: `N` (Toggle Snapping), `F` (Fit Timeline), `+`/`-` (Timeline Zoom), and `Cmd/Ctrl+C` + `Cmd/Ctrl+V` (`pasteClips`).
+     - **R2.4 (Mobile UI Polish)**:
+       - Disable playback loop when `project.duration === 0` in `MobileCanvasStage.tsx` and `MobileEditorLayout.tsx`.
+       - Render a "Hidden Tracks" unhide pill/bar in `MobileTimeline.tsx` and add trim handles to `overlay`, `caption`, and `audio` clips when selected.
+   - Require `worker_r2_1` to run `npx tsc --noEmit`, `npm run lint`, and verify all changes.
+2. **Execute R2 Gate Check**:
+   - Spawn 2 Reviewers, 2 Challengers, and 1 Forensic Auditor (`teamwork_auditor`).
+   - Strict pass criteria: all must approve, CLEAN audit verdict.
+3. **Proceed to Phase 3 (R3)** once R2 Gate check passes unanimously.
 
 ## Key Artifacts
-- `PROJECT.md`: `c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code\.agents\teamwork\orchestrator\PROJECT.md`
-- `TEST_INFRA.md`: `c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code\.agents\teamwork\orchestrator\TEST_INFRA.md`
-- `TEST_READY.md`: `c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code\.agents\teamwork\orchestrator\TEST_READY.md`
-- `GATE_STATUS.md`: `c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code\.agents\teamwork\orchestrator\GATE_STATUS.md`
-- `progress.md`: `c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code\.agents\teamwork\orchestrator\progress.md`
-- `BRIEFING.md`: `c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code\.agents\teamwork\orchestrator\BRIEFING.md`
-- `scripts/test-custom-ai-editing.mjs`: Automated E2E test suite (32 tests across Tiers 1-4)
-- `scripts/test-gemini-fallback.mjs`: Model fallback test suite (6 tests)
-- `scripts/test-challenger-m1-m2.mjs`: Challenger adversarial test suite (16 tests)
-- `scripts/test-adversarial-m1-m2.mjs`: Challenger adversarial test suite (17 tests)
-- `scripts/test-m3-adversarial-challenger.mjs`: Challenger M3 adversarial test suite (12 tests)
-- `scripts/test-challenger-m3-2.mjs`: Challenger M3 combinatorial test suite (21 tests)
-
-## Verification Summary
-1. `node --test scripts/test-custom-ai-editing.mjs`: 32/32 passed (exit 0)
-2. `node --test scripts/test-sequential-edit.mjs`: 14/14 passed (exit 0)
-3. `node --test scripts/test-e2e-error-and-recovery.mjs`: 5/5 passed (exit 0)
-4. `node --test scripts/test-chat-tool-routing.mjs`: 14/14 passed (exit 0)
-5. `node --test scripts/test-gemini-fallback.mjs`: 6/6 passed (exit 0)
-6. `node --test scripts/test-challenger-m1-m2.mjs`: 16/16 passed (exit 0)
-7. `node --test scripts/test-adversarial-m1-m2.mjs`: 17/17 passed (exit 0)
-8. `node --test scripts/test-m3-adversarial-challenger.mjs`: 12/12 passed (exit 0)
-9. `node --test scripts/test-challenger-m3-2.mjs`: 21/21 passed (exit 0)
-10. `npx tsc --noEmit`: 0 type errors (exit 0)
-11. `npm run build:cloudflare`: Clean production build (exit 0)
-12. Forensic Audits: Both Gate 2 and Gate 3 forensic audits delivered verdicts of **CLEAN** with zero integrity violations.
+- Workspace Root: `c:\Users\Admin\OneDrive\Desktop\kreovar\main kreovar\kreovar main code`
+- Request: `.agents/teamwork/ORIGINAL_REQUEST.md`
+- Scope: `.agents/teamwork/orchestrator/PROJECT.md`
+- Gate Ledger: `.agents/teamwork/orchestrator/GATE_STATUS.md`
+- Explorer R2 Report: `.agents/teamwork/explorer_r2_1/handoff.md`
+- Predecessor State Folder: `.agents/teamwork/orchestrator/`
+- Predecessor Briefing: `.agents/teamwork/orchestrator/BRIEFING.md`
+- Predecessor Progress: `.agents/teamwork/orchestrator/progress.md`
+- Original Parent Conversation ID: `44115417-ab11-4fdd-851d-d48d76969a7b`

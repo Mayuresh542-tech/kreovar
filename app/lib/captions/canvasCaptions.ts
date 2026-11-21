@@ -81,7 +81,7 @@ export function drawCaptions(ctx:CanvasRenderingContext2D,segments:CaptionSegmen
    if(current){if(style.animation==="pop")zoom=1+.2*Math.sin(p*Math.PI);if(style.animation==="scale")zoom=1.15;if(style.animation==="bounce")dy=-size*.2*Math.sin(p*Math.PI);}
    if(style.animation==="slide-up"||style.animation==="slide-down")dy=(style.animation==="slide-up"?1:-1)*size*.25*(1-Math.min(1,(time-segment.start)/Math.max(.01,style.animationSpeed)));
    if(style.animation==="word-by-word"&&future)ctx.globalAlpha=0;
-   if(style.animation==="fade")ctx.globalAlpha=current?1:.85;
+   if(style.animation==="fade")ctx.globalAlpha=ctx.globalAlpha*(current?1:.85);
    ctx.translate(rtl?x-wordWidth/2:x+wordWidth/2,y+dy);ctx.scale(zoom,zoom);
    if(current&&style.highlightBg){ctx.fillStyle=style.highlightBg;ctx.fillRect(-wordWidth/2-3*scale,-size*.65,wordWidth+6*scale,size*1.3);}
    ctx.shadowColor=style.shadowColor||"transparent";ctx.shadowBlur=(style.shadowBlur||0)*scale;ctx.shadowOffsetX=(style.shadowOffsetX||0)*scale;ctx.shadowOffsetY=(style.shadowOffsetY||0)*scale;

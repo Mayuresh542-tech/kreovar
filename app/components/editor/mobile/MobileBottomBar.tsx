@@ -9,7 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-export type MobileToolDrawerTab = "edit" | "captions" | "broll" | "audio";
+export type MobileToolDrawerTab = "edit" | "captions" | "broll" | "audio" | "silence";
 
 interface MobileBottomBarProps {
   activeDrawer: MobileToolDrawerTab | null;

@@ -3,6 +3,7 @@ import { withBoundedRequest } from "@/app/lib/server/boundedRequest";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminClient, getAuthenticatedUserId } from "@/app/lib/server/adminAuth";
 import { DEFAULT_CAPTION_TEMPLATES, CaptionTemplate } from "@/app/lib/captions/templates";
+import { ALL_CAPTION_TEMPLATES } from "@/app/lib/captions/referenceTemplates";
 
 export const dynamic = "force-dynamic";
 
@@ -38,18 +39,18 @@ async function getHandler(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      systemTemplates: DEFAULT_CAPTION_TEMPLATES,
+      systemTemplates: ALL_CAPTION_TEMPLATES,
       userTemplates,
-      totalTemplates: DEFAULT_CAPTION_TEMPLATES.length + userTemplates.length,
+      totalTemplates: ALL_CAPTION_TEMPLATES.length + userTemplates.length,
     });
   } catch (err: any) {
     console.error("[Captions API] Error fetching templates:", err);
     return NextResponse.json(
       {
         success: true,
-        systemTemplates: DEFAULT_CAPTION_TEMPLATES,
+        systemTemplates: ALL_CAPTION_TEMPLATES,
         userTemplates: [],
-        totalTemplates: DEFAULT_CAPTION_TEMPLATES.length,
+        totalTemplates: ALL_CAPTION_TEMPLATES.length,
       },
       { status: 200 }
     );
@@ -69,19 +70,22 @@ async function postHandler(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { name, category, description, style } = body;
 
-    if (!name || typeof name !== "string" || !name.trim()) {
+    if (!name || typeof name !== "string" || !name.trim() || name.length > 100) {
       return NextResponse.json(
-        { error: "Template name is required." },
+        { error: "Template name is required and must be 100 characters or fewer." },
         { status: 400 }
       );
     }
 
-    if (!style || typeof style !== "object") {
+    if (!style || typeof style !== "object" || Array.isArray(style) || Object.keys(style).length > 100) {
       return NextResponse.json(
         { error: "Template style configuration is required." },
         { status: 400 }
       );
     }
+
+    const safeCategory = typeof category === "string" ? category.slice(0, 50).trim() : "Custom";
+    const safeDescription = typeof description === "string" ? description.slice(0, 500).trim() : `Custom ${name.trim()} caption style`;
 
     const adminDb = getAdminClient();
     const { data, error } = await adminDb
@@ -89,8 +93,8 @@ async function postHandler(req: NextRequest) {
       .insert({
         user_id: userId,
         name: name.trim(),
-        category: category || "Custom",
-        description: description || `Custom ${name.trim()} caption style`,
+        category: safeCategory,
+        description: safeDescription,
         style,
         is_public: false,
       })
@@ -100,7 +104,7 @@ async function postHandler(req: NextRequest) {
     if (error) {
       console.error("[Captions API] Error creating template:", error);
       return NextResponse.json(
-        { error: error.message || "Failed to save caption template." },
+        { error: "Failed to save caption template." },
         { status: 500 }
       );
     }

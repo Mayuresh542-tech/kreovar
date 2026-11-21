@@ -60,6 +60,7 @@ async function generateGeminiEditorPlanJson<T>(
 
   await options.observer?.before(requestBody, maxOutputTokens);
   try {
+    let geminiMeta: { model: string; totalTokens: number; promptTokens?: number; completionTokens?: number } | undefined;
     const value = await generateGeminiJson<T>({
       prompt,
       systemInstruction,
@@ -68,19 +69,30 @@ async function generateGeminiEditorPlanJson<T>(
       maxTokens: maxOutputTokens,
       operation: options.operation || 'editor_ai_edit',
       model: GEMINI_EDITOR_FALLBACK_MODEL,
+      ...(priorAttempts === 0 ? {
+        candidateImages: options.candidateImages,
+        footageFrames: options.footageFrames,
+        referenceImages: options.referenceImages,
+      } : {}),
+      onMetadata: (meta) => { geminiMeta = meta; },
     });
 
     const imageCount = (options.referenceImages?.length || 0) + (options.footageFrames?.length || 0) + (options.candidateImages?.length || 0);
 
+    const actualTotal = geminiMeta?.totalTokens ?? 500;
+    const actualInput = geminiMeta?.promptTokens ?? 400;
+    const actualOutput = geminiMeta?.completionTokens ?? 100;
+    const resolvedModel = geminiMeta?.model || GEMINI_EDITOR_FALLBACK_MODEL;
+
     if (lease && options.editingBudget && options.userId) {
-      await settleEditorTokens(options.userId, options.editingBudget, lease, 500);
+      await settleEditorTokens(options.userId, options.editingBudget, lease, actualTotal);
     }
-    await options.observer?.after({ total: 500, input: 400, output: 100 });
+    await options.observer?.after({ total: actualTotal, input: actualInput, output: actualOutput });
 
     return {
       value,
       provider: 'gemini',
-      model: GEMINI_EDITOR_FALLBACK_MODEL,
+      model: resolvedModel,
       attempts: priorAttempts + 1,
       imageCount,
       fallbackReason: reason,
@@ -142,6 +154,7 @@ export async function generateEditPlanJson<T>(options:EditorFallbackOptions,pref
    'GROQ_REQUEST_CAPACITY',
    'GROQ_SCHEMA_REJECTED',
    'GROQ_REQUEST_REJECTED',
+   'GROQ_INVALID_OBSERVATIONS',
   ]);
 
   const isRateLimit = error instanceof GroqEditorError && (error.code === 'GROQ_RATE_LIMIT' || error.status === 429);

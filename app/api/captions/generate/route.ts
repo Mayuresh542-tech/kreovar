@@ -33,7 +33,7 @@ async function postHandler(req: NextRequest) {
       transcript?: string;
     } = body;
 
-    try { await requireOwnedProject(adminDb, userId, projectId); }
+    try { await requireOwnedProject(adminDb, userId, projectId, { optional: true }); }
     catch { return NextResponse.json({error:"This project is unavailable."},{status:404}); }
 
     // 1. Fetch voice generation record if available

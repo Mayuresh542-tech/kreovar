@@ -69,13 +69,19 @@ function formatTurnSummary(job: EditingJob | undefined, changes: TimelineChangeI
 }
 
 export function useConversationalAiChat() {
-  const { store, repository, scope, selection, playback, select, authToken, notify } =
+  const { store, repository, scope, selection, playback, select, authToken, notify, isExecuting: contextIsExecuting, setIsExecuting: setContextIsExecuting } =
     useEditor();
   const project = useProject(store);
   const activeJob = project.editingJob;
 
   const [input, setInput] = useState("");
-  const [isExecuting, setIsExecuting] = useState(false);
+  const [localIsExecuting, setLocalIsExecuting] = useState(false);
+  const isExecuting = contextIsExecuting ?? localIsExecuting;
+  const setIsExecuting = useCallback((val: boolean) => {
+    setLocalIsExecuting(val);
+    setContextIsExecuting?.(val);
+  }, [setContextIsExecuting]);
+
   const [turns, setTurns] = useState<AiChatTurn[]>(() => {
     const history = store.getSnapshot().editingHistory || [];
     if (!history.length) return [];
@@ -103,6 +109,7 @@ export function useConversationalAiChat() {
   });
 
   const abortRef = useRef<AbortController | null>(null);
+  const currentExecutionPromiseRef = useRef<Promise<unknown> | null>(null);
 
   useEffect(() => {
     return () => {
@@ -110,14 +117,19 @@ export function useConversationalAiChat() {
     };
   }, []);
 
-  const stopExecution = useCallback(() => {
+  const stopExecution = useCallback(async () => {
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
-      setIsExecuting(false);
       notify("AI edit paused.");
+      if (currentExecutionPromiseRef.current) {
+        try {
+          await currentExecutionPromiseRef.current;
+        } catch {}
+      }
+      setIsExecuting(false);
     }
-  }, [notify]);
+  }, [notify, setIsExecuting]);
 
   const submitPrompt = useCallback(
     async (overridePrompt?: string) => {
@@ -165,7 +177,7 @@ export function useConversationalAiChat() {
         // Route all natural language instructions directly through the LLM intent parser
         createdJob = createEditingJob(beforeProject, text, selectedClipIds);
 
-        await runSequentialEdit(
+        const executionPromise = runSequentialEdit(
           store,
           repository,
           scope,
@@ -173,6 +185,8 @@ export function useConversationalAiChat() {
           controller.signal,
           authToken
         );
+        currentExecutionPromiseRef.current = executionPromise;
+        await executionPromise;
 
         const afterProject = store.getSnapshot();
         const finishedJob = afterProject.editingJob;
@@ -210,6 +224,9 @@ export function useConversationalAiChat() {
         const afterProject = store.getSnapshot();
         const latestJob = afterProject.editingJob;
         const wasAborted = controller.signal.aborted;
+        const hasPartialMutations = afterProject.revision > preRevision;
+        const changes = hasPartialMutations ? summarizeTimelineDiff(beforeProject, afterProject, latestJob) : [];
+        const didModifyTimeline = hasPartialMutations && (changes.length > 0 || (latestJob?.appliedOperations?.length ?? 0) > 0);
         const friendlyError = wasAborted
           ? "Edit stopped before completion."
           : publicErrorMessage(
@@ -229,6 +246,9 @@ export function useConversationalAiChat() {
                     false,
                     hadCaptions
                   ),
+                  changes,
+                  didModifyTimeline,
+                  postRevision: afterProject.revision,
                   degradationNotes: collectDegradationNotes(latestJob),
                   responseText: friendlyError,
                 }
@@ -240,11 +260,12 @@ export function useConversationalAiChat() {
           notify(friendlyError);
         }
       } finally {
+        currentExecutionPromiseRef.current = null;
         setIsExecuting(false);
         abortRef.current = null;
       }
     },
-    [authToken, input, isExecuting, notify, playback, repository, scope, selection, store]
+    [authToken, input, isExecuting, notify, playback, repository, scope, selection, setIsExecuting, store]
   );
 
   const canUndoTurn = useCallback(
@@ -262,7 +283,9 @@ export function useConversationalAiChat() {
     (turnId: string) => {
       const target = turns.find((t) => t.id === turnId);
       if (!target || !canUndoTurn(target)) return;
-      store.undo();
+      if (store.rollbackToRevision) {
+        store.rollbackToRevision(target.preRevision);
+      }
       setTurns((prev) =>
         prev.map((t) => (t.id === turnId ? { ...t, undone: true } : t))
       );

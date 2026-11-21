@@ -3,12 +3,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { LoaderCircle } from "lucide-react";
 import { createProject } from "@/app/lib/editor/model";
+import { createDemoProject, isDemoProject, DEMO_PROJECT_TITLE } from "@/app/lib/editor/demoProject";
 import { fromLegacy, projectFromPlanner } from "@/app/lib/editor/bridge";
 import { EditorStore, PlaybackStore, Edit } from "@/app/lib/editor/store";
 import { MediaRepository } from "@/app/lib/editor/media";
 import { cacheKey } from "@/app/lib/editor/cache";
 import { usePersistence } from "@/app/lib/editor/usePersistence";
 import { EditorContext } from "./EditorContext";
+import type { DetectedSilenceRange } from "@/app/lib/editor/audioSilenceDetector";
 import { InitialMedia } from "./ConnectedTools";
 import EditorLayout from "../EditorLayout";
 import MobileEditorLayout from "../mobile/MobileEditorLayout";
@@ -33,6 +35,8 @@ export default function Workspace({
           ? fromLegacy(initialTimeline)
           : plannerInput
           ? projectFromPlanner({ ...plannerInput, projectId }, projectTitle)
+          : isDemoProject(projectId)
+          ? createDemoProject(projectId, projectTitle === "Untitled video" ? DEMO_PROJECT_TITLE : projectTitle)
           : createProject(projectId, projectTitle)
       )
   );
@@ -40,6 +44,9 @@ export default function Workspace({
   const [repository] = useState(() => new MediaRepository());
   const [selection, setSelection] = useState<string[]>([]);
   const [notice, setNotice] = useState<string>();
+
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [detectedSilences, setDetectedSilences] = useState<DetectedSilenceRange[]>([]);
 
   const persistence = usePersistence(store, userId);
   const notify = useCallback((message: string) => setNotice(message), []);
@@ -49,13 +56,17 @@ export default function Workspace({
 
   const run = useCallback(
     (edit: Edit) => {
+      if (isExecuting) {
+        notify("Timeline is locked while AI is editing.");
+        return;
+      }
       try {
         store.execute(edit);
       } catch (e) {
         notify(e instanceof Error ? e.message : "This edit could not be applied.");
       }
     },
-    [store, notify]
+    [store, notify, isExecuting]
   );
 
   const context = useMemo(
@@ -69,8 +80,12 @@ export default function Workspace({
       select,
       run,
       notify,
+      isExecuting,
+      setIsExecuting,
+      detectedSilences,
+      setDetectedSilences,
     }),
-    [store, playback, repository, userId, projectId, authToken, selection, select, run, notify]
+    [store, playback, repository, userId, projectId, authToken, selection, select, run, notify, isExecuting, detectedSilences]
   );
 
   useEffect(() => {

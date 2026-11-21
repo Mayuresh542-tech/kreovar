@@ -8,6 +8,10 @@ import {
   CaptionSegment,
   CAPTION_PRESETS,
 } from "@/app/lib/captions/presets";
+import CaptionRenderer from "@/app/components/captions/CaptionRenderer";
+import { ALL_CAPTION_TEMPLATES, referenceCaptionTemplate } from "@/app/lib/captions/referenceTemplates";
+import { normalizeCaptionPresetId } from "@/app/lib/editor/model";
+import type { CaptionStyleConfig } from "@/app/lib/captions/templates";
 
 interface CaptionPreviewProps {
   audioUrl?: string;
@@ -59,6 +63,44 @@ export default function CaptionPreview({
   const [videoDuration, setVideoDuration] = useState<number>(duration || 0);
 
   const preset = CAPTION_PRESETS[activePresetId] || CAPTION_PRESETS.clean;
+
+  const activeStyle = useMemo<CaptionStyleConfig>(() => {
+    const normId = activePresetId ? normalizeCaptionPresetId(activePresetId) : "";
+    const matched =
+      ALL_CAPTION_TEMPLATES.find((t) => t.id === normId || t.id === activePresetId) ||
+      referenceCaptionTemplate(normId) ||
+      referenceCaptionTemplate(activePresetId);
+    if (matched) {
+      return {
+        ...matched.style,
+        position: captionPosition,
+      };
+    }
+    return {
+      fontFamily: preset.fontFamily,
+      fontSize: parseInt(preset.fontSize, 10) || 32,
+      fontWeight: preset.fontWeight || 600,
+      textTransform: preset.textTransform || "none",
+      textColor: preset.textColor || "#FFFFFF",
+      highlightColor: preset.highlightColor || "#38BDF8",
+      highlightBg: preset.highlightBg,
+      containerBg: preset.containerBg,
+      strokeColor: preset.strokeColor,
+      strokeWidth: preset.strokeWidth,
+      shadowColor: preset.shadowColor,
+      shadowBlur: preset.shadowBlur,
+      shadowOffsetX: preset.shadowOffsetX,
+      shadowOffsetY: preset.shadowOffsetY,
+      alignment: preset.alignment || "center",
+      position: captionPosition,
+      maxWordsPerLine: preset.maxWordsPerLine || 4,
+      lineSpacing: parseFloat(preset.lineHeight || "1.2") || 1.2,
+      letterSpacing: preset.letterSpacing || "normal",
+      animation: (preset.animation as any) || "fade",
+      animationSpeed: 0.18,
+      highlightingMode: preset.highlightingMode || "keyword",
+    };
+  }, [activePresetId, captionPosition, preset]);
 
   // Sync background video element play/pause
   useEffect(() => {
@@ -216,7 +258,7 @@ export default function CaptionPreview({
   // Position class for vertical layout
   const positionClass =
     captionPosition === "top"
-      ? "top-[18%]"
+      ? "top-[16%]"
       : captionPosition === "bottom"
       ? "bottom-[22%]"
       : "top-[48%] -translate-y-1/2";
@@ -399,66 +441,14 @@ export default function CaptionPreview({
         <div className={`absolute left-3 right-3 z-30 flex justify-center pointer-events-none transition-all duration-300 ${positionClass}`}>
           <AnimatePresence mode="wait">
             {activeSegment ? (
-              <motion.div
-                key={activeSegment.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.1 }}
-                style={{
-                  backgroundColor: preset.containerBg || "transparent",
-                  fontFamily: preset.fontFamily,
-                  textTransform: preset.textTransform,
-                  letterSpacing: preset.letterSpacing || "normal",
-                  lineHeight: preset.lineHeight || "1.3",
-                }}
-                className="px-3.5 py-1.5 rounded-2xl text-center flex flex-wrap justify-center items-center gap-x-1.5 gap-y-1 backdrop-blur-sm max-w-[94%] drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]"
-              >
-                {displayWords.map((w, wIdx) => {
-                  const isWordActive =
-                    currentTime >= w.start &&
-                    (currentTime <= w.end ||
-                      (wIdx === displayWords.length - 1 && currentTime <= activeSegment.end));
-
-                  let activeClasses = "";
-                  const activeInlineStyle: React.CSSProperties = {
-                    color: preset.textColor,
-                    fontWeight: preset.fontWeight,
-                    fontSize: scaledFontSize,
-                    textShadow: "0 2px 8px rgba(0,0,0,0.9)",
-                  };
-
-                  if (isWordActive) {
-                    if (preset.animation === "pop") {
-                      activeClasses = "scale-110 drop-shadow-[0_4px_14px_rgba(250,204,21,0.8)]";
-                      activeInlineStyle.color = preset.highlightColor;
-                    } else if (preset.animation === "bounce") {
-                      activeClasses = "scale-115 -translate-y-1 drop-shadow-[0_4px_16px_rgba(74,222,128,0.85)]";
-                      activeInlineStyle.color = preset.highlightColor;
-                    } else if (preset.animation === "marker") {
-                      activeClasses = "rounded px-1.5 shadow-sm";
-                      activeInlineStyle.backgroundColor = preset.highlightBg || "#38BDF8";
-                      activeInlineStyle.color = preset.highlightColor || "#090A0F";
-                    } else {
-                      // glow / clean
-                      activeClasses = "drop-shadow-[0_0_14px_rgba(56,189,248,0.9)]";
-                      activeInlineStyle.color = preset.highlightColor;
-                    }
-                  } else {
-                    activeInlineStyle.opacity = preset.id === "minimal" ? 0.7 : 0.95;
-                  }
-
-                  return (
-                    <motion.span
-                      key={`${w.word}-${wIdx}-${activeSegment.id}`}
-                      style={activeInlineStyle}
-                      className={`inline-block transition-all duration-75 ${activeClasses}`}
-                    >
-                      {w.word}
-                    </motion.span>
-                  );
-                })}
-              </motion.div>
+              <CaptionRenderer
+                text={activeSegment.text}
+                words={activeSegment.words}
+                currentTime={currentTime}
+                style={activeStyle}
+                scaleMultiplier={0.9}
+                segment={activeSegment}
+              />
             ) : (
               <div className="text-slate-500 text-[11px] font-mono uppercase tracking-wider bg-black/40 px-2.5 py-1 rounded-full backdrop-blur-sm">
                 {isPlaying ? "•••" : "Captions appear on playback"}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Check, Sliders, Trash2, Play, Pause } from "lucide-react";
 import { CaptionTemplate } from "@/app/lib/captions/templates";
 import CaptionRenderer from "./CaptionRenderer";
@@ -18,14 +18,6 @@ export interface CaptionCardPreviewProps {
   isApplying?: boolean;
 }
 
-const DEFAULT_SAMPLE_WORDS: TTSWordTimestamp[] = [
-  { word: "THIS", start: 0.0, end: 0.4 },
-  { word: "IS", start: 0.4, end: 0.8 },
-  { word: "HOW", start: 0.8, end: 1.2 },
-  { word: "YOU", start: 1.2, end: 1.6 },
-  { word: "GROW", start: 1.6, end: 2.3 },
-];
-
 export default function CaptionCardPreview({
   template,
   isSelected = false,
@@ -33,24 +25,57 @@ export default function CaptionCardPreview({
   onApply,
   onCustomize,
   onDelete,
-  sampleWords = DEFAULT_SAMPLE_WORDS,
-  sampleText = "THIS IS HOW YOU GROW",
+  sampleWords,
+  sampleText,
   isApplying = false,
 }: CaptionCardPreviewProps) {
   const [currentTime, setCurrentTime] = useState(0.9);
   const [isLooping, setIsLooping] = useState(true);
+
+  // Determine designated template text or prop sampleText
+  const templateSampleText = (template as any).sampleText;
+  const effectiveText = useMemo(() => {
+    if (sampleText && sampleText !== "THIS IS HOW YOU GROW") {
+      return sampleText;
+    }
+    return templateSampleText || sampleText || "THIS IS HOW YOU GROW";
+  }, [sampleText, templateSampleText]);
+
+  // Determine matching words with timed timestamps
+  const effectiveWords = useMemo<TTSWordTimestamp[]>(() => {
+    const tokens: string[] = effectiveText.split(/\s+/).filter(Boolean);
+    if (
+      sampleWords &&
+      sampleWords.length === tokens.length &&
+      sampleWords.map((w: TTSWordTimestamp) => w.word.toLowerCase()).join(" ") ===
+        tokens.map((t: string) => t.toLowerCase()).join(" ")
+    ) {
+      return sampleWords;
+    }
+    const step = 0.45;
+    return tokens.map((word: string, i: number) => ({
+      word,
+      start: Number((i * step).toFixed(2)),
+      end: Number(((i + 1) * step).toFixed(2)),
+    }));
+  }, [effectiveText, sampleWords]);
+
+  const maxDuration = useMemo(() => {
+    if (!effectiveWords.length) return 2.4;
+    return Number((effectiveWords[effectiveWords.length - 1].end + 0.3).toFixed(2));
+  }, [effectiveWords]);
 
   // Auto-playhead loop for live card preview
   useEffect(() => {
     if (!isLooping) return;
     const interval = setInterval(() => {
       setCurrentTime((prev) => {
-        if (prev >= 2.4) return 0.1;
+        if (prev >= maxDuration) return 0.1;
         return Math.round((prev + 0.1) * 10) / 10;
       });
     }, 120);
     return () => clearInterval(interval);
-  }, [isLooping]);
+  }, [isLooping, maxDuration]);
 
   return (
     <div
@@ -68,6 +93,11 @@ export default function CaptionCardPreview({
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-slate-300 shrink-0">
             {template.category}
           </span>
+          {(template as any).fontNote && (
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 shrink-0">
+              Free font
+            </span>
+          )}
         </div>
 
         {template.isCustom && onDelete && (
@@ -96,8 +126,8 @@ export default function CaptionCardPreview({
         {/* Live Caption Display */}
         <div className="relative z-10 w-full flex items-center justify-center">
           <CaptionRenderer
-            text={sampleText}
-            words={sampleWords}
+            text={effectiveText}
+            words={effectiveWords}
             currentTime={currentTime}
             style={template.style}
             scaleMultiplier={0.78}
@@ -149,7 +179,7 @@ export default function CaptionCardPreview({
               e.stopPropagation();
               onCustomize(template);
             }}
-            className="p-1.5 rounded-lg border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
           >
             <Sliders className="w-3.5 h-3.5" />
           </button>

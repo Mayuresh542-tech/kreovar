@@ -201,7 +201,7 @@ export interface TimelinePanelProps {
 }
 
 export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
-  const { store, playback, selection, select, run, notify } = useEditor();
+  const { store, playback, selection, select, run, notify, detectedSilences = [] } = useEditor();
   const project = useProject(store);
   const { time, playing } = usePlayback(playback);
 
@@ -271,6 +271,30 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
     setPps(target);
     if (scrollerRef.current) scrollerRef.current.scrollLeft = 0;
   }, [duration, viewport.width]);
+
+  // Global Timeline Keyboard Shortcuts via Custom Events
+  useEffect(() => {
+    const handleToggleSnapping = () => setSnapping((s) => !s);
+    const handleFit = () => fitTimeline();
+    const handleZoomEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<"in" | "out">;
+      if (customEvent.detail === "in") {
+        zoom(pps * 1.3);
+      } else {
+        zoom(pps / 1.3);
+      }
+    };
+
+    window.addEventListener("veelox:toggle-snapping", handleToggleSnapping);
+    window.addEventListener("veelox:fit-timeline", handleFit);
+    window.addEventListener("veelox:timeline-zoom", handleZoomEvent);
+
+    return () => {
+      window.removeEventListener("veelox:toggle-snapping", handleToggleSnapping);
+      window.removeEventListener("veelox:fit-timeline", handleFit);
+      window.removeEventListener("veelox:timeline-zoom", handleZoomEvent);
+    };
+  }, [fitTimeline, pps, zoom]);
 
   // Ruler tick calculation
   const tickStep = pps < 25 ? 10 : pps < 50 ? 5 : pps < 100 ? 2 : 1;
@@ -405,8 +429,15 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
   // Drop asset from library onto track
   const handleDropAsset = (event: React.DragEvent, track: Track) => {
     event.preventDefault();
-    const assetId = event.dataTransfer.getData("application/veelox-asset");
-    if (!assetId) return;
+    const raw = event.dataTransfer.getData("application/veelox-asset");
+    if (!raw) return;
+    let assetId = raw;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && parsed.assetId) {
+        assetId = parsed.assetId;
+      }
+    } catch {}
     const rect = bodyRef.current?.getBoundingClientRect();
     if (!rect) return;
     let targetTime = Math.max(0, (event.clientX - rect.left) / pps);
@@ -586,7 +617,7 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
               return (
                 <div
                   key={id}
-                  className="h-[56px] px-2.5 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
+                  className="h-[56px] shrink-0 px-2.5 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {/* Track Accent Chip */}
@@ -683,6 +714,27 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
                 );
               })}
             </div>
+
+            {/* Detected Silences Waveform Visual Shading Overlay */}
+            {detectedSilences.length > 0 && (
+              <div className="absolute top-7 bottom-0 left-0 right-0 pointer-events-none z-20">
+                {detectedSilences.map((silence, idx) => {
+                  const left = silence.start * pps;
+                  const width = Math.max(4, silence.duration * pps);
+                  return (
+                    <div
+                      key={`silence-${idx}-${silence.start}`}
+                      className="absolute top-0 bottom-0 bg-rose-500/15 border-x border-dashed border-rose-500/70 pointer-events-none flex flex-col items-center justify-start overflow-hidden select-none"
+                      style={{ left: `${left}px`, width: `${width}px` }}
+                    >
+                      <span className="text-[9px] font-mono text-rose-800 bg-white/95 border border-rose-300 rounded px-1 mt-1 shadow-xs whitespace-nowrap">
+                        ✂ {silence.duration.toFixed(2)}s
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Track Lanes */}
             <div className="flex flex-col divide-y divide-slate-200/70">

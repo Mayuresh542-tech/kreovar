@@ -37,7 +37,6 @@ export default function AiResponseBubble({
   const [showNotes, setShowNotes] = useState(false);
 
   const showActions =
-    turn.status === "completed" &&
     !turn.isClarification &&
     (turn.didModifyTimeline || turn.changes.length > 0 || turn.undone);
 

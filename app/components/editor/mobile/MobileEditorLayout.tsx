@@ -60,6 +60,7 @@ export default function MobileEditorLayout({
   const handleTogglePlay = useCallback(() => {
     const state = playback.getSnapshot();
     const curDuration = projectDuration(store.getSnapshot());
+    if (curDuration <= 0) return;
     if (!state.playing && curDuration > 0 && state.time >= curDuration) {
       playback.set(0, true);
     } else {

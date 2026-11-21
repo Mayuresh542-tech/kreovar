@@ -39,29 +39,36 @@ export async function requestGroqEditorJson<T>(options:EditorJsonOptions,body:Re
  await options.observer?.before(body,request.maxOutput);
  const start=Date.now(),operation=request.operation||options.operation||'editor_ai_edit';
  const log=(status:'error'|'success',units:number,errorMessage?:string)=>recordProviderUsage({providerKey:'groq',operation,userId:options.userId,units,unitType:'tokens',status,durationMs:Date.now()-start,...(errorMessage?{errorMessage}:{})});
- let response:Response;
- try{response=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},redirect:'error',body:JSON.stringify(body),signal:options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(request.timeoutMs)]):AbortSignal.timeout(request.timeoutMs),cache:'no-store'});}catch(error){await log('error',0,'GROQ_NETWORK_ERROR');if(options.signal?.aborted)throw options.signal.reason;if(error instanceof Error&&error.name==='AbortError')throw error;throw new GroqEditorError('GROQ_UNAVAILABLE');}
- const raw=await readResponse(response),usage=object(raw?.usage),input=count(usage?.prompt_tokens),output=count(usage?.completion_tokens),reported=count(usage?.total_tokens),rejected=!response.ok&&[400,401,402,403,404,413,429].includes(response.status),total=reported??(input!==null&&output!==null?input+output:rejected?0:null);
- if(lease&&options.editingBudget&&options.userId)await settleEditorTokens(options.userId,options.editingBudget,lease,total);
- await options.observer?.after({total,input,output});
- options.signal?.throwIfAborted();
- const fail=async(code:GroqCode,status=503,retryAfterSeconds?:number):Promise<never>=>{await log('error',total??0,code+'; http='+response.status);throw new GroqEditorError(code,status,retryAfterSeconds);};
- if(!response.ok){
-  const errorCode=object(raw?.error)?.code;
-  if(response.status===403&&(errorCode==='model_permission_blocked_project'||errorCode==='model_permission_blocked_org'))return fail('GROQ_MODEL_BLOCKED');
-  if(response.status===401||response.status===403)return fail('GROQ_AUTH_FAILED');
-  if(response.status===402)return fail('GROQ_ALLOWANCE_REACHED');
-  if(response.status===429){const retry=response.headers.get('retry-after'),seconds=retry&&/^\d+(?:\.\d+)?$/.test(retry)?Math.ceil(Number(retry)):undefined;return fail('GROQ_RATE_LIMIT',429,seconds&&seconds<=86400?seconds:undefined);}
-  if(response.status===400&&errorCode==='json_validate_failed')return fail('GROQ_SCHEMA_REJECTED',502);
-  if(response.status===400)return fail('GROQ_REQUEST_REJECTED',502);
-  if(response.status===413)return fail('GROQ_REQUEST_CAPACITY',413);
-  return fail('GROQ_UNAVAILABLE');
+ let leaseSettled=false;
+ try{
+  let response:Response;
+  try{response=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},redirect:'error',body:JSON.stringify(body),signal:options.signal?AbortSignal.any([options.signal,AbortSignal.timeout(request.timeoutMs)]):AbortSignal.timeout(request.timeoutMs),cache:'no-store'});}catch(error){await log('error',0,'GROQ_NETWORK_ERROR');if(options.signal?.aborted)throw options.signal.reason;if(error instanceof Error&&error.name==='AbortError')throw error;throw new GroqEditorError('GROQ_UNAVAILABLE');}
+  const raw=await readResponse(response),usage=object(raw?.usage),input=count(usage?.prompt_tokens),output=count(usage?.completion_tokens),reported=count(usage?.total_tokens),rejected=!response.ok&&[400,401,402,403,404,413,429].includes(response.status),total=reported??(input!==null&&output!==null?input+output:rejected?0:null);
+  if(lease&&options.editingBudget&&options.userId){await settleEditorTokens(options.userId,options.editingBudget,lease,total);leaseSettled=true;}
+  await options.observer?.after({total,input,output});
+  options.signal?.throwIfAborted();
+  const fail=async(code:GroqCode,status=503,retryAfterSeconds?:number):Promise<never>=>{await log('error',total??0,code+'; http='+response.status);throw new GroqEditorError(code,status,retryAfterSeconds);};
+  if(!response.ok){
+   const errorCode=object(raw?.error)?.code;
+   if(response.status===403&&(errorCode==='model_permission_blocked_project'||errorCode==='model_permission_blocked_org'))return fail('GROQ_MODEL_BLOCKED');
+   if(response.status===401||response.status===403)return fail('GROQ_AUTH_FAILED');
+   if(response.status===402)return fail('GROQ_ALLOWANCE_REACHED');
+   if(response.status===429){const retry=response.headers.get('retry-after'),seconds=retry&&/^\d+(?:\.\d+)?$/.test(retry)?Math.ceil(Number(retry)):undefined;return fail('GROQ_RATE_LIMIT',429,seconds&&seconds<=86400?seconds:undefined);}
+   if(response.status===400&&errorCode==='json_validate_failed')return fail('GROQ_SCHEMA_REJECTED',502);
+   if(response.status===400)return fail('GROQ_REQUEST_REJECTED',502);
+   if(response.status===413)return fail('GROQ_REQUEST_CAPACITY',413);
+   return fail('GROQ_UNAVAILABLE');
+  }
+  if(raw?.model!==request.model)return fail('GROQ_MODEL_MISMATCH',502);
+  const choice=Array.isArray(raw?.choices)?object(raw.choices[0]):null,message=object(choice?.message);
+  if(choice?.finish_reason!=='stop'||typeof message?.content!=='string'||!message.content.trim())return fail('GROQ_INVALID_RESPONSE',502);
+  let result:unknown;try{result=JSON.parse(message.content);}catch{return fail('GROQ_INVALID_RESPONSE',502);}
+  if(!object(result))return fail('GROQ_INVALID_RESPONSE',502);
+  options.signal?.throwIfAborted();await log('success',total??0);
+  return result as T;
+ }finally{
+  if(lease&&!leaseSettled&&options.editingBudget&&options.userId){
+   await settleEditorTokens(options.userId,options.editingBudget,lease,null).catch(()=>{});
+  }
  }
- if(raw?.model!==request.model)return fail('GROQ_MODEL_MISMATCH',502);
- const choice=Array.isArray(raw?.choices)?object(raw.choices[0]):null,message=object(choice?.message);
- if(choice?.finish_reason!=='stop'||typeof message?.content!=='string'||!message.content.trim())return fail('GROQ_INVALID_RESPONSE',502);
- let result:unknown;try{result=JSON.parse(message.content);}catch{return fail('GROQ_INVALID_RESPONSE',502);}
- if(!object(result))return fail('GROQ_INVALID_RESPONSE',502);
- options.signal?.throwIfAborted();await log('success',total??0);
- return result as T;
 }

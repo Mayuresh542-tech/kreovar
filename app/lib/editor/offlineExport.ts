@@ -1,4 +1,5 @@
 import {loadEditorStudioFonts} from './editorCaptionStudio';
+import {loadCaptionFonts} from "../captions/typography";
 import {Input,BlobSource,ALL_FORMATS,CanvasSink,VideoSampleSink,AudioBufferSink,Output,WebMOutputFormat,Mp4OutputFormat,BufferTarget,CanvasSource,AudioBufferSource,Quality,canEncodeVideo,canEncodeAudio,type InputVideoTrack,type VideoSample,type WrappedCanvas} from "mediabunny";
 import {Compositor,visibleLayers} from "./compositor";
 import {dimensions,projectDuration,clamp,type EditorProject,type Clip} from "./model";
@@ -35,6 +36,7 @@ function clipMaxScale(clip:Clip){
  if(clip.zooms?.length)for(const z of clip.zooms)peak=Math.max(peak,clip.transform.scale*Math.max(z.fromScale,z.toScale));
  if(clip.mediaAnimation){
   if(clip.mediaAnimation.entrance==='zoom-out'||clip.mediaAnimation.exit==='zoom-in')peak*=1.3;
+  if(clip.mediaAnimation.entrance==='ken-burns-push'||clip.mediaAnimation.entrance==='ken-burns-pull'||clip.mediaAnimation.kenBurns)peak*=1.08;
   if(clip.mediaAnimation.loop==='pulse')peak*=1.07;
  }
  return clamp(peak,1,4);
@@ -168,6 +170,19 @@ async function createVideoFrameFeeder(
  return canvasSinkFeeder();
 }
 
+function withFeederMutex(feeder: VideoFrameFeeder): VideoFrameFeeder {
+ let feederQueue: Promise<unknown> = Promise.resolve();
+ const safeNext = (name: string): Promise<DecodedFrame> => {
+  const run = feederQueue.then(() => feeder.next(name));
+  feederQueue = run.catch(() => {});
+  return run;
+ };
+ return {
+  next: safeNext,
+  dispose: () => feeder.dispose()
+ };
+}
+
 /** Decode at timeline timestamps and encode every frame; never use wall-clock recording. */
 export async function renderOffline(project:EditorProject,options:ExportOptions,repository:MediaRepository,onProgress:(value:ExportProgress)=>void,signal:AbortSignal){
  const duration=projectDuration(project),schedule=frameSchedule(duration,options.fps),canvas=document.createElement("canvas"),[w,h]=dimensions[project.settings.aspectRatio],scale=options.resolution/Math.min(w,h);
@@ -216,7 +231,7 @@ export async function renderOffline(project:EditorProject,options:ExportOptions,
    await document.fonts.ready;
    await Promise.all([
     loadEditorStudioFonts(project),
-    ...[...Object.values(project.textLayers),...Object.values(project.captions)].map(layer=>document.fonts.load(layer.style.weight+" "+layer.style.size+"px \""+layer.style.font+"\"")),
+    ...[...Object.values(project.textLayers),...Object.values(project.captions)].map(layer=>loadCaptionFonts(`"${layer.style.font}"`,layer.style.weight,layer.style.size,layer.style.fontAccent,layer.text)),
    ]);
   })();
 
@@ -256,7 +271,7 @@ export async function renderOffline(project:EditorProject,options:ExportOptions,
     signal.throwIfAborted();
     const c=project.clips[id],track=await (await input(c.assetId!)).getPrimaryVideoTrack();
     if(!track||!await track.canDecode())throw new Error("Video codec cannot be decoded: "+c.name);
-    feeders.set(id,await createVideoFrameFeeder(track,timestamps,canvas.width,canvas.height,c,signal));
+    feeders.set(id,withFeederMutex(await createVideoFrameFeeder(track,timestamps,canvas.width,canvas.height,c,signal)));
    })),
    Promise.all(audioClips.map(async c=>{
     signal.throwIfAborted();
@@ -269,12 +284,14 @@ export async function renderOffline(project:EditorProject,options:ExportOptions,
     const steps=Math.max(2,Math.ceil(c.duration*60)+1);
     const curve=Float32Array.from({length:steps},(_,i)=>{const local=c.duration*i/(steps-1);return clipGain(project,c,c.startTime+local,windows);});
     gain.gain.setValueCurveAtTime(curve,c.startTime,c.duration);
-    for await(const wrapped of new AudioBufferSink(audioTrack).buffers(c.sourceStart,c.sourceEnd)){
+    const effectiveSourceEnd = Math.min(c.sourceEnd, c.sourceStart + c.duration * c.speed);
+    for await(const wrapped of new AudioBufferSink(audioTrack).buffers(c.sourceStart,effectiveSourceEnd)){
      signal.throwIfAborted();
      const slice=clipAudioSlice(c,wrapped.timestamp,wrapped.buffer.duration);
      if(slice.length<=0)continue;
      const source=offline.createBufferSource();source.buffer=wrapped.buffer;source.playbackRate.value=c.speed;source.connect(gain);source.start(slice.when,slice.offset,slice.length);
     }
+    gain.gain.setValueAtTime(0, c.startTime + c.duration);
    })),
   ]);
 

@@ -15,6 +15,8 @@ import {
   Keyboard,
   Sparkles,
   SlidersHorizontal,
+  Smartphone,
+  ChevronDown,
 } from "lucide-react";
 import BrandMark from "../BrandMark";
 import ThemeToggle from "../ThemeToggle";
@@ -31,8 +33,17 @@ import {
   aspectRatios,
   projectDuration,
 } from "@/app/lib/editor/model";
-import { duplicateClip, removeClip, splitClip, pasteClips } from "@/app/lib/editor/operations";
+import { duplicateClip, removeClip, splitClip, pasteClips, reframeProject, trimToPlayhead, type ReframeMode } from "@/app/lib/editor/operations";
 import { nudgeClips } from "@/app/lib/editor/timelineNavigation";
+import {
+  resolveShortcutAction,
+  getShuttleNextState,
+  splitTopmostUnmutedClipAtPlayhead,
+  deleteOrRippleDeleteClips,
+  toggleSelectedTrackMute,
+  SHORTCUT_DEFINITIONS,
+} from "@/app/lib/editor/shortcuts";
+import { loadDemoProjectIntoStore } from "@/app/lib/editor/demoProject";
 
 const ExportDialog = dynamic(() => import("./workspace/ExportDialog"), {
   ssr: false,
@@ -74,6 +85,8 @@ export default function EditorLayout({
   // Modals
   const [exportOpen, setExportOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [reframeOpen, setReframeOpen] = useState(false);
+  const clipboardRef = useRef<{ project: typeof project; ids: string[] } | null>(null);
 
   // Resizable Bottom Timeline Height (Range: 220px to 450px, default 300px)
   const [timelineHeight, setTimelineHeight] = useState<number>(() => {
@@ -92,100 +105,259 @@ export default function EditorLayout({
     }
   }, [selection, isDrawerOpen, activeTab]);
 
-  // Global Keyboard Shortcuts
+  // Global NLE Keyboard Shortcuts
   useEffect(() => {
-    const isEditingTarget = (target: EventTarget | null) =>
-      target instanceof HTMLElement &&
-      !!target.closest("input,textarea,select,[contenteditable=true],dialog");
-
     function handleKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement;
-      if (isEditingTarget(target) || exportOpen || shortcutsOpen) return;
-
-      const modifier = event.ctrlKey || event.metaKey;
       const curProject = store.getSnapshot();
       const time = playback.getSnapshot().time;
-      const key = event.key.toLowerCase();
 
-      // Undo / Redo
-      if (modifier && key === "z") {
-        event.preventDefault();
-        if (event.shiftKey) store.redo();
-        else store.undo();
-      } else if (modifier && key === "y") {
-        event.preventDefault();
-        store.redo();
-      }
-      // Save
-      else if (modifier && key === "s") {
-        event.preventDefault();
-        retrySave?.();
-      }
-      // Play / Pause toggle
-      else if (event.code === "Space") {
-        event.preventDefault();
-        const state = playback.getSnapshot();
-        playback.set(state.time, !state.playing);
-      }
-      // Select All Unlocked Clips
-      else if (modifier && key === "a") {
-        event.preventDefault();
-        select(
-          Object.keys(curProject.clips).filter(
-            (id) => !curProject.tracks[curProject.clips[id].trackId]?.locked
-          )
-        );
-      }
-      // Nudge
-      else if (event.altKey && (event.key === "ArrowLeft" || event.key === "ArrowRight") && selection.length) {
-        event.preventDefault();
-        run((p) =>
-          nudgeClips(p, selection, (event.key === "ArrowRight" ? 1 : -1) * (event.shiftKey ? 10 : 1))
-        );
-      }
-      // Frame Step
-      else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-        event.preventDefault();
-        const dur = projectDuration(curProject);
-        const delta = (event.key === "ArrowRight" ? 1 : -1) * (event.shiftKey ? 10 : 1) / curProject.settings.fps;
-        playback.set(Math.max(0, Math.min(dur, time + delta)), false);
-      }
-      // Split
-      else if (key === "s" && !modifier) {
-        event.preventDefault();
-        const targets = (selection.length ? selection : Object.keys(curProject.clips)).filter((id) => {
-          const c = curProject.clips[id];
-          return (
-            !curProject.tracks[c.trackId]?.locked &&
-            time > c.startTime + 1 / curProject.settings.fps &&
-            time < c.startTime + c.duration - 1 / curProject.settings.fps
-          );
-        });
-        if (targets.length) {
-          run((p) => targets.reduce((next, id) => splitClip(next, id, time), p));
-        } else {
-          notify("Move the playhead inside a clip to split.");
+      const action = resolveShortcutAction(
+        {
+          key: event.key,
+          code: event.code,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey,
+          altKey: event.altKey,
+          target: event.target,
+        },
+        { shortcutsOpen, exportOpen }
+      );
+
+      if (!action) return;
+
+      switch (action) {
+        case "escape": {
+          if (shortcutsOpen) {
+            event.preventDefault();
+            setShortcutsOpen(false);
+            return;
+          }
+          if (exportOpen) {
+            event.preventDefault();
+            setExportOpen(false);
+            return;
+          }
+          store.cancel();
+          select([]);
+          break;
         }
-      }
-      // Duplicate
-      else if (modifier && key === "d") {
-        event.preventDefault();
-        run((p) => selection.reduce((next, id) => duplicateClip(next, id), p));
-      }
-      // Delete
-      else if ((event.key === "Delete" || event.key === "Backspace") && selection.length) {
-        event.preventDefault();
-        run((p) => selection.reduce((next, id) => removeClip(next, id), p));
-        select([]);
-      }
-      // Deselect or cancel
-      else if (event.key === "Escape") {
-        store.cancel();
-        select([]);
-      }
-      // Shortcuts modal trigger
-      else if (event.key === "?") {
-        setShortcutsOpen(true);
+
+        case "toggle-play": {
+          event.preventDefault();
+          const state = playback.getSnapshot();
+          if (state.playing) {
+            playback.set(state.time, false, 1);
+          } else {
+            const dur = projectDuration(curProject);
+            playback.set(state.time >= dur ? 0 : state.time, true, 1);
+          }
+          break;
+        }
+
+        case "shuttle-forward": {
+          event.preventDefault();
+          const state = playback.getSnapshot();
+          const next = getShuttleNextState(state.speed ?? 1, state.playing, "forward");
+          const dur = projectDuration(curProject);
+          playback.set(state.time >= dur && next.playing ? 0 : state.time, next.playing, next.speed);
+          notify(next.speed === 2 ? "Shuttle Forward 2x" : "Play Forward 1x");
+          break;
+        }
+
+        case "shuttle-pause": {
+          event.preventDefault();
+          const state = playback.getSnapshot();
+          const next = getShuttleNextState(state.speed ?? 1, state.playing, "pause");
+          playback.set(state.time, next.playing, next.speed);
+          notify("Shuttle Paused");
+          break;
+        }
+
+        case "shuttle-backward": {
+          event.preventDefault();
+          const state = playback.getSnapshot();
+          const next = getShuttleNextState(state.speed ?? 1, state.playing, "backward");
+          const dur = projectDuration(curProject);
+          playback.set(state.time <= 0 && next.playing ? dur : state.time, next.playing, next.speed);
+          notify(next.speed === -2 ? "Shuttle Reverse -2x" : "Shuttle Reverse -1x");
+          break;
+        }
+
+        case "split-clip": {
+          event.preventDefault();
+          const result = splitTopmostUnmutedClipAtPlayhead(curProject, time, selection);
+          if (result.splitClipId) {
+            run(() => result.nextProject);
+            notify(result.wasTopmostFallback ? "Split topmost unmuted clip" : "Split selected clip");
+          } else {
+            notify("Move playhead inside an unlocked clip to split.");
+          }
+          break;
+        }
+
+        case "trim-start-to-playhead": {
+          event.preventDefault();
+          const result = trimToPlayhead(curProject, "start", time, selection);
+          if (result.modifiedClipIds.length > 0) {
+            run(() => result.project);
+            notify("Trimmed start to playhead ([)");
+          } else {
+            notify("Move playhead inside an unlocked clip to trim start.");
+          }
+          break;
+        }
+
+        case "trim-end-to-playhead": {
+          event.preventDefault();
+          const result = trimToPlayhead(curProject, "end", time, selection);
+          if (result.modifiedClipIds.length > 0) {
+            run(() => result.project);
+            notify("Trimmed end to playhead (])");
+          } else {
+            notify("Move playhead inside an unlocked clip to trim end.");
+          }
+          break;
+        }
+
+        case "delete-clip": {
+          if (selection.length) {
+            event.preventDefault();
+            run((p) => deleteOrRippleDeleteClips(p, selection, { ripple: false }));
+            select([]);
+            notify(`Deleted ${selection.length} clip(s).`);
+          }
+          break;
+        }
+
+        case "ripple-delete-clip": {
+          if (selection.length) {
+            event.preventDefault();
+            run((p) => deleteOrRippleDeleteClips(p, selection, { ripple: true }));
+            select([]);
+            notify(`Ripple deleted ${selection.length} clip(s).`);
+          }
+          break;
+        }
+
+        case "toggle-mute": {
+          event.preventDefault();
+          const result = toggleSelectedTrackMute(curProject, selection);
+          if (result.trackId) {
+            run(() => result.project);
+            const trackName = curProject.tracks[result.trackId]?.name || "Track";
+            notify(`${result.muted ? "Muted" : "Unmuted"} ${trackName}`);
+          }
+          break;
+        }
+
+        case "undo": {
+          event.preventDefault();
+          store.undo();
+          break;
+        }
+
+        case "redo": {
+          event.preventDefault();
+          store.redo();
+          break;
+        }
+
+        case "save": {
+          event.preventDefault();
+          retrySave?.();
+          break;
+        }
+
+        case "select-all": {
+          event.preventDefault();
+          select(
+            Object.keys(curProject.clips).filter(
+              (id) => !curProject.tracks[curProject.clips[id].trackId]?.locked
+            )
+          );
+          break;
+        }
+
+        case "nudge-left":
+        case "nudge-right": {
+          if (selection.length) {
+            event.preventDefault();
+            run((p) =>
+              nudgeClips(p, selection, (action === "nudge-right" ? 1 : -1) * (event.shiftKey ? 10 : 1))
+            );
+          }
+          break;
+        }
+
+        case "step-backward":
+        case "step-forward": {
+          event.preventDefault();
+          const dur = projectDuration(curProject);
+          const delta = ((action === "step-forward" ? 1 : -1) * (event.shiftKey ? 10 : 1)) / curProject.settings.fps;
+          playback.set(Math.max(0, Math.min(dur, time + delta)), false);
+          break;
+        }
+
+        case "duplicate-clip": {
+          if (selection.length) {
+            event.preventDefault();
+            run((p) => selection.reduce((next, id) => duplicateClip(next, id), p));
+          }
+          break;
+        }
+
+        case "copy-clips": {
+          if (selection.length) {
+            event.preventDefault();
+            clipboardRef.current = { project: curProject, ids: [...selection] };
+            notify(`Copied ${selection.length} clip(s).`);
+          }
+          break;
+        }
+
+        case "paste-clips": {
+          if (clipboardRef.current?.ids.length) {
+            event.preventDefault();
+            try {
+              run((p) => pasteClips(p, clipboardRef.current!.project, clipboardRef.current!.ids, time));
+              notify(`Pasted ${clipboardRef.current.ids.length} clip(s).`);
+            } catch (err) {
+              notify(err instanceof Error ? err.message : "Paste failed.");
+            }
+          }
+          break;
+        }
+
+        case "toggle-shortcuts-modal": {
+          event.preventDefault();
+          setShortcutsOpen((prev) => !prev);
+          break;
+        }
+
+        case "toggle-snapping": {
+          event.preventDefault();
+          window.dispatchEvent(new CustomEvent("veelox:toggle-snapping"));
+          break;
+        }
+
+        case "fit-timeline": {
+          event.preventDefault();
+          window.dispatchEvent(new CustomEvent("veelox:fit-timeline"));
+          break;
+        }
+
+        case "zoom-in": {
+          event.preventDefault();
+          window.dispatchEvent(new CustomEvent("veelox:timeline-zoom", { detail: "in" }));
+          break;
+        }
+
+        case "zoom-out": {
+          event.preventDefault();
+          window.dispatchEvent(new CustomEvent("veelox:timeline-zoom", { detail: "out" }));
+          break;
+        }
       }
     }
 
@@ -302,9 +474,19 @@ export default function EditorLayout({
           </button>
         </div>
 
-        {/* Right: Theme Toggle, Undo/Redo, Aspect Ratio, Preview Quality, Export Button */}
+        {/* Right: Theme Toggle, Keyboard Shortcuts Help, Undo/Redo, Aspect Ratio, Preview Quality, Export Button */}
         <div className="flex items-center gap-2">
           <ThemeToggle />
+
+          {/* Keyboard Shortcuts Help Button */}
+          <button
+            onClick={() => setShortcutsOpen(true)}
+            title="Keyboard Shortcuts (?)"
+            aria-label="Keyboard Shortcuts"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+          >
+            <Keyboard size={15} />
+          </button>
 
           {/* Undo */}
           <button
@@ -362,6 +544,78 @@ export default function EditorLayout({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* 1-Click 9:16 Smart Reframing Menu */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setReframeOpen((prev) => !prev)}
+              title="1-Click 16:9 to 9:16 Smart Reframing"
+              className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium text-xs px-2.5 py-1.5 rounded-lg shadow-sm transition-all active:scale-95"
+            >
+              <Smartphone size={13} />
+              <span className="hidden md:inline">Reframe 9:16</span>
+              <ChevronDown
+                size={11}
+                className={reframeOpen ? "rotate-180 transition-transform" : "transition-transform"}
+              />
+            </button>
+            {reframeOpen && (
+              <div className="absolute right-0 mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-1.5 text-xs space-y-1">
+                <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Smart 9:16 Conversion
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    run((p) => reframeProject(p, "fit-with-blur"));
+                    notify("Applied 1-Click Fit with Blur (9:16)");
+                    setReframeOpen(false);
+                  }}
+                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-slate-50 flex flex-col gap-0.5 text-slate-800 transition-colors"
+                >
+                  <span className="font-semibold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" /> Fit with Blur
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Scales to fit width; blurred background wings fill top & bottom
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    run((p) => reframeProject(p, "center-crop"));
+                    notify("Applied 1-Click Center Crop (1.77x Eye-Line)");
+                    setReframeOpen(false);
+                  }}
+                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-slate-50 flex flex-col gap-0.5 text-slate-800 transition-colors"
+                >
+                  <span className="font-semibold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500" /> Center Crop (Eye-Line)
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    1.77x punch-in centered on upper-third eye-line (focusY: -0.14)
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    run((p) => reframeProject(p, "split-screen"));
+                    notify("Applied 1-Click Split Screen (A-Roll + B-Roll)");
+                    setReframeOpen(false);
+                  }}
+                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-slate-50 flex flex-col gap-0.5 text-slate-800 transition-colors"
+                >
+                  <span className="font-semibold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Split Screen
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    A-roll speaker top half + contextual B-roll / gameplay bottom half
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Preview Quality Selector */}
@@ -484,15 +738,20 @@ export default function EditorLayout({
             role="dialog"
             aria-modal="true"
             aria-labelledby="shortcuts-title"
-            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl text-slate-900 space-y-4"
+            className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl text-slate-900 space-y-4 max-h-[88vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <Keyboard size={20} className="text-blue-600" />
-                <h2 id="shortcuts-title" className="font-semibold text-sm text-slate-900">
-                  Keyboard Workstation Shortcuts
-                </h2>
+                <div>
+                  <h2 id="shortcuts-title" className="font-semibold text-sm text-slate-900">
+                    NLE Keyboard Shortcuts &amp; Navigation
+                  </h2>
+                  <p className="text-[11px] text-slate-500">
+                    Pro editing workflows inspired by industry NLE standards (Final Cut, Premiere, DaVinci).
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setShortcutsOpen(false)}
@@ -502,36 +761,63 @@ export default function EditorLayout({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-              {[
-                ["Play / Pause", "Space"],
-                ["Split Clip", "S"],
-                ["Delete Clip", "Delete / Backspace"],
-                ["Duplicate Clip", "Ctrl + D"],
-                ["Undo / Redo", "Ctrl + Z / Ctrl + Shift + Z"],
-                ["Step Frame", "← / →"],
-                ["Select All", "Ctrl + A"],
-                ["Nudge Clip", "Alt + ← / →"],
-                ["Toggle Snapping", "N"],
-                ["Fit Timeline", "F"],
-                ["Timeline Zoom", "+ / -"],
-                ["Deselect", "Esc"],
-              ].map(([action, shortcut]) => (
-                <div
-                  key={action}
-                  className="p-2 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between"
-                >
-                  <span className="text-slate-600 text-[11px] font-sans">{action}</span>
-                  <span className="text-blue-700 font-semibold text-[10px] bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
-                    {shortcut}
-                  </span>
-                </div>
-              ))}
+            <div className="overflow-y-auto space-y-4 pr-1 flex-1">
+              {(
+                [
+                  "Playback & Shuttle",
+                  "Editing & Split",
+                  "Tracks & Audio",
+                  "History & Clipboard",
+                  "Navigation & View",
+                ] as const
+              ).map((category) => {
+                const items = SHORTCUT_DEFINITIONS.filter((d) => d.category === category);
+                if (!items.length) return null;
+                return (
+                  <div key={category} className="space-y-1.5">
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      {category}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {items.map((def) => (
+                        <div
+                          key={def.id}
+                          className="p-2 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-slate-800 text-[11px] font-medium font-sans truncate">
+                              {def.label}
+                            </div>
+                            <div className="text-slate-400 text-[10px] truncate">
+                              {def.description}
+                            </div>
+                          </div>
+                          <span className="text-blue-700 font-mono font-semibold text-[10px] bg-blue-50 border border-blue-200 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
+                            {def.keys}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <p className="text-[11px] text-slate-500 text-center pt-2">
-              On macOS, use ⌘ Command instead of Ctrl.
-            </p>
+            <div className="border-t border-slate-200 pt-3 flex items-center justify-between flex-shrink-0 text-[11px] text-slate-500">
+              <span>On macOS, use ⌘ Command instead of Ctrl.</span>
+              <button
+                type="button"
+                onClick={() => {
+                  loadDemoProjectIntoStore(store);
+                  setShortcutsOpen(false);
+                  notify("Loaded 15-second creator demo project.");
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold border border-blue-200 transition-colors cursor-pointer"
+              >
+                <Sparkles size={13} />
+                <span>Try Demo Project</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

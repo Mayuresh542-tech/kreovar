@@ -100,7 +100,7 @@ test('Error & Recovery: Browser refresh during editing restores latest valid che
 test('Error & Recovery: Failed AI stage saves committed stages and retry does not duplicate mutations', async () => {
   const p = fixtureProject();
   const store = new EditorStore(p);
-  const job = pipeline.createEditingJob(p, 'Add captions and zooms', []);
+  const job = pipeline.createEditingJob(p, 'Add captions and zooms', [], undefined, { faultTolerant: false });
 
   let failZooms = true;
   const executedStages = [];
@@ -214,7 +214,7 @@ test('Error & Recovery: User manual edits during planning trigger stale revision
 test('Error & Recovery: Empty AI responses and zero-operation stages throw and never report false success', async () => {
   const p = fixtureProject();
   const store = new EditorStore(p);
-  const job = pipeline.createEditingJob(p, 'Add subtle zoom', []);
+  const job = pipeline.createEditingJob(p, 'Add subtle zoom', [], undefined, { faultTolerant: false });
 
   const runtime = {
     getProject: () => store.getSnapshot(),

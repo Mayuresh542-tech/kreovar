@@ -58,6 +58,10 @@ export default function CanvasStage({
   const [zoom, setZoom] = useState<number | "fit">("fit");
   const [buffering, setBuffering] = useState(false);
   const [isLooping, setIsLooping] = useState(true);
+  const isLoopingRef = useRef(isLooping);
+  useEffect(() => {
+    isLoopingRef.current = isLooping;
+  }, [isLooping]);
   const [showSafeAreas, setShowSafeAreas] = useState(false);
   const [showCrosshair, setShowCrosshair] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -117,12 +121,18 @@ export default function CanvasStage({
       last = now;
 
       try {
-        let next = playbackTime(state.time, state.playing, waiting, delta, curDuration);
+        const speed = state.speed ?? 1;
+        let next = playbackTime(state.time, state.playing, waiting, delta, curDuration, speed);
 
-        // Loop handling
-        if (state.playing && isLooping && curDuration > 0 && next >= curDuration) {
+        // Loop handling and shuttle bounds
+        if (state.playing && isLoopingRef.current && curDuration > 0 && next >= curDuration) {
           next = 0;
-          playback.set(0, true);
+          playback.set(0, true, speed);
+        } else if (state.playing && speed < 0 && next <= 0) {
+          next = 0;
+          playback.set(0, false, 1);
+        } else if (state.playing && speed > 0 && next >= curDuration && curDuration > 0) {
+          playback.set(curDuration, false, 1);
         }
 
         const displayTime = curDuration
@@ -179,7 +189,7 @@ export default function CanvasStage({
         }
 
         if (state.playing && ready) {
-          playback.set(next, isLooping || next < curDuration);
+          playback.set(next, isLoopingRef.current || next < curDuration);
         } else if (!ready) {
           compositor.pause();
         }
@@ -206,7 +216,7 @@ export default function CanvasStage({
       compositor.dispose();
       engineRef.current = null;
     };
-  }, [store, playback, repository, notify, isLooping]);
+  }, [store, playback, repository, notify]);
 
   // Stage Fit and Aspect Ratio Sizing
   useEffect(() => {
@@ -282,14 +292,22 @@ export default function CanvasStage({
     playback.set(playback.getSnapshot().time, false);
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const t = clip.transform;
+    const [w, h] = dimensions[store.getSnapshot().settings.aspectRatio];
+    const box = boundsRef.current.find((b) => b.id === id);
+    const centerX = rect.left + (box ? (box.x / w) * rect.width : (0.5 + t.x) * rect.width);
+    const centerY = rect.top + (box ? (box.y / h) * rect.height : (0.5 + t.y) * rect.height);
     const startX = event.clientX;
     const startY = event.clientY;
-    const t = clip.transform;
+    const startDist = Math.hypot(startX - centerX, startY - centerY);
+    const startAngle = Math.atan2(startY - centerY, startX - centerX) * (180 / Math.PI);
 
     pointerEdit(
       store,
-      (e) => (p) =>
-        changeClipProperty(p, id, {
+      (e) => (p) => {
+        const curDist = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+        const curAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+        return changeClipProperty(p, id, {
           transform: {
             ...t,
             ...(mode === "move"
@@ -300,14 +318,15 @@ export default function CanvasStage({
               : mode === "scale"
               ? {
                   scale: clamp(
-                    t.scale * (1 + (e.clientX - startX) / Math.max(30, rect.width * 0.3)),
+                    t.scale * (startDist > 2 ? curDist / startDist : 1),
                     0.05,
                     10
                   ),
                 }
-              : { rotation: t.rotation + (e.clientX - startX) * 0.6 }),
+              : { rotation: Math.round(t.rotation + (curAngle - startAngle)) }),
           },
-        }),
+        });
+      },
       notify
     );
   };
@@ -413,7 +432,7 @@ export default function CanvasStage({
       {/* Main Preview Container */}
       <div
         ref={stageRef}
-        className="flex-1 w-full flex items-center justify-center relative min-h-0 overflow-hidden"
+        className={`flex-1 w-full flex items-center justify-center relative min-h-0 ${zoom !== "fit" && zoom > 1 ? "overflow-auto p-4" : "overflow-hidden"}`}
       >
         <div
           ref={frameRef}
@@ -437,14 +456,36 @@ export default function CanvasStage({
             </div>
           )}
 
-          {/* Safe Area Overlay for 9:16 Short-Form Videos */}
-          {showSafeAreas && aspectRatio === "9:16" && (
-            <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-amber-400/50 m-8 rounded-lg flex flex-col justify-between p-3 text-[10px] text-amber-300 font-mono">
-              <span className="opacity-80">Top Header Safe Zone</span>
-              <span className="opacity-80 self-end text-right">
-                Right Action Sidebar (Likes/Share)
-              </span>
-              <span className="opacity-80">Bottom Caption & Audio Safe Zone</span>
+          {/* Dynamic Safe Area Overlays */}
+          {showSafeAreas && (
+            <div className="absolute inset-0 pointer-events-none">
+              {aspectRatio === "9:16" && (
+                <div className="absolute inset-x-[16%] top-[12%] bottom-[20%] border-2 border-dashed border-amber-400/60 rounded-md flex flex-col justify-between p-2 text-[10px] text-amber-300 font-mono">
+                  <span className="opacity-80">Top Header Safe</span>
+                  <span className="opacity-80 text-right">Action Sidebar</span>
+                  <span className="opacity-80">Bottom Caption Safe</span>
+                </div>
+              )}
+              {aspectRatio === "4:5" && (
+                <div className="absolute inset-x-[5%] inset-y-[10%] border-2 border-dashed border-amber-400/60 rounded-md flex items-end p-2 text-[10px] text-amber-300 font-mono">
+                  <span className="opacity-80">4:5 Feed Safe Area</span>
+                </div>
+              )}
+              {aspectRatio === "1:1" && (
+                <div className="absolute inset-[10%] border-2 border-dashed border-amber-400/60 rounded-md flex items-end p-2 text-[10px] text-amber-300 font-mono">
+                  <span className="opacity-80">1:1 Square Safe Area</span>
+                </div>
+              )}
+              {aspectRatio === "16:9" && (
+                <>
+                  <div className="absolute inset-[5%] border border-dashed border-amber-400/60 rounded flex items-start p-1.5 text-[9px] text-amber-300 font-mono">
+                    <span className="opacity-80">Action Safe (90%)</span>
+                  </div>
+                  <div className="absolute inset-[10%] border border-dashed border-cyan-400/60 rounded flex items-end p-1.5 text-[9px] text-cyan-300 font-mono">
+                    <span className="opacity-80">Title Safe (80%)</span>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

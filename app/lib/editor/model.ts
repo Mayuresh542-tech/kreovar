@@ -32,6 +32,7 @@ export interface Caption extends TextLayer { templateId?: string; studioStyle?:i
 export type AudioRole="speech"|"background"|"sfx";
 export interface Clip {
   mediaAnimation?:import("./mediaAnimation").MediaAnimation;
+  kenBurns?:import("./kenBurns").KenBurnsPreset;
   visualTreatment?:import("./visualTreatment").VisualTreatment;
   shape?:import("./shapes").ShapeStyle;
   surface?:import("./styleSurface").StyleSurface;
@@ -39,6 +40,7 @@ export interface Clip {
   graphic?:import('./motionGraphics').MotionGraphic;
   zooms?: import("./zoom").ZoomMotion[];
   audioRole?:AudioRole; ducking?:boolean;
+  preservePitch?: boolean;
   id: string; assetId?: string; contentId?: string; trackId: string; name: string;
   startTime: number; duration: number; sourceStart: number; sourceEnd: number;
   transform: Transform; volume: number; speed: number; fadeIn: number; fadeOut: number;
@@ -63,7 +65,7 @@ export const dimensions: Record<Ratio, [number, number]> = { "16:9": [1920,1080]
 export const defaultTransform: Transform = { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 };
 export const defaultStyle: TextStyle = { font: "Inter", size: 72, weight: 700, align: "center", color: "#ffffff", background: "transparent", stroke: "#000000", strokeWidth: 0, shadow: 0, letterSpacing: 0, lineHeight: 1.2 };
 export const uid = () => crypto.randomUUID();
-export const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+export const clamp = (v: number, min: number, max: number) => !Number.isFinite(v) ? min : Math.max(min, Math.min(max, v));
 export const projectDuration = (p: EditorProject) => Object.values(p.clips).reduce((end,c) => Math.max(end,c.startTime+c.duration),0);
 export const isVisual = (kind: TrackKind) => kind !== "audio";
 export const canPlace = (kind: TrackKind, asset: AssetKind) => asset === "audio" ? kind === "audio" : kind === "video" || kind === "overlay" || (asset === "image" && kind === "image");

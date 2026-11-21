@@ -56,8 +56,7 @@ function getProjectIndex(p: EditorProject): ProjectRenderIndex {
   const allClips = Object.values(p.clips);
   const visualTracks = p.trackOrder
     .map(id => p.tracks[id])
-    .filter((t): t is Track => !!t && t.kind !== "audio")
-    .sort((a, b) => priority[a.kind] - priority[b.kind]);
+    .filter((t): t is Track => !!t && t.kind !== "audio");
   const transitionsByToClipId = new Map<string, Transition[]>();
   for (const t of Object.values(p.transitions)) {
     const list = transitionsByToClipId.get(t.toClipId);
@@ -97,7 +96,20 @@ export function visibleLayers(p:EditorProject,time:number):Layer[]{
         }
       }layers.push(layer);
     }
-  }return layers.sort((a,b)=>(a.clip.shape?2.5:priority[a.track.kind])-(b.clip.shape?2.5:priority[b.track.kind]));
+  }
+  const trackOrderIndex = new Map(p.trackOrder.map((id, index) => [id, index]));
+  return layers.sort((a, b) => {
+    const idxA = trackOrderIndex.get(a.track.id) ?? 0;
+    const idxB = trackOrderIndex.get(b.track.id) ?? 0;
+    if (idxA !== idxB) {
+      if (a.clip.shape && !b.clip.shape && b.track.kind === 'image') return 1;
+      if (b.clip.shape && !a.clip.shape && a.track.kind === 'image') return -1;
+      return idxA - idxB;
+    }
+    if (a.clip.shape && !b.clip.shape) return 1;
+    if (b.clip.shape && !a.clip.shape) return -1;
+    return 0;
+  });
 }
 type TextLayoutResult = { mixed?: ReturnType<typeof mixedTextLines>; lines: string[]; inkWidth: number; width: number; height: number };
 const textLayoutCache = new Map<string, TextLayoutResult>();
@@ -121,7 +133,28 @@ function layoutText(ctx:CanvasRenderingContext2D,layer:TextLayer,width:number,to
 export class Compositor {
   private entries=new Map<string,Entry>();private loading=new Map<string,Promise<void>>();
   private context?:AudioContext;private destination?:MediaStreamAudioDestinationNode;private output?:GainNode;private closed=false;
+  private isScrubbing=false;private lastSyncTime=-1;private lastSyncNow=0;
+  private cachedFrames=new Map<string,{canvas:HTMLCanvasElement;width:number;height:number}>();
   constructor(private repository:MediaRepository,private onError:(error:Error)=>void=()=>{}){}
+  setScrubbing(scrubbing:boolean){
+    this.isScrubbing=scrubbing;
+    if(scrubbing){
+      if(this.output&&this.context)this.output.gain.setValueAtTime(0,this.context.currentTime);
+      for(const entry of this.entries.values()){
+        if(entry.gain&&this.context)entry.gain.gain.setValueAtTime(0,this.context.currentTime);
+        if(entry.element instanceof HTMLMediaElement&&!entry.element.paused)entry.element.pause();
+      }
+    }else{
+      if(this.output&&this.context)this.output.gain.setValueAtTime(1,this.context.currentTime);
+      // Precision seek all media on scrub release
+      for(const entry of this.entries.values()){
+        if(entry.element instanceof HTMLMediaElement&&entry.ready&&!entry.element.seeking){
+          // Will be synced to exact target on next frame
+        }
+      }
+    }
+  }
+  getScrubbing():boolean{return this.isScrubbing;}
   async activateAudio(exporting=false){
     if(!this.context){this.context=new AudioContext();this.output=this.context.createGain();if(exporting){this.destination=this.context.createMediaStreamDestination();this.output.connect(this.destination);}else this.output.connect(this.context.destination);}
     await this.context.resume();for(const entry of this.entries.values())this.connectAudio(entry);
@@ -163,6 +196,11 @@ export class Compositor {
   }
   private sourceTime(c:Clip,time:number,hold=false){return clamp(c.sourceStart+(hold?c.duration-0.001:time-c.startTime)*c.speed,c.sourceStart,Math.max(c.sourceStart,c.sourceEnd-0.001));}
   sync(p:EditorProject,time:number,playing:boolean):boolean {
+    const now=typeof performance!=="undefined"?performance.now():Date.now();
+    if(!playing&&this.lastSyncTime>=0&&Math.abs(time-this.lastSyncTime)>0.001){
+      if(now-this.lastSyncNow<150)this.isScrubbing=true;
+    }
+    this.lastSyncTime=time;this.lastSyncNow=now;
     const index=getProjectIndex(p),windows=index.speechWindows,layers=visibleLayers(p,time),holdIds=new Set(layers.filter(l=>l.hold).map(l=>l.clip.id));
     const wanted=new Set(layers.map(l=>l.clip.id));let ready=true;
     const lookahead=playing?3:1;
@@ -180,12 +218,27 @@ export class Compositor {
       if(!entry?.ready){ready=false;continue;}
       if(element instanceof HTMLMediaElement){
         const hold=holdIds.has(id),target=Math.min(this.sourceTime(c,time,hold),Math.max(0,element.duration-.001));
-        if(!element.seeking&&Math.abs(element.currentTime-target)>(playing?.22*c.speed:.015)){element.currentTime=target;ready=false;}
-        if(element.seeking||element.readyState<2)ready=false;
-        element.playbackRate=c.speed;
-        if(entry.gain&&this.context)entry.gain.gain.setTargetAtTime(hold?0:clipGain(p,c,time,windows),this.context.currentTime,.008);
-        // Start active sources together only after the readiness pass below.
-        if(!playing||hold)element.pause();
+        const delta=Math.abs(element.currentTime-target);
+        if(this.isScrubbing||!playing){
+          if(entry.gain&&this.context)entry.gain.gain.setValueAtTime(0,this.context.currentTime);
+          if(!element.paused)element.pause();
+          if(!element.seeking&&delta>0.03){
+            if("fastSeek" in element&&typeof (element as any).fastSeek==="function"){
+              (element as any).fastSeek(target);
+            }else{
+              element.currentTime=target;
+            }
+          }
+        }else{
+          if(!element.seeking&&delta>(playing?.22*c.speed:.015)){element.currentTime=target;ready=false;}
+          if(element.seeking||element.readyState<2)ready=false;
+          element.playbackRate=c.speed;
+          if('preservesPitch' in element){(element as any).preservesPitch=c.preservePitch!==false;}
+          else if('webkitPreservesPitch' in element){(element as any).webkitPreservesPitch=c.preservePitch!==false;}
+          if(entry.gain&&this.context)entry.gain.gain.setTargetAtTime(hold?0:clipGain(p,c,time,windows),this.context.currentTime,.008);
+          // Start active sources together only after the readiness pass below.
+          if(!playing||hold)element.pause();
+        }
       }
     }
     for(const id of wanted){const entry=this.entries.get(id),element=entry?.element,c=p.clips[id];
@@ -209,7 +262,8 @@ export class Compositor {
       if(!c.shape&&!text&&!frame&&(!element||!this.entries.get(c.id)?.ready))continue;
       const sourceTime=c.sourceStart+Math.max(0,(layer.hold?c.startTime+c.duration-1/p.settings.fps:time)-c.startTime)*c.speed,treatment=visualTreatmentAt(c,layer.hold?c.startTime+c.duration-1/p.settings.fps:time);
       const local=time-c.startTime,fade=layer.hold?1:Math.min(c.fadeIn?clamp(local/c.fadeIn,0,1):1,c.fadeOut?clamp((c.duration-local)/c.fadeOut,0,1):1);
-      ctx.save();ctx.globalAlpha=t.opacity*layer.opacity*fade*treatment.opacity;ctx.translate(width*(.5+t.x+layer.x),height*(.5+t.y));ctx.rotate(t.rotation*Math.PI/180);ctx.scale(t.scale*layer.scale*treatment.scale*animation.scaleX,t.scale*layer.scale*treatment.scale*animation.scaleY);
+      const treatmentEyeLine = (!c.shape && !text && treatment.scale > 1.001) ? (treatment.scale - 1) * 0.14 : 0;
+      ctx.save();ctx.globalAlpha=t.opacity*layer.opacity*fade*treatment.opacity;ctx.translate(width*(.5+t.x+layer.x),height*(.5+t.y+treatmentEyeLine));ctx.rotate(t.rotation*Math.PI/180);ctx.scale(t.scale*layer.scale*treatment.scale*animation.scaleX,t.scale*layer.scale*treatment.scale*animation.scaleY);
       const fx=c.effects,blur=Math.min(50,fx.blur+treatment.blur+animation.blur);
       if(fx.brightness!==0||fx.contrast!==0||fx.saturation!==0||blur>0.01){
         const parts:string[]=[];
@@ -243,13 +297,39 @@ export class Compositor {
           }
         });
       }else if(frame||element instanceof HTMLVideoElement||element instanceof HTMLImageElement){
-        const ew=frame?frame.width:element instanceof HTMLVideoElement?element.videoWidth:(element as HTMLImageElement).naturalWidth,eh=frame?frame.height:element instanceof HTMLVideoElement?element.videoHeight:(element as HTMLImageElement).naturalHeight;
-        if(!ew||!eh){ctx.restore();continue;}const mediaBounds=drawVisualMedia(ctx,frame?.image||element as HTMLVideoElement|HTMLImageElement,ew,eh,width,height,c.visualTreatment,sourceTime,treatment.rgbOffset);bw=mediaBounds.width;bh=mediaBounds.height;if(c.surface&&c.surface!=="none"){ctx.save();if(c.visualTreatment?.mask)applyVisualMask(ctx,c.visualTreatment.mask,bw,bh,sourceTime);drawStyleSurface(ctx,bw,bh,local,c.surface);ctx.restore();}
+        const isVideo=element instanceof HTMLVideoElement;
+        const ew=frame?frame.width:isVideo?element.videoWidth:(element as HTMLImageElement).naturalWidth,eh=frame?frame.height:isVideo?element.videoHeight:(element as HTMLImageElement).naturalHeight;
+        if(isVideo && element.readyState>=2 && ew>0 && eh>0){
+          if(typeof document!=="undefined"){
+            let cached=this.cachedFrames.get(c.id);
+            if(!cached||cached.width!==ew||cached.height!==eh){
+              const offscreen=document.createElement("canvas");
+              offscreen.width=ew;offscreen.height=eh;
+              cached={canvas:offscreen,width:ew,height:eh};
+              this.cachedFrames.set(c.id,cached);
+            }
+            const offCtx=cached.canvas.getContext("2d");
+            if(offCtx)offCtx.drawImage(element,0,0,ew,eh);
+          }
+          const mediaBounds=drawVisualMedia(ctx,frame?.image||element,ew,eh,width,height,c.visualTreatment,sourceTime,treatment.rgbOffset);
+          bw=mediaBounds.width;bh=mediaBounds.height;
+          if(c.surface&&c.surface!=="none"){ctx.save();if(c.visualTreatment?.mask)applyVisualMask(ctx,c.visualTreatment.mask,bw,bh,sourceTime);drawStyleSurface(ctx,bw,bh,local,c.surface);ctx.restore();}
+        }else if(isVideo && this.cachedFrames.has(c.id)){
+          const cached=this.cachedFrames.get(c.id)!;
+          const mediaBounds=drawVisualMedia(ctx,cached.canvas,cached.width,cached.height,width,height,c.visualTreatment,sourceTime,treatment.rgbOffset);
+          bw=mediaBounds.width;bh=mediaBounds.height;
+          if(c.surface&&c.surface!=="none"){ctx.save();if(c.visualTreatment?.mask)applyVisualMask(ctx,c.visualTreatment.mask,bw,bh,sourceTime);drawStyleSurface(ctx,bw,bh,local,c.surface);ctx.restore();}
+        }else if(frame||element instanceof HTMLImageElement||(isVideo&&ew&&eh)){
+          if(!ew||!eh){ctx.restore();continue;}
+          const mediaBounds=drawVisualMedia(ctx,frame?.image||element as HTMLVideoElement|HTMLImageElement,ew,eh,width,height,c.visualTreatment,sourceTime,treatment.rgbOffset);
+          bw=mediaBounds.width;bh=mediaBounds.height;
+          if(c.surface&&c.surface!=="none"){ctx.save();if(c.visualTreatment?.mask)applyVisualMask(ctx,c.visualTreatment.mask,bw,bh,sourceTime);drawStyleSurface(ctx,bw,bh,local,c.surface);ctx.restore();}
+        }else{ctx.restore();continue;}
       }
       if(!layer.hold)bounds.push({id:c.id,x:width*(.5+t.x),y:height*(.5+t.y),width:bw*t.scale*treatment.scale*Math.abs(animation.scaleX),height:bh*t.scale*treatment.scale*Math.abs(animation.scaleY),rotation:t.rotation});ctx.restore();
     }ctx.setTransform(1,0,0,1,0,0);return bounds;
   }
   pause(){for(const e of this.entries.values())if(e.element instanceof HTMLMediaElement)e.element.pause();}
-  private release(id:string){const entry=this.entries.get(id);if(!entry)return;entry.source?.disconnect();entry.gain?.disconnect();if(entry.element instanceof HTMLMediaElement){entry.element.pause();entry.element.removeAttribute("src");entry.element.load();}this.entries.delete(id);this.loading.delete(id);}
-  dispose(){this.closed=true;this.frames.clear();for(const id of this.entries.keys())this.release(id);void this.context?.close();}
+  private release(id:string){this.cachedFrames.delete(id);const entry=this.entries.get(id);if(!entry)return;entry.source?.disconnect();entry.gain?.disconnect();if(entry.element instanceof HTMLMediaElement){entry.element.pause();entry.element.removeAttribute("src");entry.element.load();}this.entries.delete(id);this.loading.delete(id);}
+  dispose(){this.closed=true;this.frames.clear();this.cachedFrames.clear();for(const id of this.entries.keys())this.release(id);void this.context?.close();}
 }

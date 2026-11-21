@@ -37,7 +37,7 @@ function CaptionsContent(){
  const [detectedLanguage,setDetectedLanguage]=useState(""),[captionLanguage,setCaptionLanguage]=useState("auto"),[scriptMode,setScriptMode]=useState<"hinglish"|"hindi"|"english">("hinglish");
  function applyScriptMode(mode:"hinglish"|"hindi"|"english"){
   setScriptMode(mode);
-  if(mode==="hinglish"){setCaptionLanguage("hinglish");if(segments.length){remember();const updated=segments.map(s=>({...s,text:normalizeHinglishText(s.text),words:s.words?normalizeHinglishWords(s.words):undefined}));setSegments(updated);setText(updated.map(s=>s.text).join(" "));}}
+  if(mode==="hinglish"){setCaptionLanguage("hinglish");if(segments.length){remember();const updated=segments.map(s=>({...s,text:normalizeHinglishText(s.text),words:s.words?normalizeHinglishWords(s.words):[]}));setSegments(updated);setText(updated.map(s=>s.text).join(" "));}}
   else if(mode==="hindi")setCaptionLanguage("hi");
   else if(mode==="english")setCaptionLanguage("en");
  }
@@ -77,7 +77,7 @@ function CaptionsContent(){
    controller.signal.throwIfAborted();original.current=file;setFileName(file.name);setDuration(meta.duration);setAspect(meta.width/meta.height||16/9);setUrl(localUrl);localUrl=undefined;
    const data=await transcribeCaptionVideo(file,meta.duration,controller.signal,setBusy,captionLanguage);
    const rawTimed=(data.segments as CaptionSegment[]||[]).filter(s=>typeof s.text==="string"&&Number.isFinite(s.start)&&Number.isFinite(s.end)&&s.end>s.start&&s.start<meta.duration).map(s=>({...s,end:Math.min(s.end,meta.duration)}));if(!rawTimed.length)throw new Error("No speech was found. You can import an SRT caption file instead.");
-   const timed=(scriptMode==='hinglish'||captionLanguage==='hinglish')?rawTimed.map(s=>({...s,text:normalizeHinglishText(s.text),words:s.words?normalizeHinglishWords(s.words):undefined})):rawTimed;
+   const timed=(scriptMode==='hinglish'||captionLanguage==='hinglish')?rawTimed.map(s=>({...s,text:normalizeHinglishText(s.text),words:s.words?normalizeHinglishWords(s.words):[]})):rawTimed;
    setDetectedLanguage(typeof data.language==="string"?data.language.slice(0,80):"");setSegments(timed);setText(data.transcript||"");setCaptionAsset(data.asset||null);
   }catch(cause){setError(controller.signal.aborted?"Caption generation cancelled. You can retry or import an SRT file.":cause instanceof Error?cause.message:"Transcription failed. Import an SRT or retry.");}finally{if(localUrl)URL.revokeObjectURL(localUrl);if(job.current===controller){job.current=null;setGenerating(false);setBusy("");}}
  }

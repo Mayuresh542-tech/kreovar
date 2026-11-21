@@ -241,12 +241,12 @@ describe('Preset Failure Resilience & Non-Stopping Pipeline Progression', () => 
     assert.equal(r.getProject().clips.footage.zooms.length, 1);
   });
 
-  test('Non-preset custom edit mandatory failure still halts as expected', async () => {
+  test('Non-preset custom edit failure skips with degradation notice, and strict mode halts as expected', async () => {
     const p = source();
     const job = pipeline.createEditingJob(p, 'Add zooms to this video', []); // No preset!
     assert.equal(job.presetId, undefined);
 
-    const r = makeRuntime(p, async (stage, project, j) => {
+    const handler = async (stage, project, j) => {
       switch (stage) {
         case 'analyzeFootage':
           return { summary: 'Analyze', operations: ['zooms'] };
@@ -257,11 +257,18 @@ describe('Preset Failure Resilience & Non-Stopping Pipeline Progression', () => 
         default:
           throw new Error(`Unexpected stage: ${stage}`);
       }
-    });
+    };
 
+    const r = makeRuntime(p, handler);
     const result = await pipeline.runEditingJob(r, job, signal());
 
-    assert.equal(result.status, 'failed', 'Non-preset mandatory failures must halt the edit');
-    assert.deepEqual(result.failedStages, ['applyZooms']);
+    assert.equal(result.status, 'completed', 'Non-preset failure must gracefully skip and complete edit');
+    assert.ok(result.degradationNotices?.some(n => n.stage === 'applyZooms' && n.status === 'skipped'));
+
+    const strictJob = pipeline.createEditingJob(p, 'Add zooms to this video', [], undefined, { faultTolerant: false });
+    const strictRuntime = makeRuntime(p, handler);
+    const strictResult = await pipeline.runEditingJob(strictRuntime, strictJob, signal());
+    assert.equal(strictResult.status, 'failed', 'Strict non-preset edit must halt on failure');
+    assert.deepEqual(strictResult.failedStages, ['applyZooms']);
   });
 });

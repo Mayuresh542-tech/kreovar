@@ -9,6 +9,8 @@ import {validateAssetBytes} from "../assetPolicy";
 import {getStudioAsset} from "../assetStore";
 import {aiProjectSnapshot} from "../../editor/aiValidation";
 import {projectDuration,type EditorProject,type Clip} from "../../editor/model";
+import {audioRole} from "../../editor/audioMix";
+import {buildFfmpegDuckingFilter,getSpeechIntervals,type DuckingConfig} from "../../editor/audioDucking";
 
 const MAX_FILE=100*1048576,MAX_TOTAL=250*1048576;
 function run(binary:string,args:string[],signal:AbortSignal):Promise<string>{
@@ -22,11 +24,15 @@ function run(binary:string,args:string[],signal:AbortSignal):Promise<string>{
  if(signal.aborted)abort();
  });
 }
-export function audioClipFilter(c:Clip,input:number,name:string){
+export function audioClipFilter(c:Clip,input:number,name:string,project?:EditorProject,speechWindows?:Array<{start:number;end:number}>,duckingConfig?:Partial<DuckingConfig>){
  const tempo=c.speed<.5?[.5,c.speed/.5]:c.speed>2?[2,c.speed/2]:[c.speed];
  const chain=["atrim=start="+c.sourceStart+":end="+c.sourceEnd,"asetpts=PTS-STARTPTS",...tempo.map(n=>"atempo="+n),"atrim=duration="+c.duration,"volume="+c.volume];
  if(c.fadeIn)chain.push("afade=t=in:st=0:d="+Math.min(c.fadeIn,c.duration));
  if(c.fadeOut)chain.push("afade=t=out:st="+Math.max(0,c.duration-c.fadeOut)+":d="+Math.min(c.fadeOut,c.duration));
+ if(project?.settings?.audioDucking&&c.ducking!==false&&audioRole(project,c)!=='speech'){
+  const duckFilter=buildFfmpegDuckingFilter(c,speechWindows||getSpeechIntervals(project),duckingConfig);
+  if(duckFilter)chain.push(duckFilter);
+ }
  chain.push("adelay="+Math.round(c.startTime*1000)+":all=1");return "["+input+":a:0]"+chain.join(",")+"["+name+"]";
 }
 /** Reuse the browser's complete visual composition; mix original audio on exact timeline timestamps. */
@@ -54,10 +60,10 @@ export async function finalizeEditorMp4(userId:string,raw:unknown,recording:Buff
    if(!Number.isFinite(sourceDuration)||sourceDuration<=0||row.kind==="audio"&&!audio)throw new Error("An original audio stream cannot be decoded.");
    const index=inputs.length+1;inputs.push(file);indices.set(id,{index,duration:sourceDuration,audio});
   }
-  const filters:string[]=[],mixes:string[]=[];
+  const filters:string[]=[],mixes:string[]=[],windows=getSpeechIntervals(project);
   for(const c of clips){const info=indices.get(sourceAssets[c.assetId!].libraryId!)!;
    if(c.sourceEnd>info.duration+.03||Math.abs(c.duration-(c.sourceEnd-c.sourceStart)/c.speed)>.04)throw new Error("A clip exceeds its original audio range. Trim it and retry.");
-   if(!info.audio)continue;const name="mix"+mixes.length;filters.push(audioClipFilter(c,info.index,name));mixes.push("["+name+"]");
+   if(!info.audio)continue;const name="mix"+mixes.length;filters.push(audioClipFilter(c,info.index,name,project,windows));mixes.push("["+name+"]");
   }
   const probe=JSON.parse(await run(process.env.FFPROBE_PATH||"ffprobe",["-v","error","-protocol_whitelist","file,pipe","-format_whitelist","mov","-select_streams","v:0","-show_entries","stream=width,height","-of","json",path.join(dir,"composition.mp4")],signal));
   assertRenderResolution(probe.streams?.[0]);

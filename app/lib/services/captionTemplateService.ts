@@ -4,6 +4,7 @@ import {
   DEFAULT_CAPTION_TEMPLATES,
   getTemplateById,
 } from "../captions/templates";
+import { ALL_CAPTION_TEMPLATES } from "../captions/referenceTemplates";
 import { VeeloxProject, VeeloxCaption } from "./types";
 import { VeeloxTimelineProject } from "../timeline/types";
 import { saveProject } from "./projectService";
@@ -51,7 +52,7 @@ export async function fetchAllCaptionTemplates(): Promise<{
       saveLocalCustomTemplates(mergedCustom);
 
       return {
-        systemTemplates: data.systemTemplates || DEFAULT_CAPTION_TEMPLATES,
+        systemTemplates: data.systemTemplates || ALL_CAPTION_TEMPLATES,
         userTemplates: mergedCustom,
       };
     }
@@ -60,7 +61,7 @@ export async function fetchAllCaptionTemplates(): Promise<{
   }
 
   return {
-    systemTemplates: DEFAULT_CAPTION_TEMPLATES,
+    systemTemplates: ALL_CAPTION_TEMPLATES,
     userTemplates: localCustom,
   };
 }

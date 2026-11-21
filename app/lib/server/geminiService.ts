@@ -11,13 +11,18 @@ export interface GeminiCompletionOptions {
   operation?: string;
   signal?: AbortSignal;
   model?: string;
+  candidateImages?: { candidateId: string; data: string }[];
+  footageFrames?: { clipId?: string; timelineTime?: number; sourceTime?: number; data: string }[];
+  referenceImages?: { styleId?: string; timeSecondsApprox?: number; mediaType?: string; data: string }[];
+  onMetadata?: (meta: { model: string; totalTokens: number; promptTokens?: number; completionTokens?: number }) => void;
 }
 
-export const GEMINI_EDITOR_MODEL = "gemini-3.8-flash";
+export const GEMINI_EDITOR_MODEL = "gemini-2.5-flash";
 const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || GEMINI_EDITOR_MODEL;
 const FALLBACK_GEMINI_MODELS = [
-  "gemini-3.8-flash",
+  "gemini-2.5-flash",
   "gemini-3-flash-preview",
+  "gemini-3.8-flash",
   "gemini-3.6-flash",
   "gemini-3.5-flash",
   "gemini-flash-latest",
@@ -103,11 +108,55 @@ export async function generateGeminiContent(
     new Set([primaryModel, ...FALLBACK_GEMINI_MODELS])
   );
 
+  const parts: Record<string, any>[] = [{ text: options.prompt }];
+
+  if (options.referenceImages?.length) {
+    for (const img of options.referenceImages) {
+      parts.push({
+        text: `PRIVATE STYLE REFERENCE ${img.styleId || ''}, observed sample approximately ${img.timeSecondsApprox || 0}s.`
+      });
+      parts.push({
+        inline_data: {
+          mime_type: img.mediaType || 'image/jpeg',
+          data: img.data
+        }
+      });
+    }
+  }
+
+  if (options.footageFrames?.length) {
+    for (const frame of options.footageFrames) {
+      parts.push({
+        text: `CURRENT FOOTAGE FRAME ${JSON.stringify({ clipId: frame.clipId, timelineTime: frame.timelineTime, sourceTime: frame.sourceTime })}.`
+      });
+      parts.push({
+        inline_data: {
+          mime_type: 'image/jpeg',
+          data: frame.data
+        }
+      });
+    }
+  }
+
+  if (options.candidateImages?.length) {
+    for (const candidate of options.candidateImages) {
+      parts.push({
+        text: `B-ROLL CANDIDATE ${candidate.candidateId}.`
+      });
+      parts.push({
+        inline_data: {
+          mime_type: 'image/jpeg',
+          data: candidate.data
+        }
+      });
+    }
+  }
+
   const bodyPayload: Record<string, any> = {
     contents: [
       {
         role: "user",
-        parts: [{ text: options.prompt }],
+        parts,
       },
     ],
     generationConfig: {
@@ -172,6 +221,15 @@ export async function generateGeminiContent(
 
         const durationMs = Date.now() - startTime;
         const totalTokens = data?.usageMetadata?.totalTokenCount || 500;
+        const promptTokens = data?.usageMetadata?.promptTokenCount;
+        const completionTokens = data?.usageMetadata?.candidatesTokenCount;
+
+        options.onMetadata?.({
+          model,
+          totalTokens,
+          promptTokens,
+          completionTokens,
+        });
 
         // Log usage telemetry
         await recordProviderUsage({

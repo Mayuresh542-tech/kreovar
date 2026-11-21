@@ -10,7 +10,7 @@ const user={id,email:'disposable@example.invalid',app_metadata:{}};
 function load(mocks,extra={}){
  const context=vm.createContext({URL,Headers,Response,Buffer,Date,Map,Set,Error,console,process:{env:{NEXT_PUBLIC_SUPABASE_URL:'https://test.supabase.co',NEXT_PUBLIC_SUPABASE_ANON_KEY:'public',WHOP_ACCOUNT_ID:'biz_test'}},...extra});
  const code=ts.transpileModule(fs.readFileSync(path.join(root,'app/lib/server/accountDeletion.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
- const module={exports:{}};new vm.Script(`(function(require,module,exports){${code}\n})`).runInContext(context)(s=>mocks[s]||require(s),module,module.exports);return module.exports;
+ const mod={exports:{}};new vm.Script(`(function(require,module,exports){${code}\n})`).runInContext(context)(s=>mocks[s]||require(s),mod,mod.exports);return mod.exports;
 }
 function fixture(options={}){
  const calls=[],queryErrors=options.queryErrors||{},pages=options.pages?[...options.pages]:[[{bucket_id:'studio-assets',name:id+'/voice/file.mp3',owner_id:null}],[]];
@@ -54,8 +54,8 @@ test('device cleanup removes only the deleted user namespace and preserves other
  const db={transaction(){let finished=0;const tx={objectStore(name){const store=stores[name],keys=[...store.keys()];let at=0;return{openCursor(){const request={};function next(){queueMicrotask(()=>{if(at===keys.length){request.result=null;request.onsuccess();if(++finished===2)queueMicrotask(()=>tx.oncomplete());return;}const key=keys[at++];request.result={key,delete:()=>store.delete(key),continue:next};request.onsuccess();});}next();return request;}};}};return tx;}};
  const context=vm.createContext({Map,Set,Promise,Error,queueMicrotask,indexedDB:{open(){const request={result:db};queueMicrotask(()=>request.onsuccess());return request;}}});
  const code=ts.transpileModule(fs.readFileSync(path.join(root,'app/lib/editor/cache.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
- const module={exports:{}};new vm.Script(`(function(module,exports){${code}\n})`).runInContext(context)(module,module.exports);
- assert.deepEqual([...await module.exports.clearAccountCache(id)],['p']);
+ const mod={exports:{}};new vm.Script(`(function(module,exports){${code}\n})`).runInContext(context)(mod,mod.exports);
+ assert.deepEqual([...await mod.exports.clearAccountCache(id)],['p']);
  for(const store of Object.values(stores)){assert.ok([...store.keys()].every(k=>!k.startsWith(id+':')));assert.ok([...store.keys()].some(k=>k.startsWith(other+':')));assert.ok([...store.keys()].some(k=>k.startsWith('guest:')));}
 });
 

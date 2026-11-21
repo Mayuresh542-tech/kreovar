@@ -16,13 +16,13 @@ function loadModule(relative) {
   const code = ts.transpileModule(raw, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
-  const exports = {};
+  const mod = { exports: {} };
   new vm.Script('(function(require,module,exports){\n' + code + '\n})', { filename: file }).runInThisContext()(
-    require,
-    { exports },
-    exports
+    s => s.startsWith('@/') ? loadModule(s.slice(2)) : s.startsWith('.') ? loadModule(path.relative(root, path.resolve(path.dirname(file), s))) : require(s),
+    mod,
+    mod.exports
   );
-  return exports;
+  return mod.exports;
 }
 
 describe('Structured Intent & Constraint Parsing (editingIntent.ts)', () => {

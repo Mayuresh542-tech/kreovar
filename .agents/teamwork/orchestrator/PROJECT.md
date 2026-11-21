@@ -1,108 +1,65 @@
-# Project: Kreovar AI Editor Intelligent Custom Editing & Preset Repair
+# Project: Kreovar Video Editor Hardening & UI/Export Integration
 
 ## Architecture
-- **Model Provider Tier**: `app/lib/server/editorProvider.ts` orchestrates LLM plan generation. Uses Groq with Qwen 3.7 27B (`qwen/qwen3.8-27b`) as the primary provider, with automatic failover on HTTP 429 rate limits, timeouts, or 5xx server errors to Gemini 3.8 Flash (`gemini-3.8-flash`) via `app/lib/server/geminiService.ts`. Telemetry and usage tracked consistently via `recordProviderUsage`.
-- **Wire Contract & API Route**: `POST /api/editor/ai-edit` receives `prompt`, `conversationHistory`, `pipelineStage`, and project state. Context-aware prompt generation in `app/lib/server/editorAi.ts` incorporates conversation history, transcript timestamps, sampled visual frames, clip properties, and existing captions.
-- **Pipeline Stage Execution & Lifecycle**: `app/lib/editor/sequentialEdit.ts` and `app/lib/editor/sequentialEditClient.ts` manage multistage jobs:
-  - Custom edits run `analyzeFootage` locally -> `applyRequestedEdits` atomically (using all 28 native operations and 7 media tools) -> `validateEdit`.
-  - Preset pipelines (`engaging`, `clean`, `punchy`) run sequential stages (`applyCaptions`, `applyMotionGraphics`, `applyBroll`, `applyZooms`, `applySoundEffects`).
-  - Resilient stage and job validation tolerates 0 additions on short footage (<4s), footage with 0 speech segments, explicit skip rationales, or clarification question returns.
-- **Presentation Layer**: `app/components/editor/workspace/AiEditingChat.tsx` presents chat interactions, captures conversation turns, displays clarification questions, and maintains `editingHistory`.
+- **Timeline & State Management**: `app/lib/editor/sequentialEdit.ts`, `app/lib/editor/sequentialEditClient.ts`, `app/lib/editor/inPlaceReconciler.ts`, `app/lib/editor/operations.ts`, `app/lib/editor/rippleCut.ts`, `useConversationalAiChat.ts`. Manages multi-stage AI editing, atomic snapshot rollback, non-destructive validation, and speech transcript alignment.
+- **Transcribe & Captions**: `app/api/transcribe/route.ts`, `app/captions/page.tsx`, `app/lib/editor/canvasCaptions.ts`, `app/lib/editor/studioCanvas.ts`. Speech alignment, word-level timestamps, Hinglish normalization, preset styling.
+- **Desktop & Mobile Presentation**:
+  - Desktop: `app/components/editor/workspace/AssetDrawer.tsx`, `app/components/editor/workspace/TimelinePanel.tsx`, `app/components/editor/workspace/CanvasStage.tsx`, `app/components/editor/workspace/EditorLayout.tsx`. Full Inspector controls, B-roll integration, transitions, safe areas, drag-and-drop, keyboard shortcuts.
+  - Mobile: `app/components/editor/workspace/MobileEditorLayout.tsx`, `app/components/editor/workspace/MobileCanvasStage.tsx`, `app/components/editor/workspace/MobileTimeline.tsx`. Hidden track unhide, trim handles, loop guard.
+- **Compositor & Offline Export**: `app/lib/editor/offlineExport.ts`, `app/lib/editor/compositor.ts`, `app/lib/editor/studioCanvas.ts`, `app/lib/editor/aiValidation.ts`. Multi-track compositing according to `project.trackOrder`, audio time-stretching & bleed prevention, font pre-loading, feeder concurrency control.
+- **Billing, Rate-Limiting & AI Providers**: `app/api/editor/broll-choice/route.ts`, `app/lib/server/planUsage.ts`, `app/api/editor/generate-image/route.ts`, `app/lib/server/groqEditorTransport.ts`, `app/lib/server/editorProvider.ts`. Atomic credit accounting, rate limit ordering, try/finally token settlement, Gemini token metadata & vision frames.
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | Custom stages initialization | Free-form edits initialize `stagesFor(['requestedEdits'])` yielding `['analyzeFootage', 'applyRequestedEdits', 'validateEdit']` | M3 | survey |
-| 2 | Local custom `analyzeFootage` | Custom edits analyze duration and speech locally without remote LLM roundtrip, preventing sub-stage decomposition | M3 | survey |
-| 3 | Atomic `applyRequestedEdits` execution | Executes full edit plan in single atomic stage supporting all 28 native operations and 7 media tools | M3 | survey |
-| 4 | Wire contract `conversationHistory` | Client serializes prior completed/clarified turns and `POST /api/editor/ai-edit` parses and forwards them | M3 | survey |
-| 5 | Conversation history extraction | `sequentialEditClient.ts` extracts completed and clarified turns from `project.editingHistory` | M3 | survey |
-| 6 | Clarification history preservation | `persist()` saves clarification question summaries without overwriting with generic completion text | M3 | survey |
-| 7 | Conversational instruction parsing | Understands free-form natural language instructions and user intent in `editorAi.ts` | M3 | survey |
-| 8 | Section bounds & temporal ranges | Supports "first 10s untouched", "after 0:15", "second half" restricting timeline modifications | M3 | survey |
-| 9 | Strict negative constraints | Complies with "don't change audio", "no SFX", "don't cut footage", preserving specified tracks/clips | M3 | survey |
-| 10 | Conversational refinements | Modifies existing clips/captions in-place (`composeCaption`, `changeClipProperty`, `clearZooms`, `changeText`) without duplicate elements | M3 | survey |
-| 11 | Word gap silence trimming | Trims >0.6s speech gaps using speechContext word timestamps into a single consolidated `rippleCut` | M3 | survey |
-| 12 | Style directive presets | Understands style directives (podcast, documentary, high-energy) affecting caption styling, zooms, and ducking | M3 | survey |
-| 13 | Clarification question detection | Ambiguous or conflicting instructions return `intent.questions` without crashing the pipeline | M3 | survey |
-| 14 | `applyRequestedEdits` zero-decision tolerance | Clarification turns with 0 decisions complete successfully without throwing 'no actionable edits' | M3 | survey |
-| 15 | `validateStageChanges` clarification tolerance | Permits 0 timeline changes when clarification questions are returned | M3 | survey |
-| 16 | `validateCompletedJob` clarification tolerance | Completed jobs with clarification questions pass validation without requiring revision increments | M3 | survey |
-| 17 | Chat UI clarification display | `AiEditingChat.tsx` displays clarification questions from the job summary instead of generic export text | M3 | survey |
-| 18 | Short footage preset resilience | Supporting stages (`applyZooms`, `applyBroll`, `applyMotionGraphics`, `applySoundEffects`) tolerate 0 additions when duration < 4.0s | M2 | survey |
-| 19 | Speech-free preset resilience | Supporting stages tolerate 0 additions when speech segments count === 0 | M2 | survey |
-| 20 | Explicit skip rationale resilience | Supporting stages tolerate 0 additions when stage output summary documents an editorial skip rationale | M2 | survey |
-| 21 | Preset completed job validation | `validateCompletedJob` passes if at least one meaningful stage (e.g. analysis/captions) completed | M2 | survey |
-| 22 | Dynamic caption generation & restyling | `applyCaptions` restyles in-place with `applyCaptionTemplate` if captioned, otherwise generates captions with dynamic motion | M2 | survey |
-| 23 | Primary LLM Provider: Groq Qwen 3.7 27B | `editorProvider.ts` uses `qwen/qwen3.8-27b` via Groq for planning | M1 | survey |
-| 24 | Gemini 3.8 Flash model support | `geminiService.ts` includes `gemini-3.8-flash` in candidate models with consistent JSON schema support | M1 | survey |
-| 25 | Automatic failover to Gemini | `editorProvider.ts` catches Groq 429, timeouts, and 5xx errors and transparently fails over to Gemini 3.8 Flash | M1 | survey |
-| 26 | Consistent schema & usage tracking | Primary and fallback providers maintain JSON schema compliance and record usage via `recordProviderUsage` | M1 | survey |
+| 1 | TypeScript Signature Alignment | `normalizeHinglishWords` accepts `{ word?: string; start: number; end: number }` base interface | R1 | ORIGINAL_REQUEST |
+| 2 | Eliminate In-Place Mutation | Clone snapshot before validation in `sequentialEdit.ts` & `sequentialEditClient.ts` | R1 | ORIGINAL_REQUEST |
+| 3 | Preserve Text Clips without Graphic | Retain titles & lower-thirds on `text` track unless flagged hallucination | R1 | ORIGINAL_REQUEST |
+| 4 | Multi-Stage Pipeline Expansion | Dynamically expand intermediate stages in `analyzeFootage` right before `validateEdit` | R1 | ORIGINAL_REQUEST |
+| 5 | Reconciler RippleCut Invariant | Sort and append `rippleCut` decisions at the very end of reconciled decisions | R1 | ORIGINAL_REQUEST |
+| 6 | Atomic Multi-Stage Undo & Lock Race | Record `preTurnRevision`, atomic rollback, lock manual edits during execution, await lock release | R1 | ORIGINAL_REQUEST |
+| 7 | Test DOM Alignment | Align `test-sequential-edit.mjs` selectors/testids with `AssetDrawer.tsx` / `EditorLayout.tsx` | R1 | ORIGINAL_REQUEST |
+| 8 | ESLint Cleanup | Fix 5 ESLint errors in `scripts/test-account-deletion.mjs`, `scripts/test-caption-video.mjs`, `scripts/test-seo.mjs` | R1 | ORIGINAL_REQUEST |
+| 9 | Full Clip & Caption Inspector | Port missing controls (Transform, Timing, Visual FX, Captions, Audio) into `AssetDrawer.tsx` | R2 | ORIGINAL_REQUEST |
+| 10 | Real Tool Integrations & Track Caps | Wire B-Roll `/api/editor/broll-choice`, Transitions to `TransitionKind`, DND, Hinglish revert, 30-track cap | R2 | ORIGINAL_REQUEST |
+| 11 | Canvas & Keyboard Shortcuts | Loop ref in `CanvasStage`, 2D Euclidean scale/rotate handles, dynamic Safe Area guides, N/F/+/-/Cmd+C/Cmd+V | R2 | ORIGINAL_REQUEST |
+| 12 | Mobile UI Polish | Loop disable on duration 0, Hidden Tracks unhide pill, trim handles on overlay/caption/audio | R2 | ORIGINAL_REQUEST |
+| 13 | Timeline & Caption Slicing Ops | Preserve/remap `words` in `changeText`, accurate `words[]` slice in `trimClip`/`splitClip`, `mergeCaptions` sourceEnd, re-index `rippleCut.ts` | R3 | ORIGINAL_REQUEST |
+| 14 | Export & Compositor Audio/Layer Sync | Output duration in `source.start`, bleed clamping, trackOrder visual layer sorting, alpha/filter composition, `loadCaptionFonts`, feeder mutex | R3 | ORIGINAL_REQUEST |
+| 15 | Billing, Rate-Limit & Provider Fixes | No refund on successful B-roll in `withUsage`, rate limit order in `generate-image`, Groq try/finally token settlement, Gemini token usage & vision frames | R3 | ORIGINAL_REQUEST |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Model Architecture & Fallback Integration | `app/lib/server/editorProvider.ts`, `app/lib/server/geminiService.ts` (Features 23-26) | none | DONE |
-| M2 | Preset Flow Repair & Resilience | `app/lib/editor/sequentialEdit.ts`, `app/lib/editor/sequentialEditClient.ts` (Features 18-22) | none | DONE |
-| M3 | Intelligent Custom AI Editing & Clarification | `app/lib/editor/sequentialEdit.ts`, `app/lib/editor/sequentialEditClient.ts`, `app/api/editor/ai-edit/route.ts`, `app/lib/server/editorAi.ts`, `app/components/editor/workspace/AiEditingChat.tsx` (Features 1-17) | M1, M2 | DONE |
-| M4 | Final Milestone: 100% E2E Pass & Adversarial Hardening | Full system validation against `scripts/test-custom-ai-editing.mjs` and Tier 5 coverage audit | M3, E2E Track | DONE |
-
-## E2E Testing Track (Parallel)
-| # | Name | Scope | Dependencies | Status |
-|---|------|-------|-------------|--------|
-| E2E | Comprehensive Opaque-Box Test Suite | `scripts/test-custom-ai-editing.mjs` (Tiers 1-4 coverage, 6 core acceptance scenarios, >=30 test cases) -> publishes `TEST_READY.md` | none | DONE |
-
-## Interface Contracts
-### `editorProvider.ts` ↔ `geminiService.ts`
-- `generateEditPlanJson<T>(options, preferred)`:
-  - Calls `generateGroqEditorJson<T>(options, preferred?.visualContext)`.
-  - On error matching 429 (`GROQ_RATE_LIMIT`), timeout, or 5xx, falls back to `generateGeminiJson<T>({ ...options, model: 'gemini-3.8-flash' })`.
-  - Returns `{ ...result, provider: 'gemini', fallbackReason: error.message }`.
-
-### `sequentialEditClient.ts` ↔ `/api/editor/ai-edit/route.ts`
-- Client POST body:
-  ```typescript
-  {
-    projectId: project.id,
-    prompt: stagePrompt,
-    pipelineStage: stage.id,
-    project,
-    conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>
-  }
-  ```
-- Server response:
-  ```typescript
-  {
-    summary: string,
-    questions?: string[],
-    list: EditDecisionList,
-    toolRequests: AiToolRequest[],
-    requiredOperations?: RequestedOperation[]
-  }
-  ```
-
-### `sequentialEditClient.ts` ↔ `sequentialEdit.ts`
-- `StageOutput`:
-  ```typescript
-  export interface StageOutput {
-    summary: string;
-    questions?: string[];
-    decisions?: EditDecision[];
-    requests?: AiToolRequest[];
-    operations?: RequestedOperation[];
-    skipRationale?: string;
-  }
-  ```
-- Validation rules:
-  - If `stageOutput.questions?.length > 0`: `validateStageChanges` accepts 0 changes; `validateCompletedJob` accepts revision === initialRevision.
-  - Supporting preset stages (`applyZooms`, `applyBroll`, `applyMotionGraphics`, `applySoundEffects`): tolerate 0 additions if `duration < 4.0` OR `speechContext.length === 0` OR `output.summary` matches skip keywords.
+| R1 | State Mutations, Pipeline Routing, Undo Stack & TS/Lint | Features 1-8 | none | DONE |
+| R1-Gate | R1 Gate Check | `tsc --noEmit`, `npm run lint`, `npm run test:chat-routing`, `npm run test:e2e` | R1 | DONE |
+| R2 | Real Editor Controls in Desktop & Mobile UI | Features 9-12 | R1-Gate | IN_PROGRESS |
+| R2-Gate | R2 Gate Check | Inspector, B-Roll, DND, Canvas, Mobile UI, build verification | R2 | PLANNED |
+| R3 | Export Audio Sync, Compositor, Billing & AI Vision | Features 13-15 | R2-Gate | PLANNED |
+| Final-Verify | Full Acceptance Criteria Sign-Off | All test suites passing, 0 errors, all 12 AC verified | R3 | PLANNED |
 
 ## Code Layout
-- `app/lib/server/editorProvider.ts`: Model provider dispatch & fallback orchestration
-- `app/lib/server/geminiService.ts`: Gemini SDK wrapper, models list, token usage accounting
-- `app/lib/server/editorAi.ts`: AI prompt construction, schema validation, timeline tool preparation
-- `app/api/editor/ai-edit/route.ts`: API route handling `/api/editor/ai-edit`
-- `app/lib/editor/sequentialEdit.ts`: Pure sequential editing pipeline, preset definitions, stage validation, completed job verification
-- `app/lib/editor/sequentialEditClient.ts`: Client execution runner, asset preparation, history persistence
-- `app/components/editor/workspace/AiEditingChat.tsx`: User interface for AI editing chat, presets, and clarification display
-- `scripts/test-custom-ai-editing.mjs`: Automated verification test suite
+- `app/api/transcribe/route.ts`: Transcribe API & `normalizeHinglishWords`
+- `app/captions/page.tsx`: Captions page Hinglish integration
+- `app/lib/editor/sequentialEdit.ts`: Stage expansion, validation, snapshot isolation
+- `app/lib/editor/sequentialEditClient.ts`: Execution client, lock handling, rollback
+- `app/lib/editor/inPlaceReconciler.ts`: Decision reconciliation & rippleCut ordering
+- `app/lib/editor/useConversationalAiChat.ts`: Undo management & lock integration
+- `app/components/editor/workspace/AssetDrawer.tsx`: Inspector, B-Roll, transitions, assets
+- `app/components/editor/workspace/TimelinePanel.tsx`: Track rows & vertical scroll sync
+- `app/components/editor/workspace/CanvasStage.tsx`: Canvas rendering, handles, safe areas
+- `app/components/editor/workspace/EditorLayout.tsx`: Keyboard shortcuts & layout
+- `app/components/editor/workspace/MobileEditorLayout.tsx`: Mobile layout & playback
+- `app/components/editor/workspace/MobileCanvasStage.tsx`: Mobile stage
+- `app/components/editor/workspace/MobileTimeline.tsx`: Mobile timeline, hidden tracks, trim handles
+- `app/lib/editor/operations.ts`: Timeline operations & 30-track limit
+- `app/lib/editor/rippleCut.ts`: Ripple cut, word re-indexing, visual treatment
+- `app/lib/editor/offlineExport.ts`: Offline export, audio duration, feeder mutex, fonts
+- `app/lib/editor/compositor.ts`: Realtime compositor layer ordering & filtering
+- `app/lib/editor/studioCanvas.ts` & `canvasCaptions.ts`: Caption rendering & styles
+- `app/lib/editor/aiValidation.ts`: Track cap validation & snapshot recovery
+- `app/api/editor/broll-choice/route.ts`: B-roll selection & usage accounting
+- `app/lib/server/planUsage.ts`: Usage tracking & refund rules
+- `app/api/editor/generate-image/route.ts`: Image generation & rate limit order
+- `app/lib/server/groqEditorTransport.ts`: Groq transport & try/finally token settlement
+- `app/lib/server/editorProvider.ts`: Model provider, Gemini metadata & vision frames

@@ -1,9 +1,9 @@
 "use client";
 
 import React, { memo, useRef, useState, useEffect, useMemo, useCallback } from "react";
-import { Captions, Layers, Film, Music, Sparkles } from "lucide-react";
+import { Captions, Layers, Film, Music, Sparkles, EyeOff, Target } from "lucide-react";
 import { Clip, MediaAsset, clamp, projectDuration } from "@/app/lib/editor/model";
-import { trimClip } from "@/app/lib/editor/operations";
+import { trimClip, changeTrack, moveClip } from "@/app/lib/editor/operations";
 import { usePlayback, useProject } from "@/app/lib/editor/store";
 import { pointerEdit } from "@/app/lib/editor/interaction";
 import { useEditor } from "../workspace/EditorContext";
@@ -85,7 +85,7 @@ const CompactFilmstrip = memo(function CompactFilmstrip({
 });
 
 export default function MobileTimeline() {
-  const { store, playback, selection, select, notify } = useEditor();
+  const { store, playback, selection, select, notify, run, detectedSilences = [] } = useEditor();
   const project = useProject(store);
   const { time, playing } = usePlayback(playback);
 
@@ -108,6 +108,7 @@ export default function MobileTimeline() {
 
   const duration = projectDuration(project);
   const halfWidth = Math.max(120, Math.floor(containerWidth / 2));
+  const selectedClip = selection[0] ? project.clips[selection[0]] : undefined;
 
   useEffect(() => {
     const el = scrollerRef.current;
@@ -149,6 +150,10 @@ export default function MobileTimeline() {
     }
     return { captionsAndText, overlays, mainVideo, audioClips };
   }, [project.trackOrder, project.tracks, project.clips]);
+
+  const hiddenTracks = useMemo(() => {
+    return project.trackOrder.map((id) => project.tracks[id]).filter((t) => t?.hidden);
+  }, [project.trackOrder, project.tracks]);
 
   // All clip edges for haptic snap pulses while scrubbing
   const clipEdges = useMemo(() => {
@@ -291,6 +296,35 @@ export default function MobileTimeline() {
       className="h-[160px] flex-shrink-0 w-full bg-white border-t border-slate-200 relative overflow-hidden select-none"
       aria-label="Mobile Touch Timeline"
     >
+      {/* Hidden Tracks Unhide Bar */}
+      {hiddenTracks.length > 0 && (
+        <div className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-3 py-1 bg-amber-50/95 backdrop-blur border-b border-amber-200 text-[10px] text-amber-800 shadow-xs">
+          <div className="flex items-center gap-1.5 font-medium">
+            <EyeOff size={11} className="text-amber-600" />
+            <span>{hiddenTracks.length} hidden {hiddenTracks.length === 1 ? "track" : "tracks"}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => run((p) => hiddenTracks.reduce((next, t) => changeTrack(next, t.id, { hidden: false }), p))}
+              className="bg-white border border-amber-300 rounded px-1.5 py-0.5 text-amber-900 font-semibold shadow-2xs hover:bg-amber-100"
+            >
+              Unhide All
+            </button>
+            {hiddenTracks.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => run((p) => changeTrack(p, t.id, { hidden: false }))}
+                className="bg-white border border-amber-300 rounded px-1.5 py-0.5 text-amber-900 font-semibold shadow-2xs hover:bg-amber-100"
+              >
+                Unhide {t.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Center-Fixed Static Vertical Red Playhead */}
       <div
         className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-red-500 z-30 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.65)]"
@@ -298,6 +332,57 @@ export default function MobileTimeline() {
       >
         <div className="w-2.5 h-2.5 -ml-[4px] bg-red-500 rotate-45 rounded-[1px] -mt-1 shadow" />
       </div>
+
+      {/* Floating Micro-Nudge & Alignment Bar for Selected Clip */}
+      {selectedClip && (
+        <div className="absolute top-1 right-2 z-35 flex items-center gap-1 bg-slate-900/90 backdrop-blur-md px-2 py-0.5 rounded-lg border border-slate-700 shadow-md text-[10px] text-white">
+          <span className="font-semibold truncate max-w-[70px] text-slate-300">
+            {selectedClip.name}
+          </span>
+          <span className="font-mono text-cyan-300 text-[9px] bg-slate-800 px-1 py-0.2 rounded">
+            {selectedClip.startTime.toFixed(2)}s
+          </span>
+          <div className="flex items-center gap-0.5 ml-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                const nextStart = Math.max(0, selectedClip.startTime - 0.1);
+                run((p) => moveClip(p, selectedClip.id, nextStart));
+                navigator.vibrate?.(6);
+              }}
+              title="Nudge earlier 0.1s"
+              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 active:bg-blue-600 text-slate-200 font-mono text-[9px]"
+            >
+              -0.1s
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                run((p) => moveClip(p, selectedClip.id, time));
+                navigator.vibrate?.(8);
+                notify(`Aligned "${selectedClip.name}" to playhead.`);
+              }}
+              title="Snap start to playhead"
+              className="px-1.5 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-0.5 text-[9px]"
+            >
+              <Target size={10} />
+              <span>Snap</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const nextStart = selectedClip.startTime + 0.1;
+                run((p) => moveClip(p, selectedClip.id, nextStart));
+                navigator.vibrate?.(6);
+              }}
+              title="Nudge later 0.1s"
+              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 active:bg-blue-600 text-slate-200 font-mono text-[9px]"
+            >
+              +0.1s
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Horizontal Inertia Scrollable Track Container */}
       <div
@@ -329,6 +414,27 @@ export default function MobileTimeline() {
             })}
           </div>
 
+          {/* Detected Silences Waveform Visual Shading Overlay */}
+          {detectedSilences.length > 0 && (
+            <div className="absolute top-[24px] bottom-0 left-0 right-0 pointer-events-none z-20">
+              {detectedSilences.map((silence, idx) => {
+                const left = halfWidth + silence.start * pps;
+                const width = Math.max(4, silence.duration * pps);
+                return (
+                  <div
+                    key={`silence-${idx}-${silence.start}`}
+                    className="absolute top-0 bottom-0 bg-rose-500/15 border-x border-dashed border-rose-500/70 pointer-events-none flex flex-col items-center justify-start overflow-hidden select-none"
+                    style={{ left: `${left}px`, width: `${width}px` }}
+                  >
+                    <span className="text-[8px] font-mono text-rose-800 bg-white/95 border border-rose-300 rounded px-1 mt-0.5 shadow-xs whitespace-nowrap">
+                      ✂ {silence.duration.toFixed(2)}s
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* 4 Compact Stacked Lanes (remaining ~138px) */}
           <div className="flex flex-col justify-evenly h-[138px] py-1 gap-1 bg-white">
             {/* Track 1: Captions / Text Indicators (Amber Pills) */}
@@ -346,22 +452,44 @@ export default function MobileTimeline() {
                 const left = halfWidth + clip.startTime * pps;
                 const width = Math.max(20, clip.duration * pps);
                 return (
-                  <button
+                  <div
                     key={clip.id}
-                    type="button"
                     onClick={() => {
                       select([clip.id]);
                       navigator.vibrate?.(6);
                     }}
                     style={{ left: `${left}px`, width: `${width}px` }}
-                    className={`absolute top-0 bottom-0 rounded-full bg-amber-100 border px-2 flex items-center overflow-hidden text-left transition-colors ${
+                    className={`absolute top-0 bottom-0 rounded-md bg-amber-100 border px-1.5 flex items-center overflow-hidden text-left transition-colors cursor-pointer ${
                       isSelected
-                        ? "border-blue-600 ring-1 ring-blue-600 text-amber-950 z-20"
+                        ? "border-blue-600 ring-2 ring-blue-600 text-amber-950 z-20"
                         : "border-amber-400 text-amber-950 z-10"
                     }`}
                   >
-                    <span className="text-[10px] font-medium truncate">{clip.name}</span>
-                  </button>
+                    {isSelected && (
+                      <>
+                        <div
+                          data-trim-handle
+                          onPointerDown={(e) => handleTrimClip(e, clip, "left")}
+                          className="absolute left-0 top-0 bottom-0 w-3 bg-blue-600 flex items-center justify-center z-30 cursor-ew-resize"
+                        >
+                          <div className="w-[1.5px] h-3 bg-white rounded-full" />
+                        </div>
+                        <div
+                          data-trim-handle
+                          onPointerDown={(e) => handleTrimClip(e, clip, "right")}
+                          className="absolute right-0 top-0 bottom-0 w-3 bg-blue-600 flex items-center justify-center z-30 cursor-ew-resize"
+                        >
+                          <div className="w-[1.5px] h-3 bg-white rounded-full" />
+                        </div>
+                      </>
+                    )}
+                    <span className="relative z-10 text-[9px] font-medium truncate px-1 flex items-center gap-1">
+                      <span className="px-1 py-0.2 rounded bg-amber-200/90 text-[8px] font-bold text-amber-900 flex-shrink-0">
+                        CC
+                      </span>
+                      <span className="truncate">{clip.name}</span>
+                    </span>
+                  </div>
                 );
               })}
             </div>
@@ -389,15 +517,36 @@ export default function MobileTimeline() {
                       navigator.vibrate?.(6);
                     }}
                     style={{ left: `${left}px`, width: `${width}px` }}
-                    className={`absolute top-0 bottom-0 rounded-md bg-cyan-100 border overflow-hidden flex items-center px-1.5 ${
+                    className={`absolute top-0 bottom-0 rounded-md bg-cyan-100 border overflow-hidden flex items-center px-1.5 cursor-pointer ${
                       isSelected
-                        ? "border-blue-600 ring-1 ring-blue-600 z-20"
+                        ? "border-blue-600 ring-2 ring-blue-600 z-20"
                         : "border-cyan-400 z-10"
                     }`}
                   >
                     <CompactFilmstrip clip={clip} asset={asset} width={width} />
-                    <span className="relative z-10 text-[10px] font-semibold text-cyan-950 truncate">
-                      {clip.name}
+                    {isSelected && (
+                      <>
+                        <div
+                          data-trim-handle
+                          onPointerDown={(e) => handleTrimClip(e, clip, "left")}
+                          className="absolute left-0 top-0 bottom-0 w-3.5 bg-blue-600 flex items-center justify-center z-30 cursor-ew-resize"
+                        >
+                          <div className="w-[2px] h-3.5 bg-white rounded-full" />
+                        </div>
+                        <div
+                          data-trim-handle
+                          onPointerDown={(e) => handleTrimClip(e, clip, "right")}
+                          className="absolute right-0 top-0 bottom-0 w-3.5 bg-blue-600 flex items-center justify-center z-30 cursor-ew-resize"
+                        >
+                          <div className="w-[2px] h-3.5 bg-white rounded-full" />
+                        </div>
+                      </>
+                    )}
+                    <span className="relative z-10 text-[9px] font-semibold text-cyan-950 truncate px-1 flex items-center gap-1">
+                      <span className="px-1 py-0.2 rounded bg-cyan-200/90 text-[8px] font-bold text-cyan-900 flex-shrink-0">
+                        B-ROLL
+                      </span>
+                      <span className="truncate">{clip.name}</span>
                     </span>
                   </div>
                 );
@@ -481,6 +630,16 @@ export default function MobileTimeline() {
                 const asset = clip.assetId ? project.assets[clip.assetId] : undefined;
                 const left = halfWidth + clip.startTime * pps;
                 const width = Math.max(20, clip.duration * pps);
+                const isSfx =
+                  clip.audioRole === "sfx" ||
+                  clip.name.toLowerCase().includes("sfx") ||
+                  clip.name.toLowerCase().includes("whoosh") ||
+                  clip.name.toLowerCase().includes("pop") ||
+                  clip.name.toLowerCase().includes("impact") ||
+                  clip.name.toLowerCase().includes("riser") ||
+                  clip.name.toLowerCase().includes("ding") ||
+                  clip.name.toLowerCase().includes("transition");
+
                 return (
                   <div
                     key={clip.id}
@@ -489,20 +648,55 @@ export default function MobileTimeline() {
                       navigator.vibrate?.(6);
                     }}
                     style={{ left: `${left}px`, width: `${width}px` }}
-                    className={`absolute top-0 bottom-0 rounded-md bg-emerald-100 border overflow-hidden flex items-center px-1.5 ${
-                      isSelected
-                        ? "border-blue-600 ring-1 ring-blue-600 z-20"
-                        : "border-emerald-400 z-10"
+                    className={`absolute top-0 bottom-0 rounded-md border overflow-hidden flex items-center px-1.5 cursor-pointer ${
+                      isSfx
+                        ? isSelected
+                          ? "bg-violet-100 border-blue-600 ring-2 ring-blue-600 z-30"
+                          : "bg-violet-100 border-violet-400 z-25"
+                        : isSelected
+                        ? "bg-emerald-100 border-blue-600 ring-2 ring-blue-600 z-20"
+                        : "bg-emerald-100 border-emerald-400 z-10"
                     }`}
                   >
                     <CompactWaveform
                       clip={clip}
                       asset={asset}
                       width={width}
-                      colorClass="text-emerald-600"
+                      colorClass={isSfx ? "text-violet-600" : "text-emerald-600"}
                     />
-                    <span className="relative z-10 text-[9px] font-semibold text-emerald-950 truncate">
-                      {clip.name}
+                    {isSelected && (
+                      <>
+                        <div
+                          data-trim-handle
+                          onPointerDown={(e) => handleTrimClip(e, clip, "left")}
+                          className="absolute left-0 top-0 bottom-0 w-3 bg-blue-600 flex items-center justify-center z-35 cursor-ew-resize"
+                        >
+                          <div className="w-[1.5px] h-3 bg-white rounded-full" />
+                        </div>
+                        <div
+                          data-trim-handle
+                          onPointerDown={(e) => handleTrimClip(e, clip, "right")}
+                          className="absolute right-0 top-0 bottom-0 w-3 bg-blue-600 flex items-center justify-center z-35 cursor-ew-resize"
+                        >
+                          <div className="w-[1.5px] h-3 bg-white rounded-full" />
+                        </div>
+                      </>
+                    )}
+                    <span
+                      className={`relative z-10 text-[9px] font-semibold truncate px-1 flex items-center gap-1 ${
+                        isSfx ? "text-violet-950" : "text-emerald-950"
+                      }`}
+                    >
+                      <span
+                        className={`px-1 py-0.2 rounded text-[8px] font-bold flex-shrink-0 ${
+                          isSfx
+                            ? "bg-violet-200/90 text-violet-900"
+                            : "bg-emerald-200/90 text-emerald-900"
+                        }`}
+                      >
+                        {isSfx ? "SFX" : "BGM"}
+                      </span>
+                      <span className="truncate">{clip.name}</span>
                     </span>
                   </div>
                 );

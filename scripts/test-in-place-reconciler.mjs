@@ -172,4 +172,26 @@ describe('In-Place Mutation & Constraint Reconciler (inPlaceReconciler.ts)', () 
     assert.equal(result.decisions.length, 1);
     assert.equal(result.decisions[0].startTime, 11);
   });
+
+  test('heals addClip with incompatible track or drops if unresolvable', () => {
+    let p = model.createProject('empty-p');
+    p = ops.addAsset(p, { id: 'a1', kind: 'audio', name: 'sfx.mp3', duration: 2, mime: 'audio/mp3', size: 100 });
+    // AI mistakenly targets track-video for audio asset
+    const rawDecisions = [
+      { op: 'addClip', assetId: 'a1', trackId: 'track-video', startTime: 0, duration: 2 }
+    ];
+    const result = reconcileEditingDecisions(p, rawDecisions, []);
+    assert.equal(result.decisions.length, 1);
+    // Should be reassigned to unlocked audio track
+    assert.equal(result.decisions[0].trackId, 'track-audio');
+  });
+
+  test('drops addZoom safely when timeline has no visual clips', () => {
+    const p = model.createProject('empty-p');
+    const rawDecisions = [
+      { op: 'addZoom', clipId: 'non-existent', startTime: 0, endTime: 2, fromScale: 1.0, toScale: 1.15 }
+    ];
+    const result = reconcileEditingDecisions(p, rawDecisions, []);
+    assert.equal(result.decisions.length, 0, 'Must drop addZoom when no visual clips exist');
+  });
 });

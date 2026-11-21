@@ -1,34 +1,25 @@
 # Gate Status
 
-## Gate — Iteration 1 (Milestones M1 & M2)
+## Gate — Iteration 1 (Phase 1 / R1)
 | Agent | Role | Verdict | Source |
 |-------|------|---------|--------|
-| worker_m1_1 | teamwork_worker | DONE (build & tests passed) | worker_m1_1/handoff.md |
-| worker_m2_1 | teamwork_worker | DONE (build & tests passed) | worker_m2_1/handoff.md |
-| test_writer_e2e_1 | teamwork_test_writer | DONE (32/32 tests pass) | test_writer_e2e_1/handoff.md |
-| reviewer_m1_m2_1 | teamwork_reviewer | APPROVE | reviewer_m1_m2_1/handoff.md |
-| reviewer_m1_m2_2 | teamwork_reviewer | APPROVE | reviewer_m1_m2_2/handoff.md |
-| challenger_m1_m2_1 | teamwork_challenger | REQUEST_CHANGES (speech-free presets) | challenger_m1_m2_1/handoff.md |
-| challenger_m1_m2_2 | teamwork_challenger | APPROVE | challenger_m1_m2_2/handoff.md |
-| auditor_m1_m2_1 | teamwork_auditor | CLEAN | auditor_m1_m2_1/handoff.md |
-Gate Result: **FAIL** (addressed in Iteration 2)
+| worker_r1_1 | teamwork_worker | DONE | handoff.md |
+| reviewer_r1_1 | teamwork_reviewer | APPROVE | handoff.md |
+| reviewer_r1_2 | teamwork_reviewer | APPROVE | handoff.md |
+| challenger_r1_1 | teamwork_challenger | REQUEST_CHANGES | handoff.md |
+| challenger_r1_2 | teamwork_challenger | REQUEST_CHANGES | handoff.md |
+| auditor_r1_1 | teamwork_auditor | CLEAN | handoff.md |
 
-## Gate — Iteration 2 (Milestone M2 Remediation)
+Gate Result: **FAIL** (Remediated by worker_r1_2)
+
+## Gate — Iteration 2 (Phase 1 / R1 Re-Check)
 | Agent | Role | Verdict | Source |
 |-------|------|---------|--------|
-| worker_m2_2 | teamwork_worker | DONE (speech-free presets fixed) | worker_m2_2/handoff.md |
-| challenger_m2_recheck_1 | teamwork_challenger | APPROVE | challenger_m2_recheck_1/handoff.md |
-| auditor_m2_recheck_1 | teamwork_auditor | CLEAN | auditor_m2_recheck_1/handoff.md |
-Gate Result: **PASS** (Milestones M1 and M2 fully approved and clean)
+| worker_r1_2 | teamwork_worker | DONE (All 5 remediation items verified, 100% tests pass) | handoff.md |
+| reviewer_r1_3 | teamwork_reviewer | APPROVE | handoff.md |
+| reviewer_r1_4 | teamwork_reviewer | APPROVE | handoff.md |
+| challenger_r1_3 | teamwork_challenger | APPROVE | handoff.md |
+| challenger_r1_4 | teamwork_challenger | APPROVE | handoff.md |
+| auditor_r1_2 | teamwork_auditor | CLEAN | handoff.md |
 
-## Gate — Iteration 3 (Milestone M3: Custom Editing & Clarification)
-| Agent | Role | Verdict | Source |
-|-------|------|---------|--------|
-| worker_m3_1 | teamwork_worker | DONE (R1 complete, all tests pass) | worker_m3_1/handoff.md |
-| reviewer_m3_1 | teamwork_reviewer | APPROVE | reviewer_m3_1/handoff.md |
-| reviewer_m3_2 | teamwork_reviewer | APPROVE | reviewer_m3_2/handoff.md |
-| challenger_m3_1 | teamwork_challenger | APPROVE | challenger_m3_1/handoff.md |
-| challenger_m3_2 | teamwork_challenger | APPROVE | challenger_m3_2/handoff.md |
-| auditor_m3_1 | teamwork_auditor | CLEAN | auditor_m3_1/handoff.md |
-
-Gate Result: **PASS** (Milestone M3 fully approved and audited CLEAN)
+Gate Result: **PASS** (Unanimous APPROVE and CLEAN audit)

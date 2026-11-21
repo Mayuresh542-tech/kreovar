@@ -111,8 +111,9 @@ export function extractConversationalIntent(
 
   if (
     constraints.requestedCaptionPreset ||
+    constraints.requestedCaptionStudio ||
     constraints.requestedCaptionStyling ||
-    /\b(?:captions?|subtitles?|subtitle|kinetic|transcribe|text\s+overlay)\b/i.test(lower) ||
+    /\b(?:ad\s+captions?|add\s+captions?|ad\s+subtitles?|add\s+subtitles?|captions?|subtitles?|subtitle|kinetic|transcribe|text\s+overlay|caption\s+studio)\b/i.test(lower) ||
     isHormoziStyle ||
     isPodcastStyle ||
     isCinematicStyle ||
@@ -288,8 +289,8 @@ export function buildProgressiveSteps(
   if (ops.has("captions")) {
     const captionAction =
       hasExistingCaptions && !requests.some((r) => r.type === "captions")
-        ? "Styling synced captions"
-        : "Generating synced captions";
+        ? "Styling captions with Caption Studio"
+        : "Generating Caption Studio captions";
     middleSpecs.push({ id: "captions", label: captionAction });
   }
 
@@ -474,7 +475,7 @@ export function summarizeTimelineDiff(
     items.push({
       id: "captions-added",
       label: `Added ${newCaptions.length} synced caption${newCaptions.length === 1 ? "" : "s"}`,
-      detail: tpl ? `${formatCaptionPresetName(tpl)} preset` : undefined,
+      detail: tpl ? `Caption Studio: ${formatCaptionPresetName(tpl)}` : "Caption Studio preset",
       time: first.startTime,
       clipId: first.id,
     });
@@ -484,7 +485,7 @@ export function summarizeTimelineDiff(
     items.push({
       id: "captions-styled",
       label: `Updated ${restyledCaptions.length} caption${restyledCaptions.length === 1 ? "" : "s"}`,
-      detail: tpl ? `${formatCaptionPresetName(tpl)} style` : "In-place typography update",
+      detail: tpl ? `Caption Studio: ${formatCaptionPresetName(tpl)}` : "Caption Studio style",
       time: first.startTime,
       clipId: first.id,
     });

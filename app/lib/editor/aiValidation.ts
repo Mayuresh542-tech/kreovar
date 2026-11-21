@@ -12,6 +12,8 @@ import {readMotionGraphic,GRAPHIC_KINDS} from './motionGraphics';
 import {textPlacementId} from "./textPlacement";
 import {ALL_CAPTION_TEMPLATES as DEFAULT_CAPTION_TEMPLATES} from "../captions/referenceTemplates";
 import { EditorProject, MediaAsset, Clip, Track, TextLayer, Ratio, defaultStyle, defaultTransform, aspectRatios, isKnownCaptionPreset, normalizeCaptionPresetId } from "./model";
+import { MAX_RIPPLE_CUT_RANGES } from "./rippleCut";
+export { MAX_RIPPLE_CUT_RANGES };
 import { EditDecision, EditDecisionList, applyEditDecisionList } from "./ai";
 
 const ratios = aspectRatios;
@@ -78,9 +80,9 @@ export function aiProjectSnapshot(value: unknown): EditorProject {
   });
   const clips = record<Clip>(p.clips, value => {
     const c = object(value);
-    return { id: id(c.id),...(c.mediaAnimation===undefined?{}:{mediaAnimation:readMediaAnimation(c.mediaAnimation)}),...(c.visualTreatment===undefined?{}:{visualTreatment:readVisualTreatment(c.visualTreatment)}),...(c.keyframes===undefined?{}:{keyframes:readKeyframes(c.keyframes)}),...(c.graphic===undefined?{}:{graphic:readMotionGraphic(c.graphic)}),...(c.shape===undefined?{}:{shape:readShape(c.shape)}),...(c.surface===undefined?{}:{surface:readStyleSurface(c.surface)}), ...(c.zooms===undefined?{}:{zooms:array(c.zooms,12).map(value=>{const z=object(value);return validateZoom({sourceStart:number(z.sourceStart),sourceEnd:number(z.sourceEnd),fromScale:number(z.fromScale,1,2),toScale:number(z.toScale,1,2),easing:choice(z.easing,["linear","smooth"]),returnToStart:boolean(z.returnToStart),focusX:number(z.focusX,-.4,.4),focusY:number(z.focusY,-.4,.4)});})}), ...(c.assetId ? { assetId: id(c.assetId) } : {}), ...(c.contentId ? { contentId: id(c.contentId) } : {}), trackId: id(c.trackId), name: string(c.name), startTime: number(c.startTime), duration: number(c.duration, 1 / 120), sourceStart: number(c.sourceStart), sourceEnd: number(c.sourceEnd), transform: transform(c.transform), effects: effects(c.effects), volume: number(c.volume, 0, 2), speed: number(c.speed, .25, 4), fadeIn: number(c.fadeIn), fadeOut: number(c.fadeOut),...(c.audioRole===undefined?{}:{audioRole:choice(c.audioRole,["speech","background","sfx"] as const)}),...(c.ducking===undefined?{}:{ducking:boolean(c.ducking)}) };
+    return { id: id(c.id),...(c.mediaAnimation===undefined?{}:{mediaAnimation:readMediaAnimation(c.mediaAnimation)}),...(c.kenBurns===undefined?{}:{kenBurns:choice(c.kenBurns,["ken-burns-push","ken-burns-pull","ken-burns-pan-left","ken-burns-pan-right"] as const)}),...(c.visualTreatment===undefined?{}:{visualTreatment:readVisualTreatment(c.visualTreatment)}),...(c.keyframes===undefined?{}:{keyframes:readKeyframes(c.keyframes)}),...(c.graphic===undefined?{}:{graphic:readMotionGraphic(c.graphic)}),...(c.shape===undefined?{}:{shape:readShape(c.shape)}),...(c.surface===undefined?{}:{surface:readStyleSurface(c.surface)}), ...(c.zooms===undefined?{}:{zooms:array(c.zooms,12).map(value=>{const z=object(value);return validateZoom({sourceStart:number(z.sourceStart),sourceEnd:number(z.sourceEnd),fromScale:number(z.fromScale,1,2),toScale:number(z.toScale,1,2),easing:choice(z.easing,["linear","smooth"]),returnToStart:boolean(z.returnToStart),focusX:number(z.focusX,-.4,.4),focusY:number(z.focusY,-.4,.4)});})}), ...(c.assetId ? { assetId: id(c.assetId) } : {}), ...(c.contentId ? { contentId: id(c.contentId) } : {}), trackId: id(c.trackId), name: string(c.name), startTime: number(c.startTime), duration: number(c.duration, 1 / 120), sourceStart: number(c.sourceStart), sourceEnd: number(c.sourceEnd), transform: transform(c.transform), effects: effects(c.effects), volume: number(c.volume, 0, 2), speed: number(c.speed, .25, 4), fadeIn: number(c.fadeIn), fadeOut: number(c.fadeOut),...(c.audioRole===undefined?{}:{audioRole:choice(c.audioRole,["speech","background","sfx"] as const)}),...(c.ducking===undefined?{}:{ducking:boolean(c.ducking)}) };
   });
-  for(const c of Object.values(clips))if(c.visualTreatment)setVisualTreatment({assets,tracks,clips} as EditorProject,c.id,c.visualTreatment);
+  for(const c of Object.values(clips))if(c.visualTreatment && !tracks[c.trackId]?.locked)setVisualTreatment({assets,tracks,clips} as EditorProject,c.id,c.visualTreatment);
   const readText = (value: unknown): TextLayer => {
     const t = object(value);
     return { id: id(t.id), text: typeof t.text === "string" && t.text.length <= 5000 ? t.text : string(t.text, 5000), style: style(t.style) };
@@ -121,9 +123,9 @@ function decision(value: unknown): EditDecision {
     case 'animate':return {op:d.op,clipId:id(d.clipId),preset:choice(d.preset,MOTION_PRESETS)};
     case 'addGraphic':return {op:d.op,kind:choice(d.kind,GRAPHIC_KINDS),text:string(d.text,120),startTime:number(d.startTime),duration:number(d.duration,.5,12),...(d.accent===undefined?{}:{accent:string(d.accent,9)}),...(d.motion===undefined?{}:{motion:choice(d.motion,MOTION_PRESETS)})};
     case 'addOverlay':return {op:d.op,assetId:id(d.assetId),trackId:id(d.trackId),startTime:number(d.startTime),duration:number(d.duration,.5,12),...(d.motion===undefined?{}:{motion:choice(d.motion,MOTION_PRESETS)})};
-    case "addZoom":return {op:d.op,clipId:id(d.clipId),startTime:number(d.startTime),endTime:number(d.endTime),fromScale:number(d.fromScale,1,2),toScale:number(d.toScale,1,2),...(d.returnToStart===undefined?{}:{returnToStart:boolean(d.returnToStart)}),...(d.easing===undefined?{}:{easing:choice(d.easing,["linear","smooth"] as const)}),...(d.focusX===undefined?{}:{focusX:number(d.focusX,-.4,.4)}),...(d.focusY===undefined?{}:{focusY:number(d.focusY,-.4,.4)})};
+    case "addZoom":return {op:d.op,clipId:id(d.clipId),startTime:number(d.startTime),endTime:number(d.endTime),fromScale:number(d.fromScale,1,2),toScale:number(d.toScale,1,2),...(d.returnToStart===undefined?{}:{returnToStart:boolean(d.returnToStart)}),...(d.easing===undefined?{}:{easing:choice(d.easing,["linear","smooth"] as const)}),...(d.focusX===undefined?{}:{focusX:number(d.focusX,-.4,.4)}),...(d.focusY===undefined?{}:{focusY:number(d.focusY,-.4,.4)}),...(d.style===undefined?{}:{style:choice(d.style,["punch-in","smooth-push","snap-in","slow-pull-back"] as const)})};
     case "clearZooms":return {op:d.op,clipId:id(d.clipId)};
-    case "rippleCut":return {op:d.op,ranges:array(d.ranges,20).map(value=>{const r=object(value);return {start:number(r.start),end:number(r.end)};})};
+    case "rippleCut":return {op:d.op,ranges:array(d.ranges,MAX_RIPPLE_CUT_RANGES).map(value=>{const r=object(value);return {start:number(r.start),end:number(r.end)};})};
     case "applyTextPlacement":return {op:d.op,clipIds:array(d.clipIds,100).map(id),placementId:textPlacementId(d.placementId)};
     case "appendSequence": return {op:d.op,assetIds:array(d.assetIds,30).map(id),...(d.trackId===undefined?{}:{trackId:id(d.trackId)})};
     case "applyCaptionTemplate": return {op:d.op,clipIds:array(d.clipIds).map(id),templateId:templateId(d.templateId)};
@@ -143,13 +145,14 @@ function decision(value: unknown): EditDecision {
     case "addTransition": return { op: d.op, fromClipId: id(d.fromClipId), toClipId: id(d.toClipId), kind: choice(d.kind, ["fade", "dissolve", "slide", "zoom"]), duration: number(d.duration, 1 / 120, 5) };
     case "changeClipProperty": {
       const c = object(d.changes), changes: Extract<EditDecision, { op: "changeClipProperty" }>["changes"] = {};
-      if (Object.keys(c).some(key => !["transform", "effects", "volume", "speed", "fadeIn", "fadeOut", "audioRole", "ducking", "surface"].includes(key)) || !Object.keys(c).length) throw new Error("Unsupported clip property.");
+      if (Object.keys(c).some(key => !["transform", "effects", "volume", "speed", "preservePitch", "fadeIn", "fadeOut", "audioRole", "ducking", "surface"].includes(key)) || !Object.keys(c).length) throw new Error("Unsupported clip property.");
       if(c.audioRole!==undefined)changes.audioRole=choice(c.audioRole,["speech","background","sfx"] as const);
       if(c.ducking!==undefined)changes.ducking=boolean(c.ducking);
+      if(c.preservePitch!==undefined)changes.preservePitch=boolean(c.preservePitch);
       if (c.transform !== undefined) changes.transform = transform(c.transform);
       if (c.effects !== undefined) changes.effects = effects(c.effects);
       if (c.volume !== undefined) changes.volume = number(c.volume, 0, 2);
-      if (c.speed !== undefined) changes.speed = number(c.speed, .25, 4);
+      if (c.speed !== undefined) changes.speed = number(c.speed, 0.1, 10);
       if (c.fadeIn !== undefined) changes.fadeIn = number(c.fadeIn);
       if (c.fadeOut !== undefined) changes.fadeOut = number(c.fadeOut);
       if(c.surface!==undefined)changes.surface=readStyleSurface(c.surface);

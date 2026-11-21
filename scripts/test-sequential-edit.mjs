@@ -44,8 +44,28 @@ test('pipeline executes one stage at a time and commits captions, graphics, B-ro
  const result=await pipeline.runEditingJob(r,job,signal());assert.equal(result.status,'completed');assert.equal(r.max(),1);assert.deepEqual(seen,pipeline.stagesFor(['captions','motionGraphics','broll','zooms']));assert.equal(Object.keys(r.getProject().captions).length,1);assert(Object.values(r.getProject().clips).some(c=>c.graphic));assert(Object.values(r.getProject().clips).some(c=>c.assetId==='licensed'));assert.equal(r.getProject().clips.footage.zooms.length,1);assert.equal(r.getProject().clips.footage.volume,p.clips.footage.volume);assert.equal(result.appliedOperations.length,4);assert(r.saved.some(p=>p.editingJob.completedStages.includes('applyCaptions')&&!p.editingJob.completedStages.includes('applyBroll')));
 });
 
-test('mandatory failure stops; resume after reload does not repeat committed captions or operation keys',async()=>{
- let fail=true;const seen=[],p=source(),job=pipeline.createEditingJob(p,'captions and zooms',[]);const handler=async(stage,project,j)=>{seen.push(stage);if(stage==='analyzeFootage')return {summary:'Analyze',operations:['captions','zooms']};if(stage==='applyCaptions')return caption;if(stage==='applyZooms'){if(fail)throw Error('Provider unavailable');return {summary:'Zoom',decisions:[{op:'addZoom',clipId:'footage',startTime:5,endTime:6,fromScale:1,toScale:1.1}]};}return pipeline.validateCompletedJob(project,j);};
+test('failing stages are gracefully skipped with degradation notices and the rest of the job completes',async()=>{
+ const seen=[],p=source(),job=pipeline.createEditingJob(p,'captions and zooms',[]);
+ const handler=async(stage,project,j)=>{
+  seen.push(stage);
+  if(stage==='analyzeFootage')return {summary:'Analyze',operations:['captions','zooms']};
+  if(stage==='applyCaptions')return caption;
+  if(stage==='applyZooms'){throw Error('Provider unavailable');}
+  return pipeline.validateCompletedJob(project,j);
+ };
+ const r=runtime(p,handler);
+ const result=await pipeline.runEditingJob(r,job,signal());
+ assert.equal(result.status,'completed');
+ assert.ok(seen.includes('validateEdit'));
+ assert.equal(Object.keys(r.getProject().captions).length,1);
+ assert.equal(r.getProject().clips.footage.zooms,undefined);
+ assert.ok(result.degradationNotices?.some(n=>n.stage==='applyZooms'&&n.status==='skipped'));
+ assert.ok(result.skippedNotes?.length>0);
+ assert.equal(result.appliedOperations.length,1);
+});
+
+test('opt-out strict mode halts on failure; resume after reload does not repeat committed captions',async()=>{
+ let fail=true;const seen=[],p=source(),job=pipeline.createEditingJob(p,'captions and zooms',[],undefined,{faultTolerant:false});const handler=async(stage,project,j)=>{seen.push(stage);if(stage==='analyzeFootage')return {summary:'Analyze',operations:['captions','zooms']};if(stage==='applyCaptions')return caption;if(stage==='applyZooms'){if(fail)throw Error('Provider unavailable');return {summary:'Zoom',decisions:[{op:'addZoom',clipId:'footage',startTime:5,endTime:6,fromScale:1,toScale:1.1}]};}return pipeline.validateCompletedJob(project,j);};
  const r=runtime(p,handler);let result=await pipeline.runEditingJob(r,job,signal());assert.equal(result.status,'failed');assert.deepEqual(result.failedStages,['applyZooms']);assert(!seen.includes('validateEdit'));assert.equal(Object.keys(r.getProject().captions).length,1);
  const recovered=JSON.parse(JSON.stringify(r.getProject())),retry=runtime(recovered,handler);fail=false;result=await pipeline.runEditingJob(retry,recovered.editingJob,signal());assert.equal(result.status,'completed');assert.equal(seen.filter(s=>s==='applyCaptions').length,1);assert.equal(Object.keys(retry.getProject().captions).length,1);assert.equal(new Set(result.appliedOperations).size,result.appliedOperations.length);
 });
@@ -54,7 +74,54 @@ test('cancelled stage never inserts its partial draft; resume continues saved st
  const controller=new AbortController(),p=source(),r=runtime(p,async stage=>{if(stage==='analyzeFootage')return {summary:'Analyze',operations:['captions']};controller.abort();return caption;});const result=await pipeline.runEditingJob(r,pipeline.createEditingJob(p,'Add captions',[]),controller.signal);assert.equal(result.status,'cancelled');assert.equal(Object.keys(r.getProject().captions).length,0);assert(result.completedStages.includes('analyzeFootage'));
 });
 
-test('zero-operation stages cannot falsely report completion',async()=>{const p=source(),r=runtime(p,async stage=>stage==='analyzeFootage'?{summary:'Analyze',operations:['zooms']}:{summary:'No changes',decisions:[]});const result=await pipeline.runEditingJob(r,pipeline.createEditingJob(p,'Add zooms',[]),signal());assert.equal(result.status,'failed');assert(result.errors.at(-1).includes('No zoom'));assert.equal(result.appliedOperations.length,0);});
+test('zero-operation stages are skipped with degradation notices in resilient mode; strict mode halts',async()=>{
+ const p=source();
+ const handler=async stage=>stage==='analyzeFootage'?{summary:'Analyze',operations:['zooms']}:{summary:'No changes',decisions:[]};
+ const resRuntime=runtime(p,handler);
+ const resResult=await pipeline.runEditingJob(resRuntime,pipeline.createEditingJob(p,'Add zooms',[]),signal());
+ assert.equal(resResult.status,'completed');
+ assert.ok(resResult.degradationNotices?.some(n=>n.stage==='applyZooms'&&n.status==='skipped'));
+ assert.equal(resResult.appliedOperations.length,0);
+ const strictJob=pipeline.createEditingJob(p,'Add zooms',[],undefined,{faultTolerant:false});
+ const strictRuntime=runtime(p,handler);
+ const strictResult=await pipeline.runEditingJob(strictRuntime,strictJob,signal());
+ assert.equal(strictResult.status,'failed');
+ assert(strictResult.errors.at(-1).includes('No zoom'));
+ assert.equal(strictResult.appliedOperations.length,0);
+});
+
+test('conversational requested edit failure skips gracefully and preserves timeline',async()=>{
+ const p=source();
+ const job=pipeline.createEditingJob(p,'Remove silent gaps and enhance audio',[]);
+ const r=runtime(p,async(stage,project,j)=>{
+  if(stage==='analyzeFootage')return {summary:'Analyze',operations:['requestedEdits']};
+  if(stage==='applyRequestedEdits')throw Error('Audio analysis model service timed out');
+  return pipeline.validateCompletedJob(project,j);
+ });
+ const result=await pipeline.runEditingJob(r,job,signal());
+ assert.equal(result.status,'completed');
+ assert.ok(result.degradationNotices?.some(n=>n.stage==='applyRequestedEdits'&&n.status==='skipped'));
+ assert.deepEqual(r.getProject().clips,p.clips);
+});
+
+test('decision validation failure in buildStageProject degrades gracefully and preserves timeline',async()=>{
+ const p=source();
+ const job=pipeline.createEditingJob(p,'Add zooms',[]);
+ const r=runtime(p,async(stage,project,j)=>{
+  if(stage==='analyzeFootage')return {summary:'Analyze',operations:['zooms']};
+  if(stage==='applyZooms'){
+   return {
+    summary:'Zoom past clip end',
+    decisions:[{op:'addZoom',clipId:'footage',startTime:11,endTime:15,fromScale:1,toScale:1.1,returnToStart:true,easing:'smooth'}]
+   };
+  }
+  return pipeline.validateCompletedJob(project,j);
+ });
+ const result=await pipeline.runEditingJob(r,job,signal());
+ assert.equal(result.status,'completed');
+ assert.ok(result.degradationNotices?.some(n=>n.stage==='applyZooms'&&n.status==='skipped'));
+ assert.equal(r.getProject().clips.footage.zooms,undefined);
+});
 
 test('stage boundary rejects unrelated operations, excessive zooms, invented assets and unsafe audio gain',()=>{
  const p=source();assert.throws(()=>pipeline.assertStagePlan('planMotionGraphics',[{op:'addZoom'}],[],p),/outside/);assert.throws(()=>pipeline.assertStagePlan('analyzeFootage',[],[{type:'captions'}],p),/outside/);assert.throws(()=>pipeline.assertStagePlan('applyZooms',[{op:'addZoom',toScale:1.5,fromScale:1,startTime:1,endTime:2}],[],p),/restrained/);assert.throws(()=>pipeline.assertStagePlan('findBroll',[{op:'addClip',assetId:'invented',trackId:'track-overlay',volume:0}],[],p),/real muted/);
@@ -68,7 +135,7 @@ test('presets execute only their configured operations through the same pipeline
 
 test('completed evidence detects deleted or hidden edits instead of reporting success',()=>{const p=source(),next=pipeline.buildStageProject(p,caption),output=pipeline.validateStageChanges('applyCaptions',p,next,caption),job=pipeline.createEditingJob(p,'captions',[]);job.stages=[{id:'applyCaptions',status:'completed',key:'caption',attempts:1,output}];job.appliedOperations=['caption'];next.revision=2;const clip=Object.values(next.clips).find(c=>c.contentId);const deleted=ops.removeClip(next,clip.id);assert.throws(()=>pipeline.validateCompletedJob(deleted,job),/no longer visible/);});
 
-test('manual inspector is preserved and mode changes share a single store',()=>{const source=fs.readFileSync(path.join(root,'app/components/editor/workspace/Workspace.tsx'),'utf8');assert(source.includes('!aiMode&&<Inspector/>'));assert(source.includes('<AiEditingChat'));assert.equal((source.match(/new EditorStore\(/g)||[]).length,1);assert(!source.includes('<AiEditDialog'));assert(fs.existsSync(path.join(root,'app/components/editor/workspace/Inspector.tsx')));});
+test('manual inspector is preserved and mode changes share a single store',()=>{const source=fs.readFileSync(path.join(root,'app/components/editor/workspace/Workspace.tsx'),'utf8');const layout=fs.readFileSync(path.join(root,'app/components/editor/EditorLayout.tsx'),'utf8');assert(layout.includes('<AssetDrawer')||source.includes('<Inspector'));assert(layout.includes('<EditorAIChat')||source.includes('<AiEditingChat'));assert.equal((source.match(/new EditorStore\(/g)||[]).length,1);assert(!layout.includes('<AiEditDialog'));assert(fs.existsSync(path.join(root,'app/components/editor/AssetDrawer.tsx'))||fs.existsSync(path.join(root,'app/components/editor/workspace/Inspector.tsx')));});
 
 test('explicit task planning avoids an unnecessary model call but defers ambiguous or negative requests',()=>{assert.deepEqual(pipeline.explicitOperations('Add animated captions, motion graphics, relevant B-roll and subtle zoom effects.'),['captions','motionGraphics','broll','zooms']);assert.equal(pipeline.explicitOperations('Do not add captions. Make this engaging.'),undefined);assert.equal(pipeline.explicitOperations('Only add captions without zooms'),undefined);});
 
