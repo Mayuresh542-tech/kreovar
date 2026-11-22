@@ -357,24 +357,24 @@ export function validateCompletedJob(project:EditorProject,job:EditingJob){
  if (uniqueNotices.length > 0) {
   const skippedNotes = uniqueNotices.map(n => {
    if (n.stage === 'applyBroll' || n.stage === 'findBroll') {
-    return `⚠️ B-Roll: Suitable 9:16 stock clip nahi mila, isliye original footage ko intact maintain kiya gaya.`;
+    return `B-Roll: Suitable 9:16 stock clip nahi mila, isliye original footage ko intact maintain kiya gaya.`;
    }
    if (n.stage === 'applySoundEffects') {
-    return `⚠️ SFX: Sound effect asset unavailable ya boundary timing hone ke karan sound bypass kar di gayi.`;
+    return `SFX: Sound effect asset unavailable ya boundary timing hone ke karan sound bypass kar di gayi.`;
    }
    if (n.stage === 'applyZooms') {
-    return `⚠️ Zooms: Framing change skip kiya gaya taaki natural balance bana rahe.`;
+    return `Zooms: Framing change skip kiya gaya taaki natural balance bana rahe.`;
    }
    if (n.stage === 'planMotionGraphics' || n.stage === 'applyMotionGraphics') {
-    return `⚠️ Motion Graphics: Visual clutter avoid karne ke liye graphics bypass kiye gaye.`;
+    return `Motion Graphics: Visual clutter avoid karne ke liye graphics bypass kiye gaye.`;
    }
    if (n.stage === 'applyCaptions') {
-    return `⚠️ Captions: Spoken dialogue captions skip kiye gaye (${n.reason}).`;
+    return `Captions: Spoken dialogue captions skip kiye gaye (${n.reason}).`;
    }
    if (n.stage === 'applyRequestedEdits') {
-    return `⚠️ Requested Edits: Requested edit step skip kiya gaya (${n.reason}).`;
+    return `Requested Edits: Requested edit step skip kiya gaya (${n.reason}).`;
    }
-   return `⚠️ ${STAGE_LABELS[n.stage as EditStage] || n.stage}: ${n.reason}`;
+   return `${STAGE_LABELS[n.stage as EditStage] || n.stage}: ${n.reason}`;
   });
   job.skippedNotes = skippedNotes;
   job.completionMessage = "Video edit complete! Yahan kuch non-critical tasks hain jo skip huye:";

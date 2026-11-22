@@ -59,12 +59,12 @@ export default function MobileBottomBar({
         aria-label={item.label}
         className={`relative min-w-[48px] min-h-[44px] px-2 py-1 flex flex-col items-center justify-center rounded-xl transition-colors active:scale-95 ${
           isActive
-            ? "text-blue-600 bg-blue-50 font-semibold"
-            : "text-slate-500 hover:text-slate-900"
+            ? "text-blue-600 bg-blue-50 font-bold border border-blue-200/80 shadow-2xs"
+            : "text-slate-800 hover:text-black"
         }`}
       >
-        <Icon size={18} />
-        <span className="text-[10px] mt-0.5 tracking-tight">{item.label}</span>
+        <Icon size={18} className={isActive ? "text-blue-600" : "text-slate-800"} />
+        <span className={`text-[10px] mt-0.5 tracking-tight ${isActive ? "text-blue-600 font-bold" : "text-slate-900 font-medium"}`}>{item.label}</span>
         {item.id === "edit" && hasSelection && (
           <span className="absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-emerald-500" />
         )}

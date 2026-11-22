@@ -593,7 +593,7 @@ export default function EditorAssetsPanel({
                           {media.thumbnail ? (
                             <img src={media.thumbnail} alt="thumb" className="w-full h-full object-cover" />
                           ) : (
-                            <span className="text-2xl">{media.type === "audio" ? "🎵" : "🎬"}</span>
+                            <span className="text-2xl">{media.type === "audio" ? "" : ""}</span>
                           )}
                         </div>
                         <span className="text-[10px] font-semibold text-slate-900 truncate">{media.name}</span>
@@ -767,7 +767,7 @@ export default function EditorAssetsPanel({
                             : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                         }`}
                       >
-                        {isCurrent ? "Active ✓" : "Use"}
+                        {isCurrent ? "Active " : "Use"}
                       </button>
                     </div>
                   );
@@ -781,10 +781,10 @@ export default function EditorAssetsPanel({
                 </span>
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
-                    { name: "Whoosh Transition", icon: "💨", dur: 1.2 },
-                    { name: "Camera Shutter", icon: "📸", dur: 0.8 },
-                    { name: "Pop Notification", icon: "🔔", dur: 0.5 },
-                    { name: "Impact Boom", icon: "💥", dur: 2.0 },
+                    { name: "Whoosh Transition", icon: "", dur: 1.2 },
+                    { name: "Camera Shutter", icon: "", dur: 0.8 },
+                    { name: "Pop Notification", icon: "", dur: 0.5 },
+                    { name: "Impact Boom", icon: "", dur: 2.0 },
                   ].map((sfx) => (
                     <button
                       key={sfx.name}
@@ -903,7 +903,7 @@ export default function EditorAssetsPanel({
                   onClick={() => subtitleFileInputRef.current?.click()}
                   className="p-3 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 hover:bg-slate-100 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors shadow-2xs"
                 >
-                  <span className="text-base">📥</span>
+                  <span className="text-base"></span>
                   <span className="text-xs font-bold text-slate-900">Import Subtitles</span>
                   <span className="text-[9px] font-mono text-slate-500">SRT, VTT, ASS</span>
                 </button>
@@ -1031,7 +1031,7 @@ export default function EditorAssetsPanel({
                               </div>
                               {isSelected ? (
                                 <span className="text-[9px] font-mono text-blue-600 font-bold">
-                                  ACTIVE ✓
+                                  ACTIVE 
                                 </span>
                               ) : (
                                 <button
@@ -1218,14 +1218,14 @@ export default function EditorAssetsPanel({
               </span>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id: "glitch", name: "Glitch", icon: "⚡" },
-                  { id: "vhs", name: "VHS Retro", icon: "📼" },
-                  { id: "rgb_split", name: "RGB Split", icon: "🌈" },
-                  { id: "grain", name: "Film Grain", icon: "🎞️" },
-                  { id: "blur", name: "Gaussian Blur", icon: "💧" },
-                  { id: "sharpen", name: "Sharpen", icon: "🗡️" },
-                  { id: "noise", name: "Noise", icon: "📻" },
-                  { id: "pixelate", name: "Pixelate", icon: "👾" },
+                  { id: "glitch", name: "Glitch", icon: "" },
+                  { id: "vhs", name: "VHS Retro", icon: "" },
+                  { id: "rgb_split", name: "RGB Split", icon: "" },
+                  { id: "grain", name: "Film Grain", icon: "️" },
+                  { id: "blur", name: "Gaussian Blur", icon: "" },
+                  { id: "sharpen", name: "Sharpen", icon: "️" },
+                  { id: "noise", name: "Noise", icon: "" },
+                  { id: "pixelate", name: "Pixelate", icon: "" },
                 ].map((eff) => (
                   <button
                     key={eff.id}
@@ -1473,7 +1473,7 @@ export default function EditorAssetsPanel({
               {/* AI Auto Edit */}
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-2 shadow-2xs">
                 <div className="flex items-center gap-2">
-                  <span className="text-base text-amber-500">✨</span>
+                  <span className="text-base text-amber-500"></span>
                   <span className="text-xs font-bold text-slate-900">AI Auto-Editor</span>
                 </div>
                 <p className="text-[10px] text-slate-500">
@@ -1502,7 +1502,7 @@ export default function EditorAssetsPanel({
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-2 shadow-2xs">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <span>✂️</span> Remove Audio Silences
+                    <span>️</span> Remove Audio Silences
                   </span>
                   <span className="text-[9px] font-mono text-emerald-600 font-bold">AI Powered</span>
                 </div>
@@ -1550,7 +1550,7 @@ export default function EditorAssetsPanel({
               {/* AI Auto Reframe */}
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-2 shadow-2xs">
                 <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                  <span>📐</span> AI Auto Reframe
+                  <span></span> AI Auto Reframe
                 </span>
                 <p className="text-[10px] text-slate-500">
                   Intelligently re-centers video subjects when converting between landscape and vertical.

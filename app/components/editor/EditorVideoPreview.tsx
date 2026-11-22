@@ -673,7 +673,7 @@ export default function EditorVideoPreview({
             />
           ) : (
             <div className="flex flex-col items-center justify-center p-6 text-center text-slate-500">
-              <span className="text-3xl mb-2">🎬</span>
+              <span className="text-3xl mb-2"></span>
               <p className="text-xs font-mono">No video footage at playhead</p>
             </div>
           )}
@@ -916,7 +916,7 @@ export default function EditorVideoPreview({
               <div className="flex items-center justify-between text-[11px] font-bold text-white/90 drop-shadow">
                 <span>Following</span>
                 <span className="border-b-2 border-white pb-0.5">For You</span>
-                <span>🔍</span>
+                <span></span>
               </div>
 
               {/* Bottom & Right Rails */}
@@ -928,7 +928,7 @@ export default function EditorVideoPreview({
                     Kinetic short-form editing made effortless with Kreovar AI. #viral #editing
                   </p>
                   <div className="flex items-center gap-1 text-[8px] text-white/70">
-                    <span>🎵</span>
+                    <span></span>
                     <span className="truncate">Original Sound - Kreovar Audio</span>
                   </div>
                 </div>
@@ -962,7 +962,7 @@ export default function EditorVideoPreview({
           {/* Drag-over Drop Indicator Overlay */}
           {isDragOverPreview && (
             <div className="absolute inset-0 bg-blue-950/75 backdrop-blur-xs border-2 border-dashed border-blue-400 rounded-2xl flex flex-col items-center justify-center p-4 z-40 pointer-events-none">
-              <span className="text-3xl mb-2 animate-bounce">🎬</span>
+              <span className="text-3xl mb-2 animate-bounce"></span>
               <span className="text-xs font-bold text-white">Drop B-Roll to Apply</span>
               <span className="text-[10px] font-mono text-blue-200 mt-1">
                 Replaces footage at current playhead

@@ -673,35 +673,35 @@ export default function MobileDrawerSheet({
                       onClick={() => applyCaptionPlacement("top")}
                       className={`min-h-[40px] px-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center transition-all ${
                         captionPlacement === "top"
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : "bg-white border border-slate-200 text-slate-700"
+                          ? "bg-blue-600 text-white shadow-sm font-bold"
+                          : "bg-white border border-slate-200 text-slate-800 font-semibold"
                       }`}
                     >
-                      <span>⬆️ Top</span>
+                      <span>Top</span>
                       <span className="text-[9px] font-mono opacity-80">16% Hook</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => applyCaptionPlacement("center")}
-                      className={`min-h-[40px] px-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center transition-all ${
+                      className={`min-h-[40px] px-2 rounded-xl text-xs flex flex-col items-center justify-center transition-all ${
                         captionPlacement === "center"
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : "bg-white border border-slate-200 text-slate-700"
+                          ? "bg-blue-600 text-white shadow-sm font-bold"
+                          : "bg-white border border-slate-200 text-slate-800 font-semibold"
                       }`}
                     >
-                      <span>🎯 Middle</span>
+                      <span>Middle</span>
                       <span className="text-[9px] font-mono opacity-80">48% Viral</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => applyCaptionPlacement("bottom")}
-                      className={`min-h-[40px] px-2 rounded-xl text-xs font-semibold flex flex-col items-center justify-center transition-all ${
+                      className={`min-h-[40px] px-2 rounded-xl text-xs flex flex-col items-center justify-center transition-all ${
                         captionPlacement === "bottom"
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : "bg-white border border-slate-200 text-slate-700"
+                          ? "bg-blue-600 text-white shadow-sm font-bold"
+                          : "bg-white border border-slate-200 text-slate-800 font-semibold"
                       }`}
                     >
-                      <span>⬇️ Safe Bot</span>
+                      <span>Safe Bot</span>
                       <span className="text-[9px] font-mono opacity-80">76% Lower</span>
                     </button>
                   </div>
@@ -1051,9 +1051,9 @@ export default function MobileDrawerSheet({
                               });
                               notify("Aligned to middle eye-level (48%).");
                             }}
-                            className="min-h-[32px] px-2 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-semibold text-amber-700"
+                            className="min-h-[32px] px-2 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-800"
                           >
-                            🎯 Middle
+                            Middle
                           </button>
                           <button
                             type="button"
@@ -1498,11 +1498,11 @@ export default function MobileDrawerSheet({
                       }}
                       className={`min-h-[34px] px-1 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition-all ${
                         sfxAlignment === "playhead"
-                          ? "bg-violet-600 text-white shadow-xs"
-                          : "bg-white border border-slate-200 text-slate-700"
+                          ? "bg-blue-600 text-white shadow-xs font-bold"
+                          : "bg-white border border-slate-200 text-slate-800 font-medium"
                       }`}
                     >
-                      <span>🎯 Playhead</span>
+                      <span>Playhead</span>
                     </button>
                     <button
                       type="button"
@@ -1510,13 +1510,13 @@ export default function MobileDrawerSheet({
                         setSfxAlignment("nearest_cut");
                         navigator.vibrate?.(6);
                       }}
-                      className={`min-h-[34px] px-1 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition-all ${
+                      className={`min-h-[34px] px-1 rounded-lg text-[10px] flex items-center justify-center gap-1 transition-all ${
                         sfxAlignment === "nearest_cut"
-                          ? "bg-violet-600 text-white shadow-xs"
-                          : "bg-white border border-slate-200 text-slate-700"
+                          ? "bg-blue-600 text-white shadow-xs font-bold"
+                          : "bg-white border border-slate-200 text-slate-800 font-medium"
                       }`}
                     >
-                      <span>✂️ Snap Cut</span>
+                      <span>Snap Cut</span>
                     </button>
                     <button
                       type="button"
@@ -1524,13 +1524,13 @@ export default function MobileDrawerSheet({
                         setSfxAlignment("caption");
                         navigator.vibrate?.(6);
                       }}
-                      className={`min-h-[34px] px-1 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition-all ${
+                      className={`min-h-[34px] px-1 rounded-lg text-[10px] flex items-center justify-center gap-1 transition-all ${
                         sfxAlignment === "caption"
-                          ? "bg-violet-600 text-white shadow-xs"
-                          : "bg-white border border-slate-200 text-slate-700"
+                          ? "bg-blue-600 text-white shadow-xs font-bold"
+                          : "bg-white border border-slate-200 text-slate-800 font-medium"
                       }`}
                     >
-                      <span>💬 To Caption</span>
+                      <span>To Caption</span>
                     </button>
                   </div>
                 </div>

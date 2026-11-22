@@ -487,11 +487,11 @@ export default function Preview({ quality, readOnly = false }: { quality: number
             title="Toggle Safe Zone Guides (TikTok / Reels / Shorts)"
             aria-pressed={showSafeZone}
           >
-            📱 Safe Zone
+            Safe Zone
           </button>
           {hasAdjustments && (
             <button type="button" className="vx-canvas-degradation-chip" onClick={() => setShowAdjustments((v) => !v)} title="Click to view notes">
-              ⚠️ {adjustmentsCount} adjustments
+              {adjustmentsCount} adjustments
             </button>
           )}
           <span className="vx-badge">{buffering ? "Loading media…" : `${quality}p preview`}</span>
@@ -509,7 +509,7 @@ export default function Preview({ quality, readOnly = false }: { quality: number
             {!p.editingJob?.skippedNotes?.length &&
               (p.editingJob?.degradationNotices || []).map((n, i) => (
                 <li key={i}>
-                  ⚠️ {n.stage}: {n.reason}
+                  {n.stage}: {n.reason}
                 </li>
               ))}
           </ul>

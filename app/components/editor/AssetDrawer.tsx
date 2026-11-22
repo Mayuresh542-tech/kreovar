@@ -649,10 +649,10 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                 <button
                   key={cat}
                   onClick={() => setSfxCategory(cat)}
-                  className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-colors ${
+                  className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors ${
                     sfxCategory === cat
-                      ? "bg-violet-600 text-white font-medium"
-                      : "bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200/70"
+                      ? "bg-blue-600 text-white font-bold shadow-2xs"
+                      : "bg-slate-100 border border-slate-200 text-slate-800 hover:text-black hover:bg-slate-200 font-medium"
                   }`}
                 >
                   {cat}
@@ -918,13 +918,12 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                 <button
                   type="button"
                   onClick={() => setBrollCategory("all")}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
+                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
                     brollCategory === "all"
-                      ? "bg-cyan-600 text-white shadow-2xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      ? "bg-blue-600 text-white shadow-2xs"
+                      : "bg-slate-100 text-slate-800 hover:text-black hover:bg-slate-200"
                   }`}
                 >
-                  <span>✨</span>
                   <span>All Niches</span>
                 </button>
                 {BROLL_CATEGORIES.map((cat) => (
@@ -932,13 +931,12 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                     key={cat.id}
                     type="button"
                     onClick={() => setBrollCategory(cat.id)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
+                    className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
                       brollCategory === cat.id
-                        ? "bg-cyan-600 text-white shadow-2xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        ? "bg-blue-600 text-white shadow-2xs"
+                        : "bg-slate-100 text-slate-800 hover:text-black hover:bg-slate-200"
                     }`}
                   >
-                    <span>{cat.icon}</span>
                     <span>{cat.label.split(" ")[0]}</span>
                   </button>
                 ))}

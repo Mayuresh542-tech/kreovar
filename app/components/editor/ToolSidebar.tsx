@@ -114,16 +114,12 @@ export default function ToolSidebar({
               aria-pressed={isActive}
               className={`w-full h-12 flex flex-col items-center justify-center rounded-xl transition-all relative group ${
                 isActive
-                  ? "bg-blue-50 text-blue-600 font-semibold border border-blue-200 shadow-xs"
-                  : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                  ? "bg-blue-600 text-white font-bold shadow-xs"
+                  : "text-slate-800 hover:text-black hover:bg-slate-100"
               }`}
             >
-              {/* Active Pill Indicator */}
-              {isActive && (
-                <div className="absolute left-0 top-2 bottom-2 w-1 bg-blue-600 rounded-r-full" />
-              )}
-              <Icon size={19} className="transition-transform group-hover:scale-105" />
-              <span className="text-[10px] mt-1 tracking-tight truncate max-w-[54px]">
+              <Icon size={19} className={`transition-transform group-hover:scale-105 ${isActive ? "text-white" : "text-slate-900"}`} />
+              <span className={`text-[10px] mt-1 tracking-tight truncate max-w-[54px] ${isActive ? "text-white font-bold" : "text-slate-900 font-medium"}`}>
                 {tool.label}
               </span>
             </button>
@@ -138,17 +134,14 @@ export default function ToolSidebar({
           aria-pressed={isDrawerOpen && activeTab === "inspector"}
           className={`w-full h-12 flex flex-col items-center justify-center rounded-xl transition-all relative group mt-1 ${
             isDrawerOpen && activeTab === "inspector"
-              ? "bg-blue-50 text-blue-600 font-semibold border border-blue-200 shadow-xs"
+              ? "bg-blue-600 text-white font-bold shadow-xs"
               : hasSelection
-              ? "text-emerald-700 bg-emerald-50/70 hover:bg-emerald-50 border border-emerald-200/70"
-              : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+              ? "text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200"
+              : "text-slate-800 hover:text-black hover:bg-slate-100"
           }`}
         >
-          {isDrawerOpen && activeTab === "inspector" && (
-            <div className="absolute left-0 top-2 bottom-2 w-1 bg-blue-600 rounded-r-full" />
-          )}
-          <SlidersHorizontal size={19} />
-          <span className="text-[10px] mt-1 tracking-tight">Inspector</span>
+          <SlidersHorizontal size={19} className={isDrawerOpen && activeTab === "inspector" ? "text-white" : "text-slate-900"} />
+          <span className={`text-[10px] mt-1 tracking-tight ${isDrawerOpen && activeTab === "inspector" ? "text-white font-bold" : "text-slate-900 font-medium"}`}>Inspector</span>
           {hasSelection && (
             <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
           )}

@@ -1015,7 +1015,7 @@ export default function EditorMultiTrackTimeline({
                 style={{ left: `${mk.time * zoomFactor - 5}px` }}
                 title={`${mk.label} (Click to seek, Shift+Click to remove)`}
               >
-                <span className="text-xs -mt-1 group-hover:scale-125 transition-transform">🚩</span>
+                <span className="text-xs -mt-1 group-hover:scale-125 transition-transform"></span>
               </div>
             ))}
           </div>
@@ -1421,7 +1421,7 @@ export default function EditorMultiTrackTimeline({
                   style={{ left: `${left}px`, width: `${width}px` }}
                 >
                   {renderAudioWaveform(width, 24, isSelected ? "#FFFFFF" : "#059669")}
-                  <span className="truncate font-semibold z-10 relative">🎙️ Voiceover</span>
+                  <span className="truncate font-semibold z-10 relative">️ Voiceover</span>
                   <span className="text-[7px] text-emerald-700 font-medium z-10 relative">
                     {vo.duration.toFixed(1)}s
                   </span>
@@ -1464,7 +1464,7 @@ export default function EditorMultiTrackTimeline({
                 >
                   {renderAudioWaveform(width, 24, isSelected ? "#FFFFFF" : "#7C3AED")}
                   <span className="truncate font-semibold z-10 relative">
-                    🎵 {mus.metadata?.title || "Music"}
+                     {mus.metadata?.title || "Music"}
                   </span>
                   <span className="text-[7px] text-purple-700 font-medium z-10 relative">
                     Vol: {Math.round((timeline.settings?.musicVolume ?? 0.16) * 100)}%
@@ -1507,7 +1507,7 @@ export default function EditorMultiTrackTimeline({
                     }`}
                     style={{ left: `${left}px`, width: `${width}px` }}
                   >
-                    <span className="truncate">🔔 {sfx.metadata?.title || "SFX"}</span>
+                    <span className="truncate"> {sfx.metadata?.title || "SFX"}</span>
                   </div>
                 );
               })}

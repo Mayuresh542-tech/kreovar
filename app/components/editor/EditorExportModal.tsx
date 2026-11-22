@@ -169,7 +169,7 @@ export default function EditorExportModal({
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center text-sm font-bold shadow-xs">
-                ⚡
+                
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">Kreovar Export Engine</h3>
@@ -177,7 +177,7 @@ export default function EditorExportModal({
                   {isRendering
                     ? "Server-side compositing in progress..."
                     : isCompleted
-                    ? "Render complete ✓"
+                    ? "Render complete "
                     : "Configure export format, resolution, and frame rate"}
                 </span>
               </div>
@@ -189,7 +189,7 @@ export default function EditorExportModal({
                 onClick={onClose}
                 className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center text-xs cursor-pointer transition-colors"
               >
-                ✕
+                
               </button>
             )}
           </div>
@@ -204,12 +204,12 @@ export default function EditorExportModal({
                 </span>
                 <div className="grid grid-cols-3 gap-1.5">
                   {[
-                    { id: "shorts", label: "YouTube Shorts", icon: "🔴" },
-                    { id: "reels", label: "Instagram Reels", icon: "📸" },
-                    { id: "tiktok", label: "TikTok", icon: "🎵" },
+                    { id: "shorts", label: "YouTube Shorts", icon: "" },
+                    { id: "reels", label: "Instagram Reels", icon: "" },
+                    { id: "tiktok", label: "TikTok", icon: "" },
                     { id: "youtube", label: "YouTube 16:9", icon: "▶️" },
                     { id: "instagram_square", label: "Square 1:1", icon: "⏹️" },
-                    { id: "custom", label: "Custom Settings", icon: "⚙️" },
+                    { id: "custom", label: "Custom Settings", icon: "️" },
                   ].map((p) => (
                     <button
                       key={p.id}
@@ -296,14 +296,14 @@ export default function EditorExportModal({
                     onClick={handleExportAudioOnly}
                     className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-[10px] font-mono text-slate-700 border border-slate-200 cursor-pointer transition-colors"
                   >
-                    🎵 Audio (MP3)
+                     Audio (MP3)
                   </button>
                   <button
                     type="button"
                     onClick={() => handleExportSubtitles("srt")}
                     className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-[10px] font-mono text-slate-700 border border-slate-200 cursor-pointer transition-colors"
                   >
-                    💬 Subtitles (SRT)
+                     Subtitles (SRT)
                   </button>
                   <button
                     type="button"
@@ -321,7 +321,7 @@ export default function EditorExportModal({
                 onClick={handleStartExport}
                 className="w-full py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-colors"
               >
-                <span>⚡</span>
+                <span></span>
                 <span>START VIDEO RENDER (25 Credits)</span>
               </button>
             </div>
@@ -376,7 +376,7 @@ export default function EditorExportModal({
             <div className="flex flex-col gap-4">
               <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                  ✓
+                  
                 </div>
                 <div>
                   <h4 className="text-xs font-semibold text-emerald-900">Your video is ready!</h4>
@@ -425,14 +425,14 @@ export default function EditorExportModal({
           {isFailed && (
             <div className="flex flex-col gap-4 py-3">
               <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-3">
-                <span className="text-rose-600 text-lg">⚠️</span>
+                <span className="text-rose-600 text-lg">️</span>
                 <div className="flex flex-col gap-1">
                   <h4 className="text-xs font-semibold text-rose-900">Rendering Encountered an Error</h4>
                   <p className="text-[11px] text-rose-700">
                     {jobState.error || "Failed to encode video frames with FFmpeg."}
                   </p>
                   <span className="text-[10px] font-mono text-emerald-600 mt-1 font-medium">
-                    ✓ 25 credits have been automatically refunded to your balance.
+                     25 credits have been automatically refunded to your balance.
                   </span>
                 </div>
               </div>

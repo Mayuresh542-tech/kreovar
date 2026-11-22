@@ -19,7 +19,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import BrandMark from "../BrandMark";
-import ThemeToggle from "../ThemeToggle";
 import CaptionFonts from "../captions/CaptionFonts";
 import ToolSidebar, { EditorToolTab } from "./ToolSidebar";
 import AssetDrawer from "./AssetDrawer";
@@ -474,9 +473,8 @@ export default function EditorLayout({
           </button>
         </div>
 
-        {/* Right: Theme Toggle, Keyboard Shortcuts Help, Undo/Redo, Aspect Ratio, Preview Quality, Export Button */}
+        {/* Right: Keyboard Shortcuts Help, Undo/Redo, Aspect Ratio, Preview Quality, Export Button */}
         <div className="flex items-center gap-2">
-          <ThemeToggle />
 
           {/* Keyboard Shortcuts Help Button */}
           <button

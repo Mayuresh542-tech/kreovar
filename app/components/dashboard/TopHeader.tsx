@@ -1,5 +1,4 @@
 "use client";
-import ThemeToggle from "../ThemeToggle";
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -81,7 +80,6 @@ export default function TopHeader({
 
       {/* Right: Notifications & Profile Avatar */}
       <div className="flex items-center gap-2 sm:gap-3">
-        <ThemeToggle />
         {/* Notification Bell */}
         <Link
           href="/trends"

@@ -728,7 +728,7 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
                       style={{ left: `${left}px`, width: `${width}px` }}
                     >
                       <span className="text-[9px] font-mono text-rose-800 bg-white/95 border border-rose-300 rounded px-1 mt-1 shadow-xs whitespace-nowrap">
-                        ✂ {silence.duration.toFixed(2)}s
+                        Cut {silence.duration.toFixed(2)}s
                       </span>
                     </div>
                   );

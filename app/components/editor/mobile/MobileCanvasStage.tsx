@@ -625,7 +625,7 @@ export default function MobileCanvasStage({
             {/* Center Eye-Level & Crosshair (Golden Ratio Focus Area for Viral Captions & B-Rolls) */}
             <div className="absolute top-[48%] left-0 right-0 -translate-y-1/2 border-t border-dashed border-amber-400/50 flex items-center justify-between px-2">
               <span className="text-[8px] font-mono font-bold text-amber-300/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                🎯 Viral Eye-Level (48%)
+                Viral Eye-Level (48%)
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400/70" />
             </div>
@@ -665,7 +665,7 @@ export default function MobileCanvasStage({
               onClick={() => alignSelectedClip("center")}
               className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/25 active:bg-blue-600 transition-colors flex items-center gap-0.5 font-semibold text-amber-300"
             >
-              <span>🎯 Center</span>
+              <span>Center</span>
             </button>
             <button
               type="button"

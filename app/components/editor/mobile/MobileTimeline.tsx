@@ -427,7 +427,7 @@ export default function MobileTimeline() {
                     style={{ left: `${left}px`, width: `${width}px` }}
                   >
                     <span className="text-[8px] font-mono text-rose-800 bg-white/95 border border-rose-300 rounded px-1 mt-0.5 shadow-xs whitespace-nowrap">
-                      ✂ {silence.duration.toFixed(2)}s
+                      Cut {silence.duration.toFixed(2)}s
                     </span>
                   </div>
                 );

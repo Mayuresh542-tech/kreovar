@@ -13,10 +13,10 @@ import {
 import type { EditingJob, EditStage } from "./sequentialEdit";
 
 export const STARTER_PROMPTS = [
-  "🔥 Hormozi Viral Style",
-  "🎙️ Clean Podcast Cut",
-  "⚡ Auto Zooms + B-Roll",
-  "🎬 Cinematic Subtitles",
+  "Hormozi Viral Style",
+  "Clean Podcast Cut",
+  "Auto Zooms + B-Roll",
+  "Cinematic Subtitles",
 ] as const;
 
 export type IntentOperation =
