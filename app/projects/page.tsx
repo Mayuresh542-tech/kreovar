@@ -224,8 +224,8 @@ function ProjectsContent() {
             return (
               <div
                 key={project.id}
-                onClick={() => router.push(`/projects/${project.id}`)}
-                className="bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 p-3 sm:p-4 hover:border-slate-300 hover:shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 cursor-pointer group"
+                onClick={() => router.push(`/editor?projectId=${project.id}`)}
+                className="bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 p-3 sm:p-4 hover:border-blue-500/50 hover:shadow-sm transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 cursor-pointer group"
               >
                 {/* Left: Thumbnail & Details */}
                 <div className="flex items-start sm:items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
@@ -267,8 +267,9 @@ function ProjectsContent() {
 
                 {/* Right: Actions Menu & Open in Editor */}
                 <div className="flex items-center justify-between sm:justify-end gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
-                  <span className="sm:hidden text-[11px] text-slate-400">
-                    Tap card to view project
+                  <span className="sm:hidden inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600">
+                    <Film className="w-3.5 h-3.5" />
+                    <span>Tap to Open Editor</span>
                   </span>
 
                   <div className="flex items-center gap-2">
@@ -278,9 +279,9 @@ function ProjectsContent() {
                         e.stopPropagation();
                         router.push(`/editor?projectId=${project.id}`);
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors shadow-xs"
                     >
-                      <Film className="w-3.5 h-3.5" />
+                      <Film className="w-3.5 h-3.5 text-blue-400" />
                       <span>Open in Editor</span>
                     </button>
 
@@ -299,7 +300,7 @@ function ProjectsContent() {
 
                     {activeMenuId === project.id && (
                       <div
-                        className="absolute right-0 bottom-8 w-36 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-20 text-xs"
+                        className="absolute right-0 bottom-8 w-40 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-20 text-xs"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
@@ -311,7 +312,7 @@ function ProjectsContent() {
                           className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
-                          <span>Project Detail</span>
+                          <span>Asset Files & Hub</span>
                         </button>
                         {project.isReal&&<button type="button" onClick={()=>void toggleCompleted(project.id)} className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50">{project.status==='Completed'?'Reopen project':'Mark complete'}</button>}
                         {project.isReal && (
