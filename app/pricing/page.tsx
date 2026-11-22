@@ -27,7 +27,7 @@ function pricingSchema() {
       {
         "@type": "Offer",
         name: "Pro Plan",
-        price: "19",
+        price: "9",
         priceCurrency: "USD",
         billingDuration: "P1M",
         url: `${SITE_URL}/pricing`,

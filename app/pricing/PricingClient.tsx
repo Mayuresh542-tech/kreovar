@@ -47,7 +47,7 @@ export default function PricingClient() {
               >
                 <span>Yearly</span>
                 <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-700 text-[10px] font-semibold rounded-full">
-                  Save 17%
+                  Save 17% (2 Mo Free)
                 </span>
               </button>
             </div>

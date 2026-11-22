@@ -46,11 +46,11 @@ const FREE_PLAN: PlanConfig = {
 const PRO_PLAN: PlanConfig = {
   id: "pro",
   name: "Pro",
-  price: 19,
-  yearlyPrice: 190,
+  price: 9,
+  yearlyPrice: 90,
   currency: "USD",
-  displayPrice: "$19",
-  yearlyDisplayPrice: "$190",
+  displayPrice: "$9",
+  yearlyDisplayPrice: "$90",
   billingPeriod: "monthly",
   monthlyCredits: 0, // Legacy balances remain separate from feature allowances.
   description: "The primary plan for solo creators and teams producing weekly viral content.",
