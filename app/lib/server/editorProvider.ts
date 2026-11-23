@@ -73,6 +73,7 @@ async function generateGeminiEditorPlanJson<T>(
         candidateImages: options.candidateImages,
         footageFrames: options.footageFrames,
         referenceImages: options.referenceImages,
+        videoFile: options.videoFile,
       } : {}),
       onMetadata: (meta) => { geminiMeta = meta; },
     });
@@ -120,8 +121,16 @@ export async function generateEditPlanJson<T>(options:EditorFallbackOptions,pref
  options.signal?.throwIfAborted();
  let attempts=0,reason=preferred?.fallbackReason;
 
- if (preferred?.provider === 'gemini') {
-  return generateGeminiEditorPlanJson<T>(options, preferred, reason, attempts);
+ if (preferred?.provider === 'gemini' || (options.videoFile && preferred?.provider !== 'groq' && preferred?.provider !== 'radox')) {
+  try {
+   return await generateGeminiEditorPlanJson<T>(options, preferred, reason, attempts);
+  } catch (geminiError: any) {
+   if (options.videoFile && !preferred?.provider) {
+    reason = geminiError instanceof Error ? geminiError.message : 'GEMINI_VIDEO_FALLBACK';
+   } else {
+    throw geminiError;
+   }
+  }
  }
 
  if(process.env.EDITOR_AI_PRIMARY_PROVIDER==='radox'&&preferred?.provider!=='groq'){

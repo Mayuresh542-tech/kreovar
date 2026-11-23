@@ -39,6 +39,20 @@ interface CanvasStageProps {
   readOnly?: boolean;
 }
 
+/**
+ * Dynamic CSS cursor orientation based on handle base angle and clip rotation angle
+ * Specified in docs/CAPCUT_EDITOR_SPECIFICATION.md Section 5.6
+ */
+export function getRotatedCursor(baseAngleDeg: number, clipRotationDeg: number): string {
+  const totalAngle = (baseAngleDeg + clipRotationDeg) % 180;
+  const normalized = totalAngle < 0 ? totalAngle + 180 : totalAngle;
+
+  if (normalized >= 22.5 && normalized < 67.5) return "nesw-resize";
+  if (normalized >= 67.5 && normalized < 112.5) return "ns-resize";
+  if (normalized >= 112.5 && normalized < 157.5) return "nwse-resize";
+  return "ew-resize";
+}
+
 export default function CanvasStage({
   quality = 720,
   readOnly = false,
@@ -65,6 +79,8 @@ export default function CanvasStage({
   const [showSafeAreas, setShowSafeAreas] = useState(false);
   const [showCrosshair, setShowCrosshair] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [snapGuides, setSnapGuides] = useState<{ x: boolean; y: boolean }>({ x: false, y: false });
+  const snapGuidesRef = useRef({ x: false, y: false });
 
   const duration = projectDuration(project);
   const fps = project.settings.fps;
@@ -279,7 +295,8 @@ export default function CanvasStage({
   const handleGesture = (
     event: React.PointerEvent,
     mode: "move" | "scale" | "rotate",
-    id: string
+    id: string,
+    corner?: "tl" | "tr" | "br" | "bl"
   ) => {
     if (readOnly) return;
     event.preventDefault();
@@ -302,28 +319,134 @@ export default function CanvasStage({
     const startDist = Math.hypot(startX - centerX, startY - centerY);
     const startAngle = Math.atan2(startY - centerY, startX - centerX) * (180 / Math.PI);
 
+    // Box dimensions in screen pixels for corner scaling
+    const boxWidth = (box ? box.width / w : t.scale) * rect.width;
+    const boxHeight = (box ? box.height / h : (t.scale * h) / w) * rect.height;
+    const rotationDeg = box ? box.rotation : t.rotation;
+    const rad = (rotationDeg * Math.PI) / 180;
+    const cosR = Math.cos(rad);
+    const sinR = Math.sin(rad);
+
+    // Anchor point in local unrotated coordinates (opposite corner of dragged corner)
+    // tl dragged -> br is anchor (+W/2, +H/2)
+    // tr dragged -> bl is anchor (-W/2, +H/2)
+    // br dragged -> tl is anchor (-W/2, -H/2)
+    // bl dragged -> tr is anchor (+W/2, -H/2)
+    let lxAnchor = -boxWidth / 2;
+    let lyAnchor = -boxHeight / 2;
+    if (corner === "tl") {
+      lxAnchor = boxWidth / 2;
+      lyAnchor = boxHeight / 2;
+    } else if (corner === "tr") {
+      lxAnchor = -boxWidth / 2;
+      lyAnchor = boxHeight / 2;
+    } else if (corner === "bl") {
+      lxAnchor = boxWidth / 2;
+      lyAnchor = -boxHeight / 2;
+    } else {
+      lxAnchor = -boxWidth / 2;
+      lyAnchor = -boxHeight / 2;
+    }
+
+    // Anchor point in screen coordinates
+    const anchorOffsetX = lxAnchor * cosR - lyAnchor * sinR;
+    const anchorOffsetY = lxAnchor * sinR + lyAnchor * cosR;
+    const anchorScreenX = centerX + anchorOffsetX;
+    const anchorScreenY = centerY + anchorOffsetY;
+
+    // Diagonal vector d0 from anchor to initial dragged corner (dragStart = center - anchorOffset)
+    const d0x = -2 * anchorOffsetX;
+    const d0y = -2 * anchorOffsetY;
+    const d0LenSq = d0x * d0x + d0y * d0y;
+
+    if (mode === "move") {
+      const clearGuides = () => {
+        if (snapGuidesRef.current.x || snapGuidesRef.current.y) {
+          snapGuidesRef.current = { x: false, y: false };
+          setSnapGuides({ x: false, y: false });
+        }
+        window.removeEventListener("pointerup", clearGuides);
+        window.removeEventListener("pointercancel", clearGuides);
+        window.removeEventListener("keydown", clearGuides);
+        window.removeEventListener("blur", clearGuides);
+      };
+      window.addEventListener("pointerup", clearGuides, { once: true });
+      window.addEventListener("pointercancel", clearGuides, { once: true });
+      window.addEventListener("keydown", clearGuides, { once: true });
+      window.addEventListener("blur", clearGuides, { once: true });
+    }
+
     pointerEdit(
       store,
       (e) => (p) => {
         const curDist = Math.hypot(e.clientX - centerX, e.clientY - centerY);
         const curAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+
+        if (mode === "move") {
+          const rawX = t.x + (e.clientX - startX) / rect.width;
+          const rawY = t.y + (e.clientY - startY) / rect.height;
+
+          // Smart center alignment snapping (threshold: 6px in screen pixels) to canvas center (x: 0, y: 0)
+          const snapThresholdX = 6 / rect.width;
+          const snapThresholdY = 6 / rect.height;
+          const snappedX = Math.abs(rawX) <= snapThresholdX;
+          const snappedY = Math.abs(rawY) <= snapThresholdY;
+          const finalX = snappedX ? 0 : rawX;
+          const finalY = snappedY ? 0 : rawY;
+
+          if (snappedX !== snapGuidesRef.current.x || snappedY !== snapGuidesRef.current.y) {
+            snapGuidesRef.current = { x: snappedX, y: snappedY };
+            setSnapGuides({ x: snappedX, y: snappedY });
+          }
+
+          return changeClipProperty(p, id, {
+            transform: {
+              ...t,
+              x: finalX,
+              y: finalY,
+            },
+          });
+        }
+
+        if (mode === "scale") {
+          // Alt/Option drag: Center-uniform scale
+          if (e.altKey) {
+            return changeClipProperty(p, id, {
+              transform: {
+                ...t,
+                scale: clamp(
+                  t.scale * (startDist > 2 ? curDist / startDist : 1),
+                  0.05,
+                  10
+                ),
+              },
+            });
+          }
+
+          // Uniform corner scaling around stationary anchor point
+          const vx = e.clientX - anchorScreenX;
+          const vy = e.clientY - anchorScreenY;
+          const sRatio = d0LenSq > 1 ? (vx * d0x + vy * d0y) / d0LenSq : 1;
+          const clampedScale = clamp(t.scale * sRatio, 0.05, 10);
+          const effectiveMultiplier = clampedScale / t.scale;
+
+          const deltaCenterX = (effectiveMultiplier - 1) * (centerX - anchorScreenX);
+          const deltaCenterY = (effectiveMultiplier - 1) * (centerY - anchorScreenY);
+
+          return changeClipProperty(p, id, {
+            transform: {
+              ...t,
+              x: t.x + deltaCenterX / rect.width,
+              y: t.y + deltaCenterY / rect.height,
+              scale: clampedScale,
+            },
+          });
+        }
+
         return changeClipProperty(p, id, {
           transform: {
             ...t,
-            ...(mode === "move"
-              ? {
-                  x: t.x + (e.clientX - startX) / rect.width,
-                  y: t.y + (e.clientY - startY) / rect.height,
-                }
-              : mode === "scale"
-              ? {
-                  scale: clamp(
-                    t.scale * (startDist > 2 ? curDist / startDist : 1),
-                    0.05,
-                    10
-                  ),
-                }
-              : { rotation: Math.round(t.rotation + (curAngle - startAngle)) }),
+            rotation: Math.round(t.rotation + (curAngle - startAngle)),
           },
         });
       },
@@ -354,6 +477,8 @@ export default function CanvasStage({
 
   const renderHeight = quality;
   const renderWidth = Math.round((quality * aspectW) / aspectH);
+  const selectedClip = selection[0] ? project.clips[selection[0]] : undefined;
+  const clipRotation = selectedClip?.transform.rotation ?? 0;
 
   return (
     <section
@@ -489,6 +614,26 @@ export default function CanvasStage({
             </div>
           )}
 
+          {/* Alignment Snapping Guides (when snapped to canvas center) */}
+          {snapGuides.x && (
+            <div
+              className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-cyan-400 z-20 pointer-events-none shadow-[0_0_6px_rgba(34,211,238,0.9)]"
+              aria-hidden="true"
+            />
+          )}
+          {snapGuides.y && (
+            <div
+              className="absolute top-1/2 left-0 right-0 h-[1px] bg-cyan-400 z-20 pointer-events-none shadow-[0_0_6px_rgba(34,211,238,0.9)]"
+              aria-hidden="true"
+            />
+          )}
+          {snapGuides.x && snapGuides.y && (
+            <div
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,1)] z-20 pointer-events-none"
+              aria-hidden="true"
+            />
+          )}
+
           {/* Interactive Bounding Box around Selected Clip */}
           <div
             ref={outlineRef}
@@ -499,22 +644,51 @@ export default function CanvasStage({
             }}
           >
             {/* Label */}
-            <span className="absolute -top-6 left-0 bg-blue-600 text-white font-mono text-[9px] px-1.5 py-0.5 rounded shadow">
+            <span className="absolute -top-6 left-0 bg-blue-600 text-white font-mono text-[9px] px-1.5 py-0.5 rounded shadow pointer-events-none select-none max-w-[120px] truncate">
               {project.clips[selection[0]]?.name}
             </span>
 
-            {/* Corner Scale Handle */}
+            {/* 4 Corner Resize Handles */}
+            {/* Top-Left (TL) */}
             <button
-              aria-label="Scale layer"
-              onPointerDown={(e) => handleGesture(e, "scale", selection[0])}
-              className="absolute -bottom-2 -right-2 w-4 h-4 rounded-full bg-white border-2 border-blue-600 cursor-se-resize shadow"
+              aria-label="Scale Top-Left"
+              onPointerDown={(e) => handleGesture(e, "scale", selection[0], "tl")}
+              style={{ cursor: getRotatedCursor(135, clipRotation) }}
+              className="absolute -top-2 -left-2 w-4 h-4 rounded-full bg-white border-2 border-blue-600 shadow hover:scale-110 active:scale-95 transition-transform"
             />
+
+            {/* Top-Right (TR) */}
+            <button
+              aria-label="Scale Top-Right"
+              onPointerDown={(e) => handleGesture(e, "scale", selection[0], "tr")}
+              style={{ cursor: getRotatedCursor(45, clipRotation) }}
+              className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-white border-2 border-blue-600 shadow hover:scale-110 active:scale-95 transition-transform"
+            />
+
+            {/* Bottom-Right (BR) */}
+            <button
+              aria-label="Scale Bottom-Right"
+              onPointerDown={(e) => handleGesture(e, "scale", selection[0], "br")}
+              style={{ cursor: getRotatedCursor(135, clipRotation) }}
+              className="absolute -bottom-2 -right-2 w-4 h-4 rounded-full bg-white border-2 border-blue-600 shadow hover:scale-110 active:scale-95 transition-transform"
+            />
+
+            {/* Bottom-Left (BL) */}
+            <button
+              aria-label="Scale Bottom-Left"
+              onPointerDown={(e) => handleGesture(e, "scale", selection[0], "bl")}
+              style={{ cursor: getRotatedCursor(45, clipRotation) }}
+              className="absolute -bottom-2 -left-2 w-4 h-4 rounded-full bg-white border-2 border-blue-600 shadow hover:scale-110 active:scale-95 transition-transform"
+            />
+
+            {/* Top Rotation Handle Stalk */}
+            <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-[1.5px] h-6 bg-blue-600 pointer-events-none" />
 
             {/* Top Rotate Handle */}
             <button
               aria-label="Rotate layer"
               onPointerDown={(e) => handleGesture(e, "rotate", selection[0])}
-              className="absolute -top-5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-blue-500 border border-white cursor-grab shadow"
+              className="absolute -top-[31px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white cursor-grab active:cursor-grabbing shadow hover:scale-110 transition-transform"
             />
           </div>
 

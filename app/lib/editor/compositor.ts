@@ -252,6 +252,7 @@ export class Compositor {
   }
   private frames=new Map<string,{image:CanvasImageSource;width:number;height:number}>();
   setFrame(id:string,image:CanvasImageSource,width:number,height:number){this.frames.set(id,{image,width,height});}
+  clearFrames(){this.frames.clear();}
   render(canvas:HTMLCanvasElement,p:EditorProject,time:number):VisualBounds[]{
     const ctx=canvas.getContext("2d");if(!ctx)return[];
     const index=getProjectIndex(p);

@@ -47,14 +47,25 @@ export type MotionAnimationType =
 
 export type SpeedCurvePreset =
   | "normal"
+  | "standard"
   | "montage"
   | "hero"
   | "bullet"
   | "fast"
   | "slowmo"
-  | "custom";
+  | "custom"
+  | "Hero"
+  | "Bullet"
+  | "Montage"
+  | "Jump Cut"
+  | "Flash In"
+  | "Flash Out"
+  | "jump_cut"
+  | "flash_in"
+  | "flash_out";
 
 export type KeyframeProperty =
+  | "position"
   | "position_x"
   | "position_y"
   | "scale"
@@ -160,6 +171,10 @@ export interface TimelineItem {
   speed?: number;     // 0.1 to 8.0, default 1.0
   speedCurvePreset?: SpeedCurvePreset;
   speedPoints?: Array<{ time: number; speed: number }>;
+  preservePitch?: boolean;
+  ducking?: boolean;
+  duckingGain?: number;
+  equalPowerCrossfade?: boolean;
   colorAdjustments?: TimelineColorAdjustments;
   filterPreset?: FilterPresetId;
   filterIntensity?: number; // 0 to 1.0

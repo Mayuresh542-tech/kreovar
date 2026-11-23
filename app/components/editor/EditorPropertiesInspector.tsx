@@ -18,16 +18,33 @@ import {
   Sparkles,
   Lock,
   Unlock,
+  Volume2,
+  VolumeX,
+  Gauge,
+  Activity,
+  Zap,
+  Check,
 } from "lucide-react";
 import {
   VeeloxTimelineProject,
   TimelineItem,
   TimelineKeyframe,
+  KeyframeProperty,
   AspectRatio,
   TransitionType,
 } from "@/app/lib/timeline/types";
 import { CaptionPosition } from "@/app/lib/captions/presets";
 import { DEFAULT_CAPTION_TEMPLATES } from "@/app/lib/captions/templates";
+import {
+  SPEED_CURVE_PRESETS,
+  getSpeedCurvePreset,
+  generateSpeedCurveSvgPoints,
+  calculateAverageSpeed,
+  formatGainAsDecibels,
+  linearGainToDecibels,
+  decibelsToLinearGain,
+  formatDecibels,
+} from "@/app/lib/editor/speedCurves";
 
 interface EditorPropertiesInspectorProps {
   timeline: VeeloxTimelineProject;
@@ -91,10 +108,126 @@ export default function EditorPropertiesInspector({
   onToggleOpen,
 }: EditorPropertiesInspectorProps) {
   // Keyframe creator state
-  const [kfProperty, setKfProperty] = useState<"scale" | "rotation" | "opacity" | "volume">("scale");
+  const [kfProperty, setKfProperty] = useState<
+    "scale" | "rotation" | "opacity" | "position" | "position_x" | "position_y" | "volume"
+  >("scale");
   const [kfValue, setKfValue] = useState<number>(1.2);
   const [kfEasing, setKfEasing] = useState<"linear" | "ease_in" | "ease_out" | "ease_in_out">("ease_in_out");
   const [maintainAspectRatio, setMaintainAspectRatio] = useState(true);
+  const [speedMode, setSpeedMode] = useState<"constant" | "curve">("constant");
+
+  // Local playhead time inside selected clip
+  const localPlayhead = selectedClip
+    ? Math.max(0, Math.min(selectedClip.duration, currentTime - selectedClip.startTime))
+    : 0;
+  const roundedPlayhead = Math.round(localPlayhead * 100) / 100;
+
+  function hasKeyframeAtPlayhead(prop: KeyframeProperty | "position") {
+    if (!selectedClip || !selectedClip.keyframes) return false;
+    if (prop === "position") {
+      return selectedClip.keyframes.some(
+        (k) =>
+          (k.property === "position" || k.property === "position_x" || k.property === "position_y") &&
+          Math.abs(k.time - roundedPlayhead) < 0.05
+      );
+    }
+    return selectedClip.keyframes.some(
+      (k) => k.property === prop && Math.abs(k.time - roundedPlayhead) < 0.05
+    );
+  }
+
+  function handleAddKeyframe(propOverride?: KeyframeProperty | "position", valOverride?: number) {
+    if (!selectedClip) return;
+    const prop = propOverride || kfProperty;
+    let val = valOverride !== undefined ? valOverride : kfValue;
+
+    if (valOverride === undefined) {
+      if (prop === "scale") val = selectedClip.scale ?? 1.0;
+      else if (prop === "rotation") val = selectedClip.rotation ?? 0;
+      else if (prop === "opacity") val = selectedClip.opacity ?? 1.0;
+      else if (prop === "position_x") val = selectedClip.position?.x ?? 0;
+      else if (prop === "position_y") val = selectedClip.position?.y ?? 0;
+      else if (prop === "volume") val = selectedClip.volume ?? 1.0;
+    }
+
+    let updated = [...(selectedClip.keyframes || [])];
+
+    if (prop === "position") {
+      // Add or update both position_x and position_y at playhead
+      const xVal = selectedClip.position?.x ?? 0;
+      const yVal = selectedClip.position?.y ?? 0;
+      const filtered = updated.filter(
+        (k) =>
+          !(
+            Math.abs(k.time - roundedPlayhead) < 0.05 &&
+            (k.property === "position" || k.property === "position_x" || k.property === "position_y")
+          )
+      );
+      const kfX: TimelineKeyframe = {
+        id: `kf_${Date.now()}_x_${Math.random().toString(36).slice(2, 6)}`,
+        time: roundedPlayhead,
+        property: "position_x",
+        value: xVal,
+        easing: kfEasing,
+      };
+      const kfY: TimelineKeyframe = {
+        id: `kf_${Date.now()}_y_${Math.random().toString(36).slice(2, 6)}`,
+        time: roundedPlayhead,
+        property: "position_y",
+        value: yVal,
+        easing: kfEasing,
+      };
+      updated = [...filtered, kfX, kfY].sort((a, b) => a.time - b.time);
+    } else {
+      const filtered = updated.filter(
+        (k) => !(Math.abs(k.time - roundedPlayhead) < 0.05 && k.property === prop)
+      );
+      const newKf: TimelineKeyframe = {
+        id: `kf_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        time: roundedPlayhead,
+        property: prop as KeyframeProperty,
+        value: val,
+        easing: kfEasing,
+      };
+      updated = [...filtered, newKf].sort((a, b) => a.time - b.time);
+    }
+
+    onUpdateClip({ ...selectedClip, keyframes: updated });
+  }
+
+  function handleDeleteKeyframe(kfId: string) {
+    if (!selectedClip) return;
+    const updated = (selectedClip.keyframes || []).filter((k) => k.id !== kfId);
+    onUpdateClip({ ...selectedClip, keyframes: updated });
+  }
+
+  function handleToggleKeyframeAtPlayhead(prop: KeyframeProperty | "position", currentVal: number) {
+    if (!selectedClip) return;
+    if (prop === "position") {
+      const existing = (selectedClip.keyframes || []).filter(
+        (k) =>
+          (k.property === "position" || k.property === "position_x" || k.property === "position_y") &&
+          Math.abs(k.time - roundedPlayhead) < 0.05
+      );
+      if (existing.length > 0) {
+        const ids = new Set(existing.map((e) => e.id));
+        const updated = (selectedClip.keyframes || []).filter((k) => !ids.has(k.id));
+        onUpdateClip({ ...selectedClip, keyframes: updated });
+      } else {
+        handleAddKeyframe("position");
+      }
+      return;
+    }
+
+    const existing = (selectedClip.keyframes || []).find(
+      (k) => k.property === prop && Math.abs(k.time - roundedPlayhead) < 0.05
+    );
+    if (existing) {
+      handleDeleteKeyframe(existing.id);
+    } else {
+      handleAddKeyframe(prop, currentVal);
+    }
+  }
 
   // If panel is collapsed, render minimal vertical pill
   if (!isOpen) {
@@ -134,27 +267,6 @@ export default function EditorPropertiesInspector({
       ? "audio"
       : "video"
     : "project";
-
-  // Keyframe helpers
-  function handleAddKeyframe() {
-    if (!selectedClip) return;
-    const localTime = Math.max(0, Math.min(selectedClip.duration, currentTime - selectedClip.startTime));
-    const newKf: TimelineKeyframe = {
-      id: `kf_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      time: Math.round(localTime * 100) / 100,
-      property: kfProperty,
-      value: kfValue,
-      easing: kfEasing,
-    };
-    const updatedKeyframes = [...(selectedClip.keyframes || []), newKf].sort((a, b) => a.time - b.time);
-    onUpdateClip({ ...selectedClip, keyframes: updatedKeyframes });
-  }
-
-  function handleDeleteKeyframe(kfId: string) {
-    if (!selectedClip) return;
-    const updatedKeyframes = (selectedClip.keyframes || []).filter((k) => k.id !== kfId);
-    onUpdateClip({ ...selectedClip, keyframes: updatedKeyframes });
-  }
 
   return (
     <div
@@ -317,40 +429,61 @@ export default function EditorPropertiesInspector({
               </div>
 
               {/* Numeric Position X & Y */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-[11px] text-slate-600 font-mono">Position X (px)</label>
-                  <input
-                    type="number"
-                    value={selectedClip.position?.x ?? 0}
-                    onChange={(e) =>
-                      onUpdateClip({
-                        ...selectedClip,
-                        position: {
-                          x: parseInt(e.target.value) || 0,
-                          y: selectedClip.position?.y ?? 0,
-                        },
-                      })
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] text-slate-600 font-mono">Position (px)</label>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleKeyframeAtPlayhead("position", 0)}
+                    className={`p-0.5 rounded cursor-pointer transition-colors ${
+                      hasKeyframeAtPlayhead("position")
+                        ? "text-amber-500 fill-amber-500 hover:text-amber-600"
+                        : "text-slate-400 hover:text-amber-500"
+                    }`}
+                    title={
+                      hasKeyframeAtPlayhead("position")
+                        ? "Remove position keyframe at playhead"
+                        : "Add position keyframe at playhead"
                     }
-                    className="w-full p-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold"
-                  />
+                  >
+                    <Key className="w-3 h-3" />
+                  </button>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] text-slate-600 font-mono">Position Y (px)</label>
-                  <input
-                    type="number"
-                    value={selectedClip.position?.y ?? 0}
-                    onChange={(e) =>
-                      onUpdateClip({
-                        ...selectedClip,
-                        position: {
-                          x: selectedClip.position?.x ?? 0,
-                          y: parseInt(e.target.value) || 0,
-                        },
-                      })
-                    }
-                    className="w-full p-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold"
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-mono">X</label>
+                    <input
+                      type="number"
+                      value={selectedClip.position?.x ?? 0}
+                      onChange={(e) =>
+                        onUpdateClip({
+                          ...selectedClip,
+                          position: {
+                            x: parseInt(e.target.value) || 0,
+                            y: selectedClip.position?.y ?? 0,
+                          },
+                        })
+                      }
+                      className="w-full p-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-mono">Y</label>
+                    <input
+                      type="number"
+                      value={selectedClip.position?.y ?? 0}
+                      onChange={(e) =>
+                        onUpdateClip({
+                          ...selectedClip,
+                          position: {
+                            x: selectedClip.position?.x ?? 0,
+                            y: parseInt(e.target.value) || 0,
+                          },
+                        })
+                      }
+                      className="w-full p-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -368,7 +501,23 @@ export default function EditorPropertiesInspector({
                       {maintainAspectRatio ? <Lock className="w-2.5 h-2.5 text-blue-600" /> : <Unlock className="w-2.5 h-2.5 text-slate-400" />}
                     </button>
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleKeyframeAtPlayhead("scale", selectedClip.scale ?? 1.0)}
+                      className={`p-0.5 rounded cursor-pointer transition-colors ${
+                        hasKeyframeAtPlayhead("scale")
+                          ? "text-amber-500 fill-amber-500 hover:text-amber-600"
+                          : "text-slate-400 hover:text-amber-500"
+                      }`}
+                      title={
+                        hasKeyframeAtPlayhead("scale")
+                          ? "Remove scale keyframe at playhead"
+                          : "Add scale keyframe at playhead"
+                      }
+                    >
+                      <Key className="w-3 h-3" />
+                    </button>
                     <input
                       type="number"
                       step="5"
@@ -400,7 +549,23 @@ export default function EditorPropertiesInspector({
               <div className="space-y-1">
                 <div className="flex justify-between items-center text-[11px] font-mono">
                   <span>Rotation</span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleKeyframeAtPlayhead("rotation", selectedClip.rotation ?? 0)}
+                      className={`p-0.5 rounded cursor-pointer transition-colors ${
+                        hasKeyframeAtPlayhead("rotation")
+                          ? "text-amber-500 fill-amber-500 hover:text-amber-600"
+                          : "text-slate-400 hover:text-amber-500"
+                      }`}
+                      title={
+                        hasKeyframeAtPlayhead("rotation")
+                          ? "Remove rotation keyframe at playhead"
+                          : "Add rotation keyframe at playhead"
+                      }
+                    >
+                      <Key className="w-3 h-3" />
+                    </button>
                     <input
                       type="number"
                       min="-180"
@@ -431,7 +596,23 @@ export default function EditorPropertiesInspector({
               <div className="space-y-1">
                 <div className="flex justify-between items-center text-[11px] font-mono">
                   <span>Opacity</span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleKeyframeAtPlayhead("opacity", selectedClip.opacity ?? 1.0)}
+                      className={`p-0.5 rounded cursor-pointer transition-colors ${
+                        hasKeyframeAtPlayhead("opacity")
+                          ? "text-amber-500 fill-amber-500 hover:text-amber-600"
+                          : "text-slate-400 hover:text-amber-500"
+                      }`}
+                      title={
+                        hasKeyframeAtPlayhead("opacity")
+                          ? "Remove opacity keyframe at playhead"
+                          : "Add opacity keyframe at playhead"
+                      }
+                    >
+                      <Key className="w-3 h-3" />
+                    </button>
                     <input
                       type="number"
                       min="0"
@@ -470,7 +651,7 @@ export default function EditorPropertiesInspector({
                 </span>
                 <button
                   type="button"
-                  onClick={handleAddKeyframe}
+                  onClick={() => handleAddKeyframe()}
                   className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer flex items-center gap-1"
                   title="Add keyframe at current playhead position"
                 >
@@ -488,6 +669,9 @@ export default function EditorPropertiesInspector({
                   <option value="scale">Scale</option>
                   <option value="rotation">Rotation</option>
                   <option value="opacity">Opacity</option>
+                  <option value="position">Position (X/Y)</option>
+                  <option value="position_x">Position X</option>
+                  <option value="position_y">Position Y</option>
                   <option value="volume">Volume</option>
                 </select>
 
@@ -514,7 +698,7 @@ export default function EditorPropertiesInspector({
 
               {/* Keyframe List */}
               {selectedClip.keyframes && selectedClip.keyframes.length > 0 ? (
-                <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                <div className="space-y-1 max-h-36 overflow-y-auto custom-scrollbar">
                   {selectedClip.keyframes.map((kf) => (
                     <div
                       key={kf.id}
@@ -530,7 +714,9 @@ export default function EditorPropertiesInspector({
                           <Clock className="w-2.5 h-2.5" />
                           <span>+{kf.time.toFixed(2)}s</span>
                         </button>
-                        <span className="text-slate-700 font-semibold">{kf.property}: {kf.value}</span>
+                        <span className="text-slate-700 font-semibold truncate">
+                          {kf.property}: {typeof kf.value === "number" ? Math.round(kf.value * 100) / 100 : kf.value}
+                        </span>
                         <span className="text-[8px] px-1 rounded bg-slate-200 text-slate-600 font-normal">
                           {kf.easing || "linear"}
                         </span>
@@ -555,29 +741,245 @@ export default function EditorPropertiesInspector({
 
             <div className="h-px bg-slate-200" />
 
-            {/* Speed Controls */}
-            <div className="space-y-2">
-              <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                Playback Speed
-              </span>
-              <div className="grid grid-cols-4 gap-1.5">
-                {SPEED_PRESETS.map((spd) => {
-                  const isCurrent = (selectedClip.speed ?? 1.0) === spd;
-                  return (
-                    <button
-                      key={spd}
-                      type="button"
-                      onClick={() => onUpdateClip({ ...selectedClip, speed: spd })}
-                      className={`py-1 rounded-md text-[10px] font-mono font-bold transition-colors cursor-pointer ${
-                        isCurrent
-                          ? "bg-slate-900 text-white shadow-2xs"
-                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                      }`}
-                    >
-                      {spd}x
-                    </button>
-                  );
-                })}
+            {/* Speed & Retiming Controls */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider flex items-center gap-1">
+                  <Gauge className="w-3 h-3 text-blue-600" />
+                  Playback Speed & Curves
+                </span>
+                <span className="text-[10px] font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">
+                  {selectedClip.speedCurvePreset &&
+                  selectedClip.speedCurvePreset !== "normal" &&
+                  selectedClip.speedCurvePreset !== "standard"
+                    ? `${getSpeedCurvePreset(selectedClip.speedCurvePreset).name} Curve`
+                    : `${(selectedClip.speed ?? 1.0).toFixed(2)}x`}
+                </span>
+              </div>
+
+              {/* Mode Tabs: Constant vs Curve Ramping */}
+              <div className="grid grid-cols-2 p-0.5 bg-slate-100 rounded-lg text-[10px] font-semibold text-slate-600">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSpeedMode("constant");
+                    if (selectedClip.speedCurvePreset) {
+                      onUpdateClip({ ...selectedClip, speedCurvePreset: undefined });
+                    }
+                  }}
+                  className={`py-1 rounded-md transition-colors cursor-pointer text-center ${
+                    speedMode === "constant" &&
+                    (!selectedClip.speedCurvePreset ||
+                      selectedClip.speedCurvePreset === "normal" ||
+                      selectedClip.speedCurvePreset === "standard")
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "hover:text-slate-900"
+                  }`}
+                >
+                  Constant Speed
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSpeedMode("curve");
+                    if (
+                      !selectedClip.speedCurvePreset ||
+                      selectedClip.speedCurvePreset === "normal" ||
+                      selectedClip.speedCurvePreset === "standard"
+                    ) {
+                      onUpdateClip({
+                        ...selectedClip,
+                        speedCurvePreset: "Hero",
+                        speed: calculateAverageSpeed(SPEED_CURVE_PRESETS.hero),
+                      });
+                    }
+                  }}
+                  className={`py-1 rounded-md transition-colors cursor-pointer text-center ${
+                    speedMode === "curve" ||
+                    (selectedClip.speedCurvePreset &&
+                      selectedClip.speedCurvePreset !== "normal" &&
+                      selectedClip.speedCurvePreset !== "standard")
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "hover:text-slate-900"
+                  }`}
+                >
+                  Curve Ramping
+                </button>
+              </div>
+
+              {/* CONSTANT SPEED SLIDER & PRESETS */}
+              {speedMode === "constant" &&
+                (!selectedClip.speedCurvePreset ||
+                  selectedClip.speedCurvePreset === "normal" ||
+                  selectedClip.speedCurvePreset === "standard") && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-4 gap-1.5 font-mono text-[10px]">
+                      {SPEED_PRESETS.map((spd) => {
+                        const isCurrent = Math.abs((selectedClip.speed ?? 1.0) - spd) < 0.01;
+                        return (
+                          <button
+                            key={spd}
+                            type="button"
+                            onClick={() =>
+                              onUpdateClip({
+                                ...selectedClip,
+                                speed: spd,
+                                speedCurvePreset: undefined,
+                              })
+                            }
+                            className={`py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                              isCurrent
+                                ? "bg-slate-900 text-white shadow-2xs"
+                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                            }`}
+                          >
+                            {spd}x
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Continuous Slider with input */}
+                    <div className="space-y-1 pt-1">
+                      <div className="flex justify-between items-center text-[11px] font-mono">
+                        <span className="text-slate-500">Speed Multiplier</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0.1"
+                            max="8.0"
+                            value={Math.round((selectedClip.speed ?? 1.0) * 100) / 100}
+                            onChange={(e) =>
+                              onUpdateClip({
+                                ...selectedClip,
+                                speed: Math.max(0.1, Math.min(8.0, parseFloat(e.target.value) || 1.0)),
+                                speedCurvePreset: undefined,
+                              })
+                            }
+                            className="w-14 p-0.5 text-right rounded border border-slate-200 text-[10px] font-mono font-bold"
+                          />
+                          <span className="text-slate-500">x</span>
+                        </div>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="4.0"
+                        step="0.05"
+                        value={selectedClip.speed ?? 1.0}
+                        onChange={(e) =>
+                          onUpdateClip({
+                            ...selectedClip,
+                            speed: parseFloat(e.target.value),
+                            speedCurvePreset: undefined,
+                          })
+                        }
+                        className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
+                      />
+                    </div>
+                  </div>
+                )}
+
+              {/* CURVE RAMPING PRESETS (HERO, BULLET, MONTAGE, JUMP CUT, FLASH IN, FLASH OUT) */}
+              {(speedMode === "curve" ||
+                (selectedClip.speedCurvePreset &&
+                  selectedClip.speedCurvePreset !== "normal" &&
+                  selectedClip.speedCurvePreset !== "standard")) && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      SPEED_CURVE_PRESETS.hero,
+                      SPEED_CURVE_PRESETS.bullet,
+                      SPEED_CURVE_PRESETS.montage,
+                      SPEED_CURVE_PRESETS.jump_cut,
+                      SPEED_CURVE_PRESETS.flash_in,
+                      SPEED_CURVE_PRESETS.flash_out,
+                    ].map((preset) => {
+                      const isSelected =
+                        selectedClip.speedCurvePreset?.toLowerCase() === preset.id ||
+                        selectedClip.speedCurvePreset?.toLowerCase() === preset.name.toLowerCase();
+                      const avgSpeed = calculateAverageSpeed(preset);
+                      const svgPoints = generateSpeedCurveSvgPoints(preset, 110, 32);
+
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => {
+                            setSpeedMode("curve");
+                            onUpdateClip({
+                              ...selectedClip,
+                              speedCurvePreset: preset.name as any,
+                              speed: Math.round(avgSpeed * 100) / 100,
+                            });
+                          }}
+                          className={`p-2 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1.5 ${
+                            isSelected
+                              ? "bg-blue-50 border-blue-500 ring-2 ring-blue-200 shadow-2xs"
+                              : "bg-white border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-slate-900 flex items-center gap-1">
+                              {preset.name}
+                              {isSelected && <Check className="w-3 h-3 text-blue-600" />}
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-500">
+                              ~{avgSpeed.toFixed(1)}x
+                            </span>
+                          </div>
+
+                          {/* Mini SVG Curve Preview */}
+                          <div className="w-full h-8 bg-slate-900 rounded-md overflow-hidden flex items-center justify-center px-1">
+                            <svg viewBox="0 0 110 32" className="w-full h-full overflow-visible">
+                              <polyline
+                                fill="none"
+                                stroke={isSelected ? "#00F0FF" : "#94A3B8"}
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                points={svgPoints}
+                              />
+                            </svg>
+                          </div>
+
+                          <p className="text-[9px] text-slate-500 leading-tight truncate">
+                            {preset.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* PITCH LOCK TOGGLE (WSOLA) */}
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Music className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="text-[11px] font-bold text-slate-800">
+                      Pitch Lock (WSOLA)
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={selectedClip.preservePitch ?? true}
+                    onChange={(e) =>
+                      onUpdateClip({
+                        ...selectedClip,
+                        preservePitch: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-blue-600"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  {(selectedClip.preservePitch ?? true)
+                    ? "Preserves original vocal pitch across speed ramping using Waveform Similarity Overlap-Add (WSOLA)."
+                    : "Varispeed tape-stop active: pitch shifts proportionally with velocity."}
+                </p>
               </div>
             </div>
 
@@ -687,6 +1089,141 @@ export default function EditorPropertiesInspector({
                   </div>
                 );
               })}
+            </div>
+
+            <div className="h-px bg-slate-200" />
+
+            {/* Video Clip Audio & Decibel Controls */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider flex items-center gap-1">
+                  <Volume2 className="w-3 h-3 text-emerald-600" />
+                  Embedded Audio
+                </span>
+                <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[10px] font-mono">
+                  {Math.round((selectedClip.volume ?? 1.0) * 100)}% ({formatGainAsDecibels(selectedClip.volume ?? 1.0)})
+                </span>
+              </div>
+
+              {/* Volume Slider with Keyframe */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center text-[11px] font-mono">
+                  <span>Clip Volume</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleKeyframeAtPlayhead("volume", selectedClip.volume ?? 1.0)}
+                    className={`p-0.5 rounded cursor-pointer transition-colors ${
+                      hasKeyframeAtPlayhead("volume")
+                        ? "text-amber-500 fill-amber-500 hover:text-amber-600"
+                        : "text-slate-400 hover:text-amber-500"
+                    }`}
+                    title={
+                      hasKeyframeAtPlayhead("volume")
+                        ? "Remove volume keyframe at playhead"
+                        : "Add volume keyframe at playhead"
+                    }
+                  >
+                    <Key className="w-3 h-3" />
+                  </button>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1.5"
+                  step="0.01"
+                  value={selectedClip.volume ?? 1.0}
+                  onChange={(e) =>
+                    onUpdateClip({
+                      ...selectedClip,
+                      volume: parseFloat(e.target.value),
+                    })
+                  }
+                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
+                />
+              </div>
+
+              {/* Quick Decibel Presets */}
+              <div className="grid grid-cols-5 gap-1 font-mono text-[9px]">
+                {[
+                  { label: "Mute", gain: 0 },
+                  { label: "-12 dB", gain: 0.25 },
+                  { label: "-6 dB", gain: 0.5 },
+                  { label: "0 dB", gain: 1.0 },
+                  { label: "+3.5 dB", gain: 1.5 },
+                ].map(({ label, gain }) => {
+                  const isCurrent = Math.abs((selectedClip.volume ?? 1.0) - gain) < 0.05;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => onUpdateClip({ ...selectedClip, volume: gain })}
+                      className={`py-1 rounded font-semibold transition-colors cursor-pointer text-center ${
+                        isCurrent
+                          ? "bg-slate-900 text-white"
+                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Equal-Power Crossfade & Fades */}
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-800">
+                    Equal-Power Crossfade
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={selectedClip.equalPowerCrossfade ?? true}
+                    onChange={(e) =>
+                      onUpdateClip({
+                        ...selectedClip,
+                        equalPowerCrossfade: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-blue-600"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
+                  <div className="space-y-1">
+                    <label className="text-slate-600">Fade In (s)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="5.0"
+                      value={selectedClip.fadeIn ?? 0}
+                      onChange={(e) =>
+                        onUpdateClip({
+                          ...selectedClip,
+                          fadeIn: Math.max(0, parseFloat(e.target.value) || 0),
+                        })
+                      }
+                      className="w-full p-1 rounded border border-slate-200 font-bold"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-slate-600">Fade Out (s)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="5.0"
+                      value={selectedClip.fadeOut ?? 0}
+                      onChange={(e) =>
+                        onUpdateClip({
+                          ...selectedClip,
+                          fadeOut: Math.max(0, parseFloat(e.target.value) || 0),
+                        })
+                      }
+                      className="w-full p-1 rounded border border-slate-200 font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </>
         )}
@@ -1037,19 +1574,41 @@ export default function EditorPropertiesInspector({
         {/* ========================================================= */}
         {inspectorType === "audio" && selectedClip && (
           <>
-            {/* Audio Volume */}
+            {/* Audio Volume & Decibel Readout */}
             <div className="space-y-2">
-              <div className="flex justify-between text-[11px] font-mono">
-                <span>Track Volume</span>
-                <span className="font-bold text-slate-900">
-                  {Math.round((selectedClip.volume ?? 1.0) * 100)}%
+              <div className="flex justify-between items-center text-[11px] font-mono">
+                <span className="flex items-center gap-1 font-semibold text-slate-700">
+                  <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
+                  Volume & Gain
                 </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleKeyframeAtPlayhead("volume", selectedClip.volume ?? 1.0)}
+                    className={`p-0.5 rounded cursor-pointer transition-colors ${
+                      hasKeyframeAtPlayhead("volume")
+                        ? "text-amber-500 fill-amber-500 hover:text-amber-600"
+                        : "text-slate-400 hover:text-amber-500"
+                    }`}
+                    title={
+                      hasKeyframeAtPlayhead("volume")
+                        ? "Remove volume keyframe at playhead"
+                        : "Add volume keyframe at playhead"
+                    }
+                  >
+                    <Key className="w-3 h-3" />
+                  </button>
+                  <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
+                    {Math.round((selectedClip.volume ?? 1.0) * 100)}% ({formatGainAsDecibels(selectedClip.volume ?? 1.0)})
+                  </span>
+                </div>
               </div>
+
               <input
                 type="range"
                 min="0"
                 max="1.5"
-                step="0.05"
+                step="0.01"
                 value={selectedClip.volume ?? 1.0}
                 onChange={(e) =>
                   onUpdateClip({
@@ -1059,10 +1618,37 @@ export default function EditorPropertiesInspector({
                 }
                 className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
               />
+
+              {/* Quick Decibel Presets */}
+              <div className="grid grid-cols-5 gap-1 font-mono text-[9px]">
+                {[
+                  { label: "Mute", gain: 0 },
+                  { label: "-12 dB", gain: 0.25 },
+                  { label: "-6 dB", gain: 0.5 },
+                  { label: "0 dB", gain: 1.0 },
+                  { label: "+3.5 dB", gain: 1.5 },
+                ].map(({ label, gain }) => {
+                  const isCurrent = Math.abs((selectedClip.volume ?? 1.0) - gain) < 0.05;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => onUpdateClip({ ...selectedClip, volume: gain })}
+                      className={`py-1 rounded font-semibold transition-colors cursor-pointer text-center ${
+                        isCurrent
+                          ? "bg-slate-900 text-white"
+                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Stereo Pan (-1 to +1) */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex justify-between text-[11px] font-mono">
                 <span>Stereo Pan</span>
                 <span className="font-bold text-slate-900">
@@ -1091,34 +1677,180 @@ export default function EditorPropertiesInspector({
 
             <div className="h-px bg-slate-200" />
 
-            {/* Audio Ducking Override */}
-            {selectedClip.track === "music" && (
-              <div className="space-y-2 p-3 rounded-xl bg-purple-50 border border-purple-200">
+            {/* Equal-Power Crossfade & Transition Controls */}
+            <div className="space-y-3">
+              <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
+                Crossfade & Transitions
+              </span>
+
+              {/* Equal-Power Law Toggle */}
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-800">
+                    Equal-Power Crossfade
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={selectedClip.equalPowerCrossfade ?? true}
+                    onChange={(e) =>
+                      onUpdateClip({
+                        ...selectedClip,
+                        equalPowerCrossfade: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-blue-600"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  {(selectedClip.equalPowerCrossfade ?? true)
+                    ? "Constant power cosine-sine curve eliminates 3 dB volume dip between adjoining audio clips."
+                    : "Linear crossfade (causes subtle volume dip at center point)."}
+                </p>
+              </div>
+
+              {/* Fade In & Fade Out Durations */}
+              <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+                <div className="space-y-1">
+                  <label className="text-slate-600">Fade In (s)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="5.0"
+                    value={selectedClip.fadeIn ?? 0}
+                    onChange={(e) =>
+                      onUpdateClip({
+                        ...selectedClip,
+                        fadeIn: Math.max(0, parseFloat(e.target.value) || 0),
+                      })
+                    }
+                    className="w-full p-1.5 rounded-lg border border-slate-200 font-bold"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-600">Fade Out (s)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="5.0"
+                    value={selectedClip.fadeOut ?? 0}
+                    onChange={(e) =>
+                      onUpdateClip({
+                        ...selectedClip,
+                        fadeOut: Math.max(0, parseFloat(e.target.value) || 0),
+                      })
+                    }
+                    className="w-full p-1.5 rounded-lg border border-slate-200 font-bold"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-slate-200" />
+
+            {/* Audio Ducking Controls */}
+            <div className="space-y-2 p-3 rounded-xl bg-purple-50 border border-purple-200">
+              <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono font-bold text-purple-900 uppercase">
                   Automatic Voiceover Ducking
                 </span>
-                <p className="text-[10px] text-purple-800 leading-relaxed">
-                  When voiceover is active, background music automatically lowers to keep dialogue crystal clear.
-                </p>
-                <div className="flex justify-between text-[10px] font-mono pt-1 text-purple-950 font-semibold">
-                  <span>Ducking Level:</span>
-                  <span>{Math.round((timeline.settings?.duckingFactor ?? 0.25) * 100)}%</span>
-                </div>
                 <input
-                  type="range"
-                  min="0.05"
-                  max="0.8"
-                  step="0.05"
-                  value={timeline.settings?.duckingFactor ?? 0.25}
+                  type="checkbox"
+                  checked={selectedClip.ducking ?? selectedClip.track === "music"}
                   onChange={(e) =>
-                    onUpdateSettings({
-                      duckingFactor: parseFloat(e.target.value),
+                    onUpdateClip({
+                      ...selectedClip,
+                      ducking: e.target.checked,
                     })
                   }
-                  className="w-full h-1 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-800"
+                  className="w-4 h-4 rounded text-purple-600 cursor-pointer accent-purple-600"
                 />
               </div>
-            )}
+              <p className="text-[10px] text-purple-800 leading-relaxed">
+                When speech occurs on the timeline, background music automatically ducks by 14 dB using a smooth sin² envelope (120ms attack, 350ms release).
+              </p>
+              <div className="flex justify-between text-[10px] font-mono pt-1 text-purple-950 font-semibold">
+                <span>Ducking Attenuation:</span>
+                <span>
+                  {Math.round((timeline.settings?.duckingFactor ?? 0.2) * 100)}% (
+                  {formatGainAsDecibels(timeline.settings?.duckingFactor ?? 0.2)})
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0.05"
+                max="0.6"
+                step="0.05"
+                value={timeline.settings?.duckingFactor ?? 0.2}
+                onChange={(e) =>
+                  onUpdateSettings({
+                    duckingFactor: parseFloat(e.target.value),
+                  })
+                }
+                className="w-full h-1 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-800"
+              />
+            </div>
+
+            <div className="h-px bg-slate-200" />
+
+            {/* Audio Speed & Pitch Lock */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider flex items-center gap-1">
+                  <Gauge className="w-3 h-3 text-emerald-600" />
+                  Audio Retiming & Pitch
+                </span>
+                <span className="text-[10px] font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">
+                  {(selectedClip.speed ?? 1.0).toFixed(2)}x
+                </span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-1.5 font-mono text-[10px]">
+                {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((spd) => {
+                  const isCurrent = Math.abs((selectedClip.speed ?? 1.0) - spd) < 0.01;
+                  return (
+                    <button
+                      key={spd}
+                      type="button"
+                      onClick={() => onUpdateClip({ ...selectedClip, speed: spd })}
+                      className={`py-1 rounded-md font-bold transition-colors cursor-pointer ${
+                        isCurrent
+                          ? "bg-slate-900 text-white shadow-2xs"
+                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {spd}x
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Pitch Lock Toggle */}
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-800">
+                    Pitch Lock (WSOLA)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={selectedClip.preservePitch ?? true}
+                    onChange={(e) =>
+                      onUpdateClip({
+                        ...selectedClip,
+                        preservePitch: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-blue-600"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  {(selectedClip.preservePitch ?? true)
+                    ? "Audio retimed without pitch distortion via WSOLA overlap-add."
+                    : "Pitch shifts with speed (varispeed)."}
+                </p>
+              </div>
+            </div>
           </>
         )}
 

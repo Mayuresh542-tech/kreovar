@@ -34,6 +34,11 @@ import {
   TimelineItem,
 } from "@/app/lib/timeline/types";
 import { findSnapTime } from "@/app/lib/timeline/operations";
+import {
+  extractAudioPeaks,
+  sliceWaveformPeaks,
+  waveformCache,
+} from "@/app/lib/editor/audioWaveform";
 
 interface DraggingClipState {
   mode: "move" | "trim-start" | "trim-end";
@@ -45,6 +50,7 @@ interface DraggingClipState {
   startX: number;
   currentDeltaTime: number;
   snappedTime?: number;
+  snapLineTime?: number | null;
   hoveredTargetTrack?: TimelineTrackType;
 }
 
@@ -113,15 +119,47 @@ function isTrackCompatible(source: TimelineTrackType, target: TimelineTrackType)
 }
 
 /**
- * Procedural Audio Waveform renderer:
- * Generates an SVG bar graph representing sound peaks for voiceover and music clips.
+ * Real Audio Waveform renderer:
+ * Renders normalized audio peaks sliced by clip sourceStartTime / sourceEndTime.
  */
-function renderAudioWaveform(width: number, height: number, color = "#10B981") {
+function renderAudioWaveform(
+  width: number,
+  height: number,
+  color = "#10B981",
+  clip?: TimelineItem,
+  cachedPeaks?: Float32Array
+) {
   const barCount = Math.max(6, Math.floor(width / 5));
+  const rawStart =
+    (clip as unknown as { sourceStartTime?: number })?.sourceStartTime ??
+    (clip?.metadata?.sourceStartTime as number | undefined) ??
+    clip?.metadata?.sourceOffset ??
+    (clip as unknown as { sourceStart?: number })?.sourceStart ??
+    0;
+  const sourceStartTime = typeof rawStart === "number" ? rawStart : 0;
+
+  const rawDur =
+    clip?.metadata?.sourceDuration ??
+    (clip as unknown as { sourceDuration?: number })?.sourceDuration ??
+    clip?.duration ??
+    1;
+  const sourceDuration = typeof rawDur === "number" ? rawDur : 1;
+
+  const rawEnd =
+    (clip as unknown as { sourceEndTime?: number })?.sourceEndTime ??
+    (clip?.metadata?.sourceEndTime as number | undefined);
+  const sourceEndTime = typeof rawEnd === "number" ? rawEnd : sourceStartTime + (clip?.duration ?? 0);
+  const totalDuration = Math.max(sourceEndTime, sourceDuration, clip?.duration ?? 1);
+
+  const peaks =
+    cachedPeaks && cachedPeaks.length > 0
+      ? sliceWaveformPeaks(cachedPeaks, sourceStartTime, sourceEndTime, totalDuration, barCount)
+      : null;
+
   const bars = [];
   for (let i = 0; i < barCount; i++) {
-    const seed = (i * 29 + 17) % 100;
-    const barHeight = Math.max(3, Math.min(height - 4, (seed / 100) * (height - 6) + 3));
+    const peakValue = peaks ? peaks[i] : 0.2;
+    const barHeight = Math.max(3, Math.min(height - 4, peakValue * (height - 6) + 3));
     const y = (height - barHeight) / 2;
     bars.push(
       <rect
@@ -194,6 +232,45 @@ export default function EditorMultiTrackTimeline({
 
   // Playhead scrubbing state
   const [isScrubbingPlayhead, setIsScrubbingPlayhead] = useState(false);
+  const [scrubSnapLine, setScrubSnapLine] = useState<number | null>(null);
+  const [audioWaveforms, setAudioWaveforms] = useState<Record<string, Float32Array>>({});
+
+  // Extract and cache real waveform peaks for audio tracks (voiceover, music, sfx)
+  useEffect(() => {
+    let active = true;
+    const sourcesToExtract = new Set<string>();
+
+    for (const track of timeline.tracks) {
+      if (track.type === "voiceover" || track.type === "music" || track.type === "sfx") {
+        for (const item of track.items) {
+          if (item.source && typeof item.source === "string" && !item.source.startsWith("text:")) {
+            sourcesToExtract.add(item.source);
+          }
+        }
+      }
+    }
+
+    for (const src of sourcesToExtract) {
+      if (waveformCache.has(src)) {
+        const cached = waveformCache.get(src)!;
+        setAudioWaveforms((prev) => (prev[src] === cached ? prev : { ...prev, [src]: cached }));
+      } else {
+        extractAudioPeaks(src)
+          .then((peaks) => {
+            if (active && peaks && peaks.length > 0) {
+              setAudioWaveforms((prev) => ({ ...prev, [src]: peaks }));
+            }
+          })
+          .catch(() => {
+            // Silently ignore decode failures for offline / placeholder tracks
+          });
+      }
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [timeline.tracks]);
 
   // Clip Context Menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -310,14 +387,33 @@ export default function EditorMultiTrackTimeline({
 
   // Handle seeking from clientX
   const handleSeekFromClientX = useCallback(
-    (clientX: number) => {
+    (clientX: number, applySnap = false) => {
       if (!rulerRef.current) return;
       const rect = rulerRef.current.getBoundingClientRect();
       const clickX = clientX - rect.left;
-      const targetTime = Math.max(0, Math.min(totalDuration, clickX / zoomFactor));
+      let targetTime = Math.max(0, Math.min(totalDuration, clickX / zoomFactor));
+
+      if (applySnap && isSnappingEnabled) {
+        const snap = findSnapTime(targetTime, timeline, 0, inPoint, outPoint, {
+          clipDuration: 0,
+          currentlySnapped: scrubSnapLine !== null,
+          pixelsPerSecond: zoomFactor,
+          snapThresholdPx: 10,
+          breakThresholdPx: 16,
+        });
+        if (snap.snapped) {
+          targetTime = snap.time;
+          setScrubSnapLine(snap.snapLineTime ?? snap.time);
+        } else {
+          setScrubSnapLine(null);
+        }
+      } else {
+        setScrubSnapLine(null);
+      }
+
       onSeek(Math.round(targetTime * 100) / 100);
     },
-    [totalDuration, zoomFactor, onSeek]
+    [totalDuration, zoomFactor, onSeek, isSnappingEnabled, timeline, inPoint, outPoint, scrubSnapLine]
   );
 
   // Playhead scrubbing
@@ -325,11 +421,12 @@ export default function EditorMultiTrackTimeline({
     if (!isScrubbingPlayhead) return;
 
     function handleMouseMove(e: MouseEvent) {
-      handleSeekFromClientX(e.clientX);
+      handleSeekFromClientX(e.clientX, true);
     }
 
     function handleMouseUp() {
       setIsScrubbingPlayhead(false);
+      setScrubSnapLine(null);
     }
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -349,20 +446,55 @@ export default function EditorMultiTrackTimeline({
       const deltaPixels = e.clientX - dragState.startX;
       let rawDeltaTime = deltaPixels / zoomFactor;
       let snappedTarget: number | undefined;
+      let snapLine: number | null = null;
 
       if (isSnappingEnabled) {
-        let candidateTime = dragState.initialStartTime + rawDeltaTime;
-        if (dragState.mode === "trim-end") {
-          candidateTime = dragState.initialEndTime + rawDeltaTime;
-        }
-
-        const snap = findSnapTime(candidateTime, timeline, currentTime, inPoint, outPoint, 0.22);
-        if (snap.snapped) {
-          snappedTarget = snap.time;
-          rawDeltaTime =
-            dragState.mode === "trim-end"
-              ? snap.time - dragState.initialEndTime
-              : snap.time - dragState.initialStartTime;
+        const isCurrentlySnapped = dragState.snappedTime !== undefined;
+        if (dragState.mode === "move") {
+          const candidateTime = dragState.initialStartTime + rawDeltaTime;
+          const snap = findSnapTime(candidateTime, timeline, currentTime, inPoint, outPoint, {
+            excludeClipIds: [dragState.itemId],
+            clipDuration: dragState.initialDuration,
+            currentlySnapped: isCurrentlySnapped,
+            pixelsPerSecond: zoomFactor,
+            snapThresholdPx: 10,
+            breakThresholdPx: 16,
+          });
+          if (snap.snapped) {
+            snappedTarget = snap.time;
+            snapLine = snap.snapLineTime ?? snap.time;
+            rawDeltaTime = snap.time - dragState.initialStartTime;
+          }
+        } else if (dragState.mode === "trim-start") {
+          const candidateTime = dragState.initialStartTime + rawDeltaTime;
+          const snap = findSnapTime(candidateTime, timeline, currentTime, inPoint, outPoint, {
+            excludeClipIds: [dragState.itemId],
+            clipDuration: 0,
+            currentlySnapped: isCurrentlySnapped,
+            pixelsPerSecond: zoomFactor,
+            snapThresholdPx: 10,
+            breakThresholdPx: 16,
+          });
+          if (snap.snapped) {
+            snappedTarget = snap.time;
+            snapLine = snap.snapLineTime ?? snap.time;
+            rawDeltaTime = snap.time - dragState.initialStartTime;
+          }
+        } else if (dragState.mode === "trim-end") {
+          const candidateTime = dragState.initialEndTime + rawDeltaTime;
+          const snap = findSnapTime(candidateTime, timeline, currentTime, inPoint, outPoint, {
+            excludeClipIds: [dragState.itemId],
+            clipDuration: 0,
+            currentlySnapped: isCurrentlySnapped,
+            pixelsPerSecond: zoomFactor,
+            snapThresholdPx: 10,
+            breakThresholdPx: 16,
+          });
+          if (snap.snapped) {
+            snappedTarget = snap.time;
+            snapLine = snap.snapLineTime ?? snap.time;
+            rawDeltaTime = snap.time - dragState.initialEndTime;
+          }
         }
       }
 
@@ -383,6 +515,7 @@ export default function EditorMultiTrackTimeline({
               ...prev,
               currentDeltaTime: rawDeltaTime,
               snappedTime: snappedTarget,
+              snapLineTime: snapLine,
               hoveredTargetTrack: targetTrack,
             }
           : null
@@ -954,7 +1087,7 @@ export default function EditorMultiTrackTimeline({
         <div
           ref={rulerRef}
           onMouseDown={(e) => {
-            handleSeekFromClientX(e.clientX);
+            handleSeekFromClientX(e.clientX, true);
             setIsScrubbingPlayhead(true);
           }}
           className="relative flex-1 flex flex-col cursor-pointer"
@@ -1021,10 +1154,12 @@ export default function EditorMultiTrackTimeline({
           </div>
 
           {/* Magnetic Snap Vertical Guideline Indicator */}
-          {dragState?.snappedTime !== undefined && (
+          {((dragState?.snapLineTime != null) || (scrubSnapLine != null)) && (
             <div
               className="absolute top-0 bottom-0 w-[1.5px] bg-cyan-400 z-40 pointer-events-none shadow-sm"
-              style={{ left: `${dragState.snappedTime * zoomFactor}px` }}
+              style={{
+                left: `${((dragState?.snapLineTime ?? scrubSnapLine) as number) * zoomFactor}px`,
+              }}
             />
           )}
 
@@ -1420,7 +1555,13 @@ export default function EditorMultiTrackTimeline({
                   }`}
                   style={{ left: `${left}px`, width: `${width}px` }}
                 >
-                  {renderAudioWaveform(width, 24, isSelected ? "#FFFFFF" : "#059669")}
+                  {renderAudioWaveform(
+                    width,
+                    24,
+                    isSelected ? "#FFFFFF" : "#059669",
+                    vo,
+                    audioWaveforms[vo.source] || waveformCache.get(vo.source)
+                  )}
                   <span className="truncate font-semibold z-10 relative">️ Voiceover</span>
                   <span className="text-[7px] text-emerald-700 font-medium z-10 relative">
                     {vo.duration.toFixed(1)}s
@@ -1462,7 +1603,13 @@ export default function EditorMultiTrackTimeline({
                   }`}
                   style={{ left: `${left}px`, width: `${width}px` }}
                 >
-                  {renderAudioWaveform(width, 24, isSelected ? "#FFFFFF" : "#7C3AED")}
+                  {renderAudioWaveform(
+                    width,
+                    24,
+                    isSelected ? "#FFFFFF" : "#7C3AED",
+                    mus,
+                    audioWaveforms[mus.source] || waveformCache.get(mus.source)
+                  )}
                   <span className="truncate font-semibold z-10 relative">
                      {mus.metadata?.title || "Music"}
                   </span>
@@ -1507,7 +1654,14 @@ export default function EditorMultiTrackTimeline({
                     }`}
                     style={{ left: `${left}px`, width: `${width}px` }}
                   >
-                    <span className="truncate"> {sfx.metadata?.title || "SFX"}</span>
+                    {renderAudioWaveform(
+                      width,
+                      24,
+                      isSelected ? "#FFFFFF" : "#0D9488",
+                      sfx,
+                      audioWaveforms[sfx.source] || waveformCache.get(sfx.source)
+                    )}
+                    <span className="truncate z-10 relative"> {sfx.metadata?.title || "SFX"}</span>
                   </div>
                 );
               })}

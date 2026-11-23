@@ -14,8 +14,82 @@ export interface GeminiCompletionOptions {
   candidateImages?: { candidateId: string; data: string }[];
   footageFrames?: { clipId?: string; timelineTime?: number; sourceTime?: number; data: string }[];
   referenceImages?: { styleId?: string; timeSecondsApprox?: number; mediaType?: string; data: string }[];
+  videoFile?: { uri?: string; data?: string; buffer?: Buffer; mimeType: string };
   onMetadata?: (meta: { model: string; totalTokens: number; promptTokens?: number; completionTokens?: number }) => void;
 }
+
+export interface GeminiUploadedFile {
+  name: string;
+  uri: string;
+  mimeType: string;
+}
+
+/**
+ * Uploads a video or media buffer to the Google AI File API for native multimodal processing.
+ * Video files are automatically processed and sampled (1 frame/sec + synced audio track).
+ */
+export async function uploadGeminiFile(
+  buffer: Buffer,
+  mimeType: string,
+  displayName = "video-preview.mp4",
+  signal?: AbortSignal
+): Promise<GeminiUploadedFile> {
+  const apiKey = await getGeminiApiKey();
+  if (!apiKey) throw new Error("GEMINI_NOT_CONFIGURED");
+
+  const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const metadata = JSON.stringify({ file: { display_name: displayName } });
+
+  const pre = Buffer.from(
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`
+  );
+  const post = Buffer.from(`\r\n--${boundary}--\r\n`);
+  const body = Buffer.concat([pre, buffer, post]);
+
+  const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${encodeURIComponent(apiKey)}`;
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      "X-Goog-Upload-Protocol": "multipart",
+      "Content-Type": `multipart/related; boundary=${boundary}`,
+      "Content-Length": String(body.byteLength),
+    },
+    body,
+    signal,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    throw new Error(`Gemini File API upload failed (${response.status}): ${errorText || response.statusText}`);
+  }
+
+  const result = await response.json();
+  const file = result.file;
+  if (!file?.uri) throw new Error("Gemini File API returned an invalid response.");
+
+  // If file is in PROCESSING state, wait briefly (up to 5 polls)
+  if (file.state === "PROCESSING") {
+    let state = file.state;
+    for (let i = 0; i < 5 && state === "PROCESSING"; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const checkRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${file.name}?key=${encodeURIComponent(apiKey)}`,
+        { signal }
+      );
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        state = checkData.state;
+      }
+    }
+  }
+
+  return {
+    name: file.name,
+    uri: file.uri,
+    mimeType: file.mimeType || mimeType,
+  };
+}
+
 
 export const GEMINI_EDITOR_MODEL = "gemini-2.5-flash";
 const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || GEMINI_EDITOR_MODEL;
@@ -109,6 +183,37 @@ export async function generateGeminiContent(
   );
 
   const parts: Record<string, any>[] = [{ text: options.prompt }];
+
+  if (options.videoFile) {
+    if (options.videoFile.uri) {
+      parts.push({
+        file_data: {
+          file_uri: options.videoFile.uri,
+          mime_type: options.videoFile.mimeType,
+        },
+      });
+    } else if (options.videoFile.buffer) {
+      const uploaded = await uploadGeminiFile(
+        options.videoFile.buffer,
+        options.videoFile.mimeType,
+        "video-preview.mp4",
+        options.signal
+      );
+      parts.push({
+        file_data: {
+          file_uri: uploaded.uri,
+          mime_type: uploaded.mimeType,
+        },
+      });
+    } else if (options.videoFile.data) {
+      parts.push({
+        inline_data: {
+          mime_type: options.videoFile.mimeType,
+          data: options.videoFile.data,
+        },
+      });
+    }
+  }
 
   if (options.referenceImages?.length) {
     for (const img of options.referenceImages) {

@@ -48,6 +48,7 @@ next-env.d.ts
 !public/llms-full.txt
 scratch/
 .claude/
+.superpowers/
 *.log
 *.zip
 

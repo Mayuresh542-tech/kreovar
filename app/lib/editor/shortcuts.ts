@@ -88,7 +88,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     id: "split-clip",
     category: "Editing & Split",
     label: "Split Clip at Playhead",
-    keys: "S",
+    keys: "Ctrl+B / Cmd+B or S",
     description: "Slice selected clip at current playhead, or topmost unmuted clip if none selected.",
   },
   {
@@ -123,14 +123,14 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     id: "trim-start-to-playhead",
     category: "Editing & Split",
     label: "Trim Start to Playhead",
-    keys: "[ / Q",
+    keys: "Q / [",
     description: "Left-trim selected clip in-point to the current playhead position.",
   },
   {
     id: "trim-end-to-playhead",
     category: "Editing & Split",
     label: "Trim End to Playhead",
-    keys: "] / W",
+    keys: "W / ]",
     description: "Right-trim selected clip out-point to the current playhead position.",
   },
   {
@@ -282,8 +282,13 @@ export function resolveShortcutAction(
   }
 
   // Save
-  if (modifier && key === "s") {
+  if (modifier && key === "s" && !event.shiftKey) {
     return "save";
+  }
+
+  // CapCut Split at playhead: Ctrl+B or Cmd+B
+  if (modifier && (key === "b" || event.code === "KeyB")) {
+    return "split-clip";
   }
 
   // Select All
@@ -298,8 +303,21 @@ export function resolveShortcutAction(
   if (modifier && key === "v") {
     return "paste-clips";
   }
-  if (modifier && key === "d") {
+  if (modifier && (key === "d" || event.code === "KeyD")) {
     return "duplicate-clip";
+  }
+
+  // Timeline Zoom with modifier (Ctrl+= / Ctrl+-)
+  if (modifier && (key === "=" || key === "+" || event.code === "Equal")) {
+    return "zoom-in";
+  }
+  if (modifier && (key === "-" || key === "_" || event.code === "Minus")) {
+    return "zoom-out";
+  }
+
+  // Fit timeline to screen (Shift + Z)
+  if (event.shiftKey && !modifier && (key === "z" || event.code === "KeyZ")) {
+    return "fit-timeline";
   }
 
   // Non-modifier single-key shortcuts
@@ -310,28 +328,34 @@ export function resolveShortcutAction(
     }
 
     // NLE Shuttle controls: J / K / L
-    if (key === "j" && !event.altKey) {
+    if ((key === "j" || event.code === "KeyJ") && !event.altKey) {
       return "shuttle-backward";
     }
-    if (key === "k" && !event.altKey) {
+    if ((key === "k" || event.code === "KeyK") && !event.altKey) {
       return "shuttle-pause";
     }
-    if (key === "l" && !event.altKey) {
+    if ((key === "l" || event.code === "KeyL") && !event.altKey) {
       return "shuttle-forward";
     }
 
-    // Split clip at playhead
-    if (key === "s" && !event.altKey) {
+    // Split clip at playhead (S key or B key)
+    if ((key === "s" || event.code === "KeyS" || key === "b" || event.code === "KeyB") && !event.altKey) {
       return "split-clip";
     }
 
-    // Trim Start to Playhead ([ or Q)
-    if ((event.key === "[" || (key === "q" && !event.altKey)) && !event.ctrlKey && !event.metaKey) {
+    // Trim Start to Playhead (Q or [)
+    if (
+      (event.key === "[" || event.code === "BracketLeft" || key === "q" || event.code === "KeyQ") &&
+      !event.altKey
+    ) {
       return "trim-start-to-playhead";
     }
 
-    // Trim End to Playhead (] or W)
-    if ((event.key === "]" || (key === "w" && !event.altKey)) && !event.ctrlKey && !event.metaKey) {
+    // Trim End to Playhead (W or ])
+    if (
+      (event.key === "]" || event.code === "BracketRight" || key === "w" || event.code === "KeyW") &&
+      !event.altKey
+    ) {
       return "trim-end-to-playhead";
     }
 
@@ -341,7 +365,7 @@ export function resolveShortcutAction(
     }
 
     // Toggle Track Mute (M)
-    if (key === "m" && !event.altKey) {
+    if ((key === "m" || event.code === "KeyM") && !event.altKey) {
       return "toggle-mute";
     }
 
@@ -364,20 +388,20 @@ export function resolveShortcutAction(
     }
 
     // Snapping toggle (N)
-    if (key === "n" && !event.altKey) {
+    if ((key === "n" || event.code === "KeyN") && !event.altKey) {
       return "toggle-snapping";
     }
 
     // Fit timeline (F)
-    if (key === "f" && !event.altKey) {
+    if ((key === "f" || event.code === "KeyF") && !event.altKey) {
       return "fit-timeline";
     }
 
     // Zoom timeline (+ / -)
-    if (event.key === "+" || event.key === "=") {
+    if (event.key === "+" || event.key === "=" || event.code === "Equal") {
       return "zoom-in";
     }
-    if (event.key === "-" || event.key === "_") {
+    if (event.key === "-" || event.key === "_" || event.code === "Minus") {
       return "zoom-out";
     }
   }

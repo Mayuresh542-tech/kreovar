@@ -21,7 +21,7 @@ const messages:Record<RadoxCode,string>={
 export class RadoxEditorError extends Error {
  constructor(readonly code:RadoxCode,readonly status=503,readonly retryAfterSeconds?:number){super(publicErrorMessage(messages[code]));this.name='RadoxEditorError';}
 }
-export interface EditorJsonOptions {observer?:{before:(body:unknown,maxOutput:number)=>Promise<void>;after:(usage:{total:number|null;input:number|null;output:number|null})=>Promise<void>};editingBudget?:EditingBudget;prompt:string;systemInstruction:string;userId?:string|null;signal?:AbortSignal;referenceImages?:EditorReferenceImage[];maxTokens?:number;footageFrames?:FootageFrame[];candidateImages?:{candidateId:string;data:string}[];operation?:'editor_ai_edit'|'editor_broll_pick'}
+export interface EditorJsonOptions {observer?:{before:(body:unknown,maxOutput:number)=>Promise<void>;after:(usage:{total:number|null;input:number|null;output:number|null})=>Promise<void>};editingBudget?:EditingBudget;prompt:string;systemInstruction:string;userId?:string|null;signal?:AbortSignal;referenceImages?:EditorReferenceImage[];maxTokens?:number;footageFrames?:FootageFrame[];candidateImages?:{candidateId:string;data:string}[];operation?:'editor_ai_edit'|'editor_broll_pick';videoFile?:{uri?:string;data?:string;buffer?:Buffer;mimeType:string}}
 
 async function boundedJson(response:Response){
  const reader=response.body?.getReader();if(!reader)return null;

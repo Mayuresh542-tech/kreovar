@@ -3,14 +3,14 @@ import {loadCaptionFonts} from "../captions/typography";
 import {Input,BlobSource,ALL_FORMATS,CanvasSink,VideoSampleSink,AudioBufferSink,Output,WebMOutputFormat,Mp4OutputFormat,BufferTarget,CanvasSource,AudioBufferSource,Quality,canEncodeVideo,canEncodeAudio,type InputVideoTrack,type VideoSample,type WrappedCanvas} from "mediabunny";
 import {Compositor,visibleLayers} from "./compositor";
 import {dimensions,projectDuration,clamp,type EditorProject,type Clip} from "./model";
-import {assertVideoDuration} from "./limits";
+import {assertVideoDuration,EXTENDED_MAX_VIDEO_SECONDS} from "./limits";
 import type {MediaRepository} from "./media";
 import type {ExportOptions,ExportProgress} from "./export";
 import {clipGain,speechWindows} from "./audioMix";
 import {readOriginal} from "./original";
 
-export function frameSchedule(duration:number,fps:number){
- assertVideoDuration(duration);if(![24,30,60].includes(fps))throw new Error("Choose 24, 30 or 60 fps.");
+export function frameSchedule(duration:number,fps:number,maxSeconds?:number){
+ assertVideoDuration(duration,maxSeconds);if(![24,30,60].includes(fps))throw new Error("Choose 24, 30 or 60 fps.");
  return Array.from({length:Math.ceil(duration*fps-1e-7)},(_,i)=>({time:i/fps,duration:Math.min(1/fps,duration-i/fps)}));
 }
 export function clipAudioSlice(clip:Clip,timestamp:number,duration:number){
@@ -185,7 +185,7 @@ function withFeederMutex(feeder: VideoFrameFeeder): VideoFrameFeeder {
 
 /** Decode at timeline timestamps and encode every frame; never use wall-clock recording. */
 export async function renderOffline(project:EditorProject,options:ExportOptions,repository:MediaRepository,onProgress:(value:ExportProgress)=>void,signal:AbortSignal){
- const duration=projectDuration(project),schedule=frameSchedule(duration,options.fps),canvas=document.createElement("canvas"),[w,h]=dimensions[project.settings.aspectRatio],scale=options.resolution/Math.min(w,h);
+ const duration=projectDuration(project),schedule=frameSchedule(duration,options.fps,EXTENDED_MAX_VIDEO_SECONDS),canvas=document.createElement("canvas"),[w,h]=dimensions[project.settings.aspectRatio],scale=options.resolution/Math.min(w,h);
  canvas.width=Math.round(w*scale/2)*2;canvas.height=Math.round(h*scale/2)*2;
  canvas.getContext?.("2d",{alpha:false});
  const mp4=options.mime.includes("mp4"),codec=mp4?"avc":options.mime.includes("vp9")?"vp9":"vp8",audioCodec=mp4?"aac":"opus",quality=new Quality({bitrate:Math.round((options.quality==="high"?12000000:6000000)*(options.resolution/1080)**2)});
@@ -209,7 +209,7 @@ export async function renderOffline(project:EditorProject,options:ExportOptions,
    const asset=project.assets[id];if(!asset)throw new Error("An original asset is missing.");
    onProgress({stage:"Loading original: "+asset.name,progress:1});
    const blob=await readOriginal(asset,signal);
-   originalBytes+=blob.size;if(originalBytes>250*1024*1024)throw new Error("This edit uses more than 250 MB of originals. Use smaller files to export in this browser.");
+   originalBytes+=blob.size;
    blobs.set(id,blob);return blob;
   })();
   blobPromises.set(id,promise);
@@ -329,13 +329,14 @@ export async function renderOffline(project:EditorProject,options:ExportOptions,
    compositor.render(canvas,project,frame.time);
    // video.add() snapshots canvas synchronously into WebCodecs VideoFrame before yielding for encoder backpressure.
    encodePromise=video.add(frame.time,frame.duration);
+   compositor.clearFrames();
    // Overlap decoding/preparing frame `index + 1` with `encodePromise` backpressure wait.
    nextPreparedPromise=index+1<schedule.length?prepareFrame(index+1):null;
    if(index%5===0||index===schedule.length-1)onProgress({stage:"Rendering frame "+(index+1)+" of "+schedule.length+"…",progress:5+index/schedule.length*90});
   }
   if(encodePromise)await encodePromise;
   video.close();signal.throwIfAborted();await audio.add(mixed);audio.close();onProgress({stage:"Finishing video and audio…",progress:97});await output.finalize();signal.throwIfAborted();
-  if(!target.buffer?.byteLength||target.buffer.byteLength>512*1024*1024)throw new Error("Export is empty or exceeds the browser memory budget.");
+  if(!target.buffer?.byteLength||target.buffer.byteLength>1536*1024*1024)throw new Error("Export is empty or exceeds the browser memory budget.");
   finished=true;onProgress({stage:"Export complete",progress:100});return new Blob([target.buffer],{type:mp4?"video/mp4":"video/webm"});
  }finally{if(!finished)await output.cancel().catch(()=>{});await Promise.all([...feeders.values()].map(feeder=>feeder.dispose().catch(()=>{})));for(const value of inputs.values())value.dispose();for(const image of images.values())image.close();compositor.dispose();blobs.clear();blobPromises.clear();inputPromises.clear();}
 }

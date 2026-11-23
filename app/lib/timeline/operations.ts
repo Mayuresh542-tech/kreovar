@@ -903,61 +903,142 @@ export function moveMultipleTimelineItems(
   };
 }
 
+export interface SnapTimeOptions {
+  excludeClipIds?: string[] | string;
+  clipDuration?: number;
+  currentlySnapped?: boolean;
+  pixelsPerSecond?: number;
+  snapThresholdPx?: number;
+  breakThresholdPx?: number;
+}
+
+export interface SnapTimeResult {
+  time: number;
+  snapped: boolean;
+  snapType?: "playhead" | "clip" | "marker" | "in_out";
+  snapLineTime?: number | null;
+}
+
 /**
- * Intelligent Snapping Engine:
- * Snaps candidateTime to the nearest magnetic point (playhead, clip start/end, markers, in/out points).
+ * Intelligent Snapping Engine with CapCut Hysteresis Detent Model:
+ * Snaps candidateTime to the nearest magnetic point (playhead, clip start/end, markers, in/out points, 0).
+ * Evaluates both start-edge and end-edge of clips, excludes dragged clip(s) to eliminate ghost self-snapping,
+ * and maintains snap lock (10px snap detent) until 16px break threshold is exceeded.
  */
 export function findSnapTime(
   candidateTime: number,
   timeline: VeeloxTimelineProject,
-  playheadTime: number,
+  playheadTime = 0,
   inPoint?: number | null,
   outPoint?: number | null,
-  threshold = 0.2
-): { time: number; snapped: boolean; snapType?: "playhead" | "clip" | "marker" | "in_out" } {
-  const snapTargets: Array<{ time: number; type: "playhead" | "clip" | "marker" | "in_out" }> = [
-    { time: playheadTime, type: "playhead" },
+  thresholdOrOptions: number | SnapTimeOptions = 0.2,
+  extraOptions?: SnapTimeOptions
+): SnapTimeResult {
+  const options: SnapTimeOptions =
+    typeof thresholdOrOptions === "object"
+      ? thresholdOrOptions
+      : extraOptions || {};
+
+  const pps = Math.max(1, options.pixelsPerSecond ?? 60);
+  const snapThresholdPx = options.snapThresholdPx ?? (typeof thresholdOrOptions === "number" ? thresholdOrOptions * pps : 10);
+  const breakThresholdPx = options.breakThresholdPx ?? 16;
+  const clipDuration = Math.max(0, options.clipDuration ?? 0);
+  const currentlySnapped = !!options.currentlySnapped;
+
+  const snapDistSec = snapThresholdPx / pps;
+  const breakDistSec = breakThresholdPx / pps;
+  const maxAllowedDist = currentlySnapped ? breakDistSec : snapDistSec;
+
+  const excludeList = options.excludeClipIds
+    ? Array.isArray(options.excludeClipIds)
+      ? options.excludeClipIds
+      : [options.excludeClipIds]
+    : [];
+
+  const snapTargets: Array<{
+    time: number;
+    type: "playhead" | "clip" | "marker" | "in_out";
+    weight: number;
+  }> = [
+    { time: 0, type: "in_out", weight: 0.75 },
   ];
 
-  if (inPoint !== undefined && inPoint !== null) {
-    snapTargets.push({ time: inPoint, type: "in_out" });
+  if (Number.isFinite(playheadTime) && playheadTime > 0) {
+    snapTargets.push({ time: playheadTime, type: "playhead", weight: 1.0 });
   }
-  if (outPoint !== undefined && outPoint !== null) {
-    snapTargets.push({ time: outPoint, type: "in_out" });
+
+  if (inPoint !== undefined && inPoint !== null && inPoint >= 0) {
+    snapTargets.push({ time: inPoint, type: "in_out", weight: 0.9 });
+  }
+  if (outPoint !== undefined && outPoint !== null && outPoint > 0) {
+    snapTargets.push({ time: outPoint, type: "in_out", weight: 0.9 });
   }
 
   // Add marker times
   if (timeline.settings.markers) {
     for (const m of timeline.settings.markers) {
-      snapTargets.push({ time: m.time, type: "marker" });
+      snapTargets.push({ time: m.time, type: "marker", weight: 0.9 });
     }
   }
 
-  // Add clip boundary times
+  // Add clip boundary times (excluding dragged clip to prevent ghost self-snapping)
   for (const track of timeline.tracks) {
     for (const item of track.items) {
-      snapTargets.push({ time: item.startTime, type: "clip" });
-      snapTargets.push({ time: item.endTime, type: "clip" });
+      if (excludeList.includes(item.id)) continue;
+      snapTargets.push({ time: item.startTime, type: "clip", weight: 0.95 });
+      snapTargets.push({ time: item.endTime, type: "clip", weight: 0.95 });
     }
   }
 
-  let closestDiff = threshold;
-  let snappedTime = candidateTime;
-  let snapType: "playhead" | "clip" | "marker" | "in_out" | undefined;
+  let bestScore = -1;
+  let bestTime = candidateTime;
+  let bestSnapLine: number | null = null;
+  let bestSnapType: "playhead" | "clip" | "marker" | "in_out" | undefined;
 
   for (const target of snapTargets) {
-    const diff = Math.abs(candidateTime - target.time);
-    if (diff < closestDiff) {
-      closestDiff = diff;
-      snappedTime = target.time;
-      snapType = target.type;
+    // 1. Evaluate leading edge: candidateTime vs target.time
+    const distLead = Math.abs(candidateTime - target.time);
+    if (distLead <= maxAllowedDist) {
+      const distPx = distLead * pps;
+      const score = target.weight / (distPx + 0.1);
+      if (score > bestScore) {
+        bestScore = score;
+        bestTime = target.time;
+        bestSnapLine = target.time;
+        bestSnapType = target.type;
+      }
     }
+
+    // 2. Evaluate trailing edge: (candidateTime + clipDuration) vs target.time
+    if (clipDuration > 0) {
+      const trailingTime = candidateTime + clipDuration;
+      const distTrail = Math.abs(trailingTime - target.time);
+      if (distTrail <= maxAllowedDist) {
+        const distPx = distTrail * pps;
+        const score = (target.weight * 0.92) / (distPx + 0.1);
+        if (score > bestScore) {
+          bestScore = score;
+          bestTime = Math.max(0, target.time - clipDuration);
+          bestSnapLine = target.time;
+          bestSnapType = target.type;
+        }
+      }
+    }
+  }
+
+  if (bestScore > 0) {
+    return {
+      time: Math.round(bestTime * 100) / 100,
+      snapped: true,
+      snapType: bestSnapType,
+      snapLineTime: bestSnapLine !== null ? Math.round(bestSnapLine * 100) / 100 : null,
+    };
   }
 
   return {
-    time: Math.round(snappedTime * 100) / 100,
-    snapped: snapType !== undefined,
-    snapType,
+    time: Math.round(candidateTime * 100) / 100,
+    snapped: false,
+    snapLineTime: null,
   };
 }
 
