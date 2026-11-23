@@ -35,6 +35,8 @@ interface MobileCanvasStageProps {
   onChangeQuality: (quality: number) => void;
   onOpenImport?: () => void;
   onOpenAiCopilot?: () => void;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 const MOBILE_RATIOS: Ratio[] = ["9:16", "16:9", "1:1"];
@@ -44,6 +46,8 @@ export default function MobileCanvasStage({
   onChangeQuality,
   onOpenImport,
   onOpenAiCopilot,
+  isFullscreen = false,
+  onToggleFullscreen,
 }: MobileCanvasStageProps) {
   const { store, playback, repository, selection, select, run, notify } = useEditor();
   const project = useProject(store);
@@ -439,8 +443,10 @@ export default function MobileCanvasStage({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onDoubleClick={handleDoubleClick}
-      className="vx-stage flex-1 min-h-0 w-full bg-[#EDF1F6] relative flex items-center justify-center p-2 overflow-hidden touch-none overscroll-none select-none"
-      aria-label="Mobile Video Preview Canvas"
+      className={`vx-stage min-h-0 w-full bg-[#000000] relative flex items-center justify-center p-2 overflow-hidden touch-none overscroll-none select-none transition-all duration-200 ${
+        isFullscreen ? "fixed inset-0 z-50 p-0" : "flex-1"
+      }`}
+      aria-label="CapCut Mobile Video Preview Canvas"
     >
       {/* Top-Left Floating Aspect Ratio Pill + Safe Zone Guide Toggle */}
       <div className="absolute top-2.5 left-3 z-20 flex items-center gap-1.5">
@@ -448,14 +454,14 @@ export default function MobileCanvasStage({
           type="button"
           onClick={cycleAspectRatio}
           aria-label={`Aspect ratio ${aspectRatio}, tap to switch`}
-          className="min-h-[34px] px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-md border border-slate-200 text-[11px] font-semibold text-blue-700 flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform"
+          className="min-h-[34px] px-2.5 py-1 rounded-full bg-[#16161C]/85 backdrop-blur-md border border-[#2E2E38] text-[11px] font-semibold text-white/90 hover:text-[#00E5FF] flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
         >
           {aspectRatio === "9:16" ? (
-            <Smartphone size={12} className="text-blue-600" />
+            <Smartphone size={12} className="text-[#00E5FF]" />
           ) : aspectRatio === "1:1" ? (
-            <SquareIcon size={12} className="text-blue-600" />
+            <SquareIcon size={12} className="text-[#00E5FF]" />
           ) : (
-            <Monitor size={12} className="text-blue-600" />
+            <Monitor size={12} className="text-[#00E5FF]" />
           )}
           <span className="font-mono">{aspectRatio}</span>
         </button>
@@ -469,10 +475,10 @@ export default function MobileCanvasStage({
             }}
             aria-label="Toggle 9:16 Social Safe Zone guidelines"
             aria-pressed={showSafeZones}
-            className={`min-h-[34px] px-2.5 py-1 rounded-full border text-[10px] font-semibold flex items-center gap-1 shadow-sm active:scale-95 transition-all ${
+            className={`min-h-[34px] px-2.5 py-1 rounded-full border text-[10px] font-semibold flex items-center gap-1 shadow-md active:scale-95 transition-all ${
               showSafeZones
-                ? "bg-blue-600 text-white border-blue-600 shadow-blue-500/20"
-                : "bg-white/95 backdrop-blur-md border-slate-200 text-slate-600 hover:text-slate-900"
+                ? "bg-[#00E5FF]/20 text-[#00E5FF] border-[#00E5FF]/50 shadow-[0_0_8px_rgba(0,229,255,0.25)]"
+                : "bg-[#16161C]/85 backdrop-blur-md border-[#2E2E38] text-white/70 hover:text-white"
             }`}
           >
             <Shield size={11} className={showSafeZones ? "text-white" : "text-blue-600"} />
@@ -489,15 +495,15 @@ export default function MobileCanvasStage({
               navigator.vibrate?.(6);
             }}
             aria-label="1-Click 9:16 Smart Reframing"
-            className="min-h-[34px] px-2.5 py-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-semibold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+            className="min-h-[34px] px-2.5 py-1 rounded-full bg-[#1E1E26] hover:bg-[#252532] border border-[#2E2E38] text-white text-[10px] font-semibold flex items-center gap-1 shadow-md active:scale-95 transition-all"
           >
-            <Sparkles size={11} />
+            <Sparkles size={11} className="text-[#00E5FF]" />
             <span>Reframe</span>
           </button>
 
           {showReframeMenu && (
-            <div className="absolute top-full left-0 mt-2 w-56 bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl shadow-xl z-50 p-1.5 text-xs space-y-1">
-              <div className="px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400">
+            <div className="absolute top-full left-0 mt-2 w-56 bg-[#16161C]/95 backdrop-blur-md border border-[#26262E] rounded-xl shadow-2xl z-50 p-1.5 text-xs space-y-1">
+              <div className="px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#A0A0A8]">
                 1-Click 9:16 Reframe
               </div>
               <button
@@ -507,12 +513,12 @@ export default function MobileCanvasStage({
                   notify("Applied 1-Click Fit with Blur (9:16)");
                   setShowReframeMenu(false);
                 }}
-                className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex flex-col text-slate-800"
+                className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/10 flex flex-col text-white transition-colors"
               >
                 <span className="font-semibold text-xs flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Fit with Blur
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF]" /> Fit with Blur
                 </span>
-                <span className="text-[10px] text-slate-500">Blurred wings top & bottom</span>
+                <span className="text-[10px] text-[#A0A0A8]">Blurred wings top & bottom</span>
               </button>
               <button
                 type="button"
@@ -521,12 +527,12 @@ export default function MobileCanvasStage({
                   notify("Applied 1-Click Center Crop (1.77x Eye-Line)");
                   setShowReframeMenu(false);
                 }}
-                className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex flex-col text-slate-800"
+                className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/10 flex flex-col text-white transition-colors"
               >
                 <span className="font-semibold text-xs flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Center Crop
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" /> Center Crop
                 </span>
-                <span className="text-[10px] text-slate-500">1.77x punch-in eye-line (-0.14)</span>
+                <span className="text-[10px] text-[#A0A0A8]">1.77x punch-in eye-line (-0.14)</span>
               </button>
               <button
                 type="button"
@@ -535,26 +541,38 @@ export default function MobileCanvasStage({
                   notify("Applied 1-Click Split Screen (A-Roll + B-Roll)");
                   setShowReframeMenu(false);
                 }}
-                className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-50 flex flex-col text-slate-800"
+                className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-white/10 flex flex-col text-white transition-colors"
               >
                 <span className="font-semibold text-xs flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Split Screen
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Split Screen
                 </span>
-                <span className="text-[10px] text-slate-500">A-roll top + B-roll bottom</span>
+                <span className="text-[10px] text-[#A0A0A8]">A-roll top + B-roll bottom</span>
               </button>
             </div>
           )}
         </div>
       </div>
 
+      {/* Floating Exit Fullscreen Button when isFullscreen is active */}
+      {isFullscreen && (
+        <button
+          type="button"
+          onClick={onToggleFullscreen}
+          aria-label="Exit Fullscreen Preview"
+          className="absolute top-3 right-3 z-30 px-3 py-1.5 rounded-full bg-[#16161C]/90 backdrop-blur-md border border-[#2E2E38] text-white text-xs font-semibold flex items-center gap-1.5 shadow-xl active:scale-95"
+        >
+          <span>Exit Fullscreen</span>
+        </button>
+      )}
+
       {/* Top-Right Floating Resolution & FPS Chip */}
       <button
         type="button"
         onClick={cycleQuality}
         aria-label={`Preview quality ${quality}p at ${fps} FPS, tap to change`}
-        className="absolute top-2.5 right-3 z-20 min-h-[34px] px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-md border border-slate-200 text-[10px] font-mono text-slate-700 flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform"
+        className="absolute top-2.5 right-3 z-20 min-h-[34px] px-2.5 py-1 rounded-full bg-[#16161C]/85 backdrop-blur-md border border-[#2E2E38] text-[10px] font-mono text-white/90 flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
       >
-        <span className={`w-1.5 h-1.5 rounded-full ${buffering ? "bg-amber-500 animate-ping" : "bg-emerald-500"}`} />
+        <span className={`w-1.5 h-1.5 rounded-full ${buffering ? "bg-amber-400 animate-ping" : "bg-[#00E5FF]"}`} />
         <span>{buffering ? "Buffering…" : `${quality}p · ${fps}fps`}</span>
       </button>
 
@@ -566,7 +584,7 @@ export default function MobileCanvasStage({
             setPreviewScale(1);
             setPanOffset({ x: 0, y: 0 });
           }}
-          className="absolute bottom-2.5 left-3 z-20 px-2.5 py-1 rounded-full bg-blue-600 text-white text-[10px] font-mono flex items-center gap-1 shadow-sm"
+          className="absolute bottom-2.5 left-3 z-20 px-2.5 py-1 rounded-full bg-[#00E5FF] text-black text-[10px] font-mono font-bold flex items-center gap-1 shadow-md active:scale-95"
         >
           <ZoomIn size={11} />
           <span>{Math.round(previewScale * 100)}% · Reset</span>
@@ -576,7 +594,7 @@ export default function MobileCanvasStage({
       {/* Center-locked Player Container */}
       <div
         ref={frameRef}
-        className="relative bg-black rounded-lg overflow-hidden border border-slate-200 shadow-[0_8px_24px_rgba(15,23,42,0.16)] will-change-transform transition-transform duration-75"
+        className="relative bg-black rounded-lg overflow-hidden border border-[#26262E] shadow-[0_12px_40px_rgba(0,0,0,0.85)] will-change-transform transition-transform duration-75"
         style={{
           transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${previewScale})`,
         }}
@@ -605,26 +623,26 @@ export default function MobileCanvasStage({
           aria-label="Mobile Video Preview Canvas"
         />
 
-        {/* Selected Clip Outline */}
+        {/* Selected Clip Outline (CapCut Cyan) */}
         <div
           ref={outlineRef}
           style={{ display: "none" }}
-          className="absolute border-2 border-blue-600 pointer-events-none z-20 rounded-sm"
+          className="absolute border-2 border-[#00E5FF] shadow-[0_0_12px_rgba(0,229,255,0.45)] pointer-events-none z-20 rounded-sm"
         />
 
         {/* 9:16 Social Media Safe Zone Overlay (TikTok / Reels / Shorts Margins) */}
         {showSafeZones && aspectRatio === "9:16" && (
           <div className="absolute inset-0 pointer-events-none z-15 overflow-hidden flex flex-col justify-between">
             {/* Top Safe Area Boundary (avoids notch, search, following/for you tabs) */}
-            <div className="relative w-full h-[14%] border-b border-dashed border-cyan-400/70 bg-cyan-500/5 flex items-end px-2 pb-1">
-              <span className="text-[9px] font-mono font-medium text-cyan-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+            <div className="relative w-full h-[14%] border-b border-dashed border-[#00E5FF]/70 bg-[#00E5FF]/5 flex items-end px-2 pb-1">
+              <span className="text-[9px] font-mono font-medium text-[#00E5FF] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                 Top Safe Margin (14%)
               </span>
             </div>
 
             {/* Center Eye-Level & Crosshair (Golden Ratio Focus Area for Viral Captions & B-Rolls) */}
             <div className="absolute top-[48%] left-0 right-0 -translate-y-1/2 border-t border-dashed border-amber-400/50 flex items-center justify-between px-2">
-              <span className="text-[8px] font-mono font-bold text-amber-300/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              <span className="text-[8px] font-mono font-bold text-amber-300/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                 Viral Eye-Level (48%)
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400/70" />
@@ -632,14 +650,14 @@ export default function MobileCanvasStage({
 
             {/* Right Action Icons Margin Overlay (Like, Comment, Bookmark, Share icons zone) */}
             <div className="absolute right-0 top-[26%] bottom-[24%] w-[16%] border-l border-dashed border-rose-400/50 bg-rose-500/5 flex flex-col justify-center items-center gap-2 pr-0.5">
-              <span className="text-[7px] font-mono text-rose-300/80 -rotate-90 whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              <span className="text-[7px] font-mono text-rose-300/80 -rotate-90 whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                 TikTok Icons (16%)
               </span>
             </div>
 
             {/* Bottom Safe Area Boundary (avoids username, caption text, sound marquee, bottom nav) */}
-            <div className="relative w-full h-[22%] border-t border-dashed border-cyan-400/70 bg-cyan-500/5 flex items-start px-2 pt-1">
-              <span className="text-[9px] font-mono font-medium text-cyan-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+            <div className="relative w-full h-[22%] border-t border-dashed border-[#00E5FF]/70 bg-[#00E5FF]/5 flex items-start px-2 pt-1">
+              <span className="text-[9px] font-mono font-medium text-[#00E5FF] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                 Safe Lower Third (22% Bottom Margin)
               </span>
             </div>
@@ -648,14 +666,14 @@ export default function MobileCanvasStage({
 
         {/* Quick Accurate Alignment Pills when a visual layer is selected */}
         {isVisualSelected && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-25 flex items-center gap-1 bg-slate-900/90 backdrop-blur-md px-2 py-1 rounded-full border border-white/20 shadow-lg text-[10px] text-white">
-            <span className="font-semibold text-slate-300 mr-0.5 text-[9px] uppercase tracking-wide">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-25 flex items-center gap-1 bg-[#16161C]/90 backdrop-blur-md px-2 py-1 rounded-full border border-[#2E2E38] shadow-xl text-[10px] text-white">
+            <span className="font-semibold text-[#A0A0A8] mr-0.5 text-[9px] uppercase tracking-wide">
               {isCaptionSelected ? "Caption" : "B-Roll"}:
             </span>
             <button
               type="button"
               onClick={() => alignSelectedClip("top")}
-              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/25 active:bg-blue-600 transition-colors flex items-center gap-0.5"
+              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 active:bg-[#00E5FF] active:text-black transition-colors flex items-center gap-0.5"
             >
               <ArrowUp size={10} />
               <span>Top</span>
@@ -663,14 +681,14 @@ export default function MobileCanvasStage({
             <button
               type="button"
               onClick={() => alignSelectedClip("center")}
-              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/25 active:bg-blue-600 transition-colors flex items-center gap-0.5 font-semibold text-amber-300"
+              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 active:bg-[#00E5FF] active:text-black transition-colors flex items-center gap-0.5 font-semibold text-amber-300"
             >
               <span>Center</span>
             </button>
             <button
               type="button"
               onClick={() => alignSelectedClip("bottom")}
-              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/25 active:bg-blue-600 transition-colors flex items-center gap-0.5"
+              className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 active:bg-[#00E5FF] active:text-black transition-colors flex items-center gap-0.5"
             >
               <ArrowDown size={10} />
               <span>Safe Bot</span>
@@ -678,7 +696,7 @@ export default function MobileCanvasStage({
             <button
               type="button"
               onClick={() => alignSelectedClip("centerX")}
-              className="px-1.5 py-0.5 rounded-full bg-white/10 hover:bg-white/25 active:bg-blue-600 transition-colors"
+              className="px-1.5 py-0.5 rounded-full bg-white/10 hover:bg-white/20 active:bg-[#00E5FF] active:text-black transition-colors"
               title="Align Center Horizontally"
             >
               <AlignCenter size={11} />
@@ -689,20 +707,20 @@ export default function MobileCanvasStage({
         {/* Double-tap Play/Pause Visual Ripple */}
         {tapFeedback && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
-            <div className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white animate-ping-once">
-              {tapFeedback === "play" ? <Play size={24} className="ml-0.5" /> : <Pause size={24} />}
+            <div className="w-14 h-14 rounded-full bg-black/75 backdrop-blur-md border border-white/20 flex items-center justify-center text-white animate-ping-once">
+              {tapFeedback === "play" ? <Play size={24} className="ml-0.5 text-[#00E5FF]" /> : <Pause size={24} className="text-white" />}
             </div>
           </div>
         )}
 
         {/* Empty State */}
         {!hasClips && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-slate-950/75 z-10 gap-3">
-            <Film size={28} className="text-slate-400" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-[#0E0E12]/90 z-10 gap-3 border border-[#26262E]">
+            <Film size={28} className="text-[#A0A0A8]" />
             <div>
-              <p className="text-xs font-semibold text-white">Start Your Edit</p>
-              <p className="text-[11px] text-slate-300 mt-0.5">
-                Import a clip or let AI Copilot edit for you
+              <p className="text-xs font-semibold text-white">Start Your CapCut Edit</p>
+              <p className="text-[11px] text-[#A0A0A8] mt-0.5">
+                Import media clips or let AI Copilot edit for you
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
@@ -710,9 +728,9 @@ export default function MobileCanvasStage({
                 <button
                   type="button"
                   onClick={onOpenImport}
-                  className="min-h-[40px] px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 text-xs font-medium flex items-center gap-1.5"
+                  className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-[#22222A] hover:bg-[#2C2C36] border border-[#2E2E38] text-white text-xs font-medium flex items-center gap-1.5 active:scale-95 transition-all"
                 >
-                  <Upload size={13} />
+                  <Upload size={13} className="text-[#00E5FF]" />
                   <span>Add Media</span>
                 </button>
               )}
@@ -720,7 +738,7 @@ export default function MobileCanvasStage({
                 <button
                   type="button"
                   onClick={onOpenAiCopilot}
-                  className="min-h-[40px] px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md"
+                  className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-[#00E5FF] hover:bg-[#33EAFF] text-black text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,229,255,0.35)] active:scale-95 transition-all"
                 >
                   <Sparkles size={13} />
                   <span>AI Copilot</span>

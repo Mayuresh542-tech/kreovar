@@ -5,21 +5,25 @@ import {
   Folder,
   Captions,
   Clapperboard,
-  AudioLines,
+  Music,
+  Type,
+  Split,
   Wand2,
   Settings2,
   SlidersHorizontal,
   Keyboard,
   PanelLeftClose,
   PanelLeftOpen,
-  Scissors,
 } from "lucide-react";
 
 export type EditorToolTab =
   | "media"
+  | "audio"
+  | "text"
   | "captions"
   | "broll"
-  | "audio"
+  | "transitions"
+  | "filters"
   | "silence"
   | "effects"
   | "settings"
@@ -41,48 +45,52 @@ interface ToolItem {
   description: string;
 }
 
+/**
+ * CapCut Desktop Studio Tools Hub:
+ * Category tabs: Media, Audio, Text, Captions, B-Roll, Transitions, Filters
+ */
 const TOOLS: ToolItem[] = [
   {
     id: "media",
     label: "Media",
     icon: Folder,
-    description: "User uploads, raw A-roll footage",
+    description: "User uploads, footage, and project assets",
+  },
+  {
+    id: "audio",
+    label: "Audio",
+    icon: Music,
+    description: "Sound effects, background music, voiceover",
+  },
+  {
+    id: "text",
+    label: "Text",
+    icon: Type,
+    description: "Title templates, lower thirds, typography presets",
   },
   {
     id: "captions",
     label: "Captions",
     icon: Captions,
-    description: "Caption Studio templates & styles",
+    description: "Caption Studio templates, kinetic text, and styles",
   },
   {
     id: "broll",
     label: "B-Roll",
     icon: Clapperboard,
-    description: "Smart stock footage search",
+    description: "Smart B-roll search and stock footage",
   },
   {
-    id: "audio",
-    label: "Audio & SFX",
-    icon: AudioLines,
-    description: "Sound effects, background music, voice",
+    id: "transitions",
+    label: "Transitions",
+    icon: Split,
+    description: "Dissolve, wipes, zoom, motion cut transitions",
   },
   {
-    id: "silence",
-    label: "Silence Trimmer",
-    icon: Scissors,
-    description: "Acoustic detection & ripple cut silence removal",
-  },
-  {
-    id: "effects",
-    label: "Effects",
+    id: "filters",
+    label: "Filters",
     icon: Wand2,
-    description: "Punch-in zooms & transitions",
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    icon: Settings2,
-    description: "Resolution, FPS, base revision",
+    description: "Color grading profiles, camera punch-in zooms, LUTs",
   },
 ];
 
@@ -96,11 +104,11 @@ export default function ToolSidebar({
 }: ToolSidebarProps) {
   return (
     <aside
-      className="w-16 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col items-center justify-between py-3 select-none z-30"
+      className="w-16 flex-shrink-0 bg-[#18181C] border-r border-[#2E2E33] flex flex-col items-center justify-between py-3 select-none z-30"
       aria-label="Primary Editor Tool Navigation"
     >
       {/* Top Tools List */}
-      <nav className="flex flex-col items-center gap-2 w-full px-1.5" aria-label="Tool Tabs">
+      <nav className="flex flex-col items-center gap-1.5 w-full px-1.5" aria-label="Tool Tabs">
         {TOOLS.map((tool) => {
           const Icon = tool.icon;
           const isActive = isDrawerOpen && activeTab === tool.id;
@@ -112,50 +120,115 @@ export default function ToolSidebar({
               title={`${tool.label} — ${tool.description}`}
               aria-label={tool.label}
               aria-pressed={isActive}
-              className={`w-full h-12 flex flex-col items-center justify-center rounded-xl transition-all relative group ${
+              className={`w-full h-11 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer ${
                 isActive
-                  ? "bg-blue-600 text-white font-bold shadow-xs"
-                  : "text-slate-800 hover:text-black hover:bg-slate-100"
+                  ? "bg-[#00E5FF]/15 text-[#00E5FF] font-bold border border-[#00E5FF]/30 shadow-[0_0_12px_rgba(0,229,255,0.15)]"
+                  : "text-[#A0A0A8] hover:text-white hover:bg-[#222226]"
               }`}
             >
-              <Icon size={19} className={`transition-transform group-hover:scale-105 ${isActive ? "text-white" : "text-slate-900"}`} />
-              <span className={`text-[10px] mt-1 tracking-tight truncate max-w-[54px] ${isActive ? "text-white font-bold" : "text-slate-900 font-medium"}`}>
+              {isActive && (
+                <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#00E5FF] rounded-r shadow-[0_0_6px_#00E5FF]" />
+              )}
+              <Icon
+                size={18}
+                className={`transition-transform group-hover:scale-105 ${
+                  isActive ? "text-[#00E5FF]" : "text-[#A0A0A8] group-hover:text-white"
+                }`}
+              />
+              <span
+                className={`text-[9.5px] mt-0.5 tracking-tight truncate max-w-[54px] ${
+                  isActive ? "text-[#00E5FF] font-bold" : "text-[#A0A0A8] font-medium group-hover:text-white"
+                }`}
+              >
                 {tool.label}
               </span>
             </button>
           );
         })}
 
-        {/* Inspector Button (Highlighted if clip selected) */}
+        {/* Inspector Button (Highlighted in CapCut Cyan if clip selected) */}
         <button
           onClick={() => onSelectTab("inspector")}
           title="Inspector — Adjust selected clip properties"
           aria-label="Clip Inspector"
           aria-pressed={isDrawerOpen && activeTab === "inspector"}
-          className={`w-full h-12 flex flex-col items-center justify-center rounded-xl transition-all relative group mt-1 ${
+          className={`w-full h-11 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer mt-1 ${
             isDrawerOpen && activeTab === "inspector"
-              ? "bg-blue-600 text-white font-bold shadow-xs"
+              ? "bg-[#00E5FF]/15 text-[#00E5FF] font-bold border border-[#00E5FF]/30 shadow-[0_0_12px_rgba(0,229,255,0.15)]"
               : hasSelection
-              ? "text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200"
-              : "text-slate-800 hover:text-black hover:bg-slate-100"
+              ? "text-[#00E5FF] bg-[#222226] hover:bg-[#2A2A30] border border-[#00E5FF]/40"
+              : "text-[#A0A0A8] hover:text-white hover:bg-[#222226]"
           }`}
         >
-          <SlidersHorizontal size={19} className={isDrawerOpen && activeTab === "inspector" ? "text-white" : "text-slate-900"} />
-          <span className={`text-[10px] mt-1 tracking-tight ${isDrawerOpen && activeTab === "inspector" ? "text-white font-bold" : "text-slate-900 font-medium"}`}>Inspector</span>
-          {hasSelection && (
-            <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
+          {isDrawerOpen && activeTab === "inspector" && (
+            <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#00E5FF] rounded-r shadow-[0_0_6px_#00E5FF]" />
           )}
+          <SlidersHorizontal
+            size={18}
+            className={
+              isDrawerOpen && activeTab === "inspector"
+                ? "text-[#00E5FF]"
+                : hasSelection
+                ? "text-[#00E5FF]"
+                : "text-[#A0A0A8] group-hover:text-white"
+            }
+          />
+          <span
+            className={`text-[9.5px] mt-0.5 tracking-tight ${
+              isDrawerOpen && activeTab === "inspector"
+                ? "text-[#00E5FF] font-bold"
+                : hasSelection
+                ? "text-[#00E5FF] font-semibold"
+                : "text-[#A0A0A8] font-medium group-hover:text-white"
+            }`}
+          >
+            Inspector
+          </span>
+          {hasSelection && (
+            <div className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#00E5FF] ring-2 ring-[#18181C] shadow-[0_0_6px_#00E5FF] animate-pulse" />
+          )}
+        </button>
+
+        {/* Settings Button */}
+        <button
+          onClick={() => onSelectTab("settings")}
+          title="Project Settings"
+          aria-label="Project Settings"
+          aria-pressed={isDrawerOpen && activeTab === "settings"}
+          className={`w-full h-10 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer ${
+            isDrawerOpen && activeTab === "settings"
+              ? "bg-[#00E5FF]/15 text-[#00E5FF] font-bold border border-[#00E5FF]/30"
+              : "text-[#A0A0A8] hover:text-white hover:bg-[#222226]"
+          }`}
+        >
+          <Settings2
+            size={17}
+            className={
+              isDrawerOpen && activeTab === "settings"
+                ? "text-[#00E5FF]"
+                : "text-[#A0A0A8] group-hover:text-white"
+            }
+          />
+          <span
+            className={`text-[9px] mt-0.5 tracking-tight ${
+              isDrawerOpen && activeTab === "settings"
+                ? "text-[#00E5FF] font-bold"
+                : "text-[#A0A0A8] font-medium group-hover:text-white"
+            }`}
+          >
+            Settings
+          </span>
         </button>
       </nav>
 
       {/* Bottom Actions: Drawer Toggle & Keyboard Shortcuts */}
-      <div className="flex flex-col items-center gap-2 w-full px-1.5 border-t border-slate-200 pt-3">
+      <div className="flex flex-col items-center gap-2 w-full px-1.5 border-t border-[#2E2E33] pt-3">
         {/* Toggle Expand / Collapse Drawer */}
         <button
           onClick={onToggleDrawer}
           title={isDrawerOpen ? "Collapse Tool Drawer" : "Expand Tool Drawer"}
           aria-label={isDrawerOpen ? "Collapse Tool Drawer" : "Expand Tool Drawer"}
-          className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-xl text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
         >
           {isDrawerOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
         </button>
@@ -166,7 +239,7 @@ export default function ToolSidebar({
             onClick={onOpenShortcuts}
             title="Keyboard Shortcuts (?)"
             aria-label="Keyboard Shortcuts"
-            className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="w-10 h-10 flex items-center justify-center rounded-xl text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
           >
             <Keyboard size={18} />
           </button>

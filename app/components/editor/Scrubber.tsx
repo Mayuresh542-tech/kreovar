@@ -9,11 +9,13 @@ interface ScrubberProps {
   height: number;
   fps?: number;
   showHandle?: boolean;
+  color?: string;
 }
 
 /**
- * High-precision timeline playhead and scrubber bar synchronized with playback clock and frame updates.
- * Features a red needle pointer head and a crisp 2px red laser playhead bar.
+ * High-precision CapCut Studio timeline playhead and scrubber bar
+ * synchronized with playback clock and frame updates.
+ * Features a signature CapCut Cyan (#00E5FF) needle head and vertical laser playhead line.
  */
 export const Scrubber = memo(function Scrubber({
   time,
@@ -21,8 +23,10 @@ export const Scrubber = memo(function Scrubber({
   height,
   fps = 30,
   showHandle = true,
+  color = "#00E5FF",
 }: ScrubberProps) {
   const left = Math.max(0, time * pps);
+  const isCyan = color === "#00E5FF";
 
   return (
     <div
@@ -36,14 +40,22 @@ export const Scrubber = memo(function Scrubber({
       {/* Top Handle / Needle */}
       {showHandle && (
         <div className="relative -left-[7px] -top-0 flex flex-col items-center pointer-events-auto cursor-ew-resize group">
-          <div className="w-[14px] h-[14px] bg-red-500 rounded-sm shadow-md shadow-red-500/40 flex items-center justify-center">
-            <div className="w-[2px] h-[6px] bg-white rounded-full opacity-80" />
+          <div
+            className={`w-[14px] h-[14px] rounded-sm shadow-md flex items-center justify-center ${
+              isCyan ? "bg-[#00E5FF] shadow-[#00E5FF]/50" : "bg-red-500 shadow-red-500/40"
+            }`}
+            style={{ backgroundColor: color }}
+          >
+            <div className="w-[2px] h-[6px] bg-black rounded-full opacity-80" />
           </div>
           {/* Triangular pointer tip */}
-          <div className="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[6px] border-t-red-500 -mt-[1px]" />
+          <div
+            className="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[6px] -mt-[1px]"
+            style={{ borderTopColor: color }}
+          />
           
           {/* Floating Timecode Pill on Hover */}
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-[#0F172A] border border-slate-800 text-white font-mono text-[10px] px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none">
+          <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-[#18181C] border border-[#2E2E33] text-white font-mono text-[10px] px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none z-50">
             {formatTime(time, fps)}
           </div>
         </div>
@@ -51,8 +63,11 @@ export const Scrubber = memo(function Scrubber({
 
       {/* Synchronized Vertical Laser Playhead Bar */}
       <div
-        className="w-[2px] bg-red-500 z-50 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.7)]"
+        className={`w-[2px] z-50 pointer-events-none ${
+          isCyan ? "shadow-[0_0_8px_rgba(0,229,255,0.85)]" : "shadow-[0_0_8px_rgba(239,68,68,0.7)]"
+        }`}
         style={{
+          backgroundColor: color,
           height: `${Math.max(0, height - (showHandle ? 18 : 0))}px`,
         }}
       />

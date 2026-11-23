@@ -15,14 +15,16 @@ import {
   Pause,
   ChevronLeft,
   ChevronRight,
-  Scissors,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import CaptionFonts from "../../captions/CaptionFonts";
 import type { EditorLayoutProps } from "../EditorLayout";
 import { useEditor } from "../workspace/EditorContext";
 import { usePlayback, useProject } from "@/app/lib/editor/store";
 import { formatTime, projectDuration } from "@/app/lib/editor/model";
-import { splitClip } from "@/app/lib/editor/operations";
+import { splitClip, removeClip, duplicateClip } from "@/app/lib/editor/operations";
+import { captureKeyframe, setTransformKeyframes } from "@/app/lib/editor/keyframes";
 import MobileCanvasStage from "./MobileCanvasStage";
 import MobileTimeline from "./MobileTimeline";
 import MobileBottomBar, { type MobileToolDrawerTab } from "./MobileBottomBar";
@@ -44,18 +46,38 @@ export default function MobileEditorLayout({
   conflict,
   onReloadConflict,
 }: EditorLayoutProps) {
-  const { store, playback, selection, run, notify } = useEditor();
+  const { store, playback, selection, select, run, notify } = useEditor();
   const project = useProject(store);
   const playbackState = usePlayback(playback);
 
-  const [previewQuality, setPreviewQuality] = useState<number>(720);
+  const [previewQuality, setPreviewQuality] = useState<number>(1080);
   const [activeDrawer, setActiveDrawer] = useState<MobileToolDrawerTab | null>(null);
   const [isAiSheetOpen, setIsAiSheetOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
 
   const duration = projectDuration(project);
   const fps = project.settings.fps || 30;
   const hasClips = Object.keys(project.clips).length > 0;
+
+  // Selected clip inspection for keyframes & operations
+  const selectedClipId = selection[0];
+  const selectedClip = selectedClipId ? project.clips[selectedClipId] : undefined;
+  const isInsideClip =
+    !!selectedClip &&
+    playbackState.time >= selectedClip.startTime &&
+    playbackState.time <= selectedClip.startTime + selectedClip.duration;
+  const clipSourceTime =
+    selectedClip && isInsideClip
+      ? selectedClip.sourceStart +
+        (Math.round((playbackState.time - selectedClip.startTime) * fps) / fps) * selectedClip.speed
+      : null;
+  const hasKeyframeAtPlayhead =
+    !!selectedClip &&
+    clipSourceTime !== null &&
+    (selectedClip.keyframes || []).some(
+      (kf) => Math.abs(kf.sourceTime - clipSourceTime) <= selectedClip.speed / fps / 2 + 1e-4
+    );
 
   const handleTogglePlay = useCallback(() => {
     const state = playback.getSnapshot();
@@ -100,10 +122,65 @@ export default function MobileEditorLayout({
     if (targets.length > 0) {
       navigator.vibrate?.(10);
       run((p) => targets.reduce((next, id) => splitClip(next, id, t), p));
+      notify("Clip split at playhead.");
     } else {
       notify("Move the playhead inside a clip to split.");
     }
   }, [notify, playback, run, selection, store]);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (selection.length > 0) {
+      navigator.vibrate?.(10);
+      run((p) => selection.reduce((next, id) => removeClip(next, id), p));
+      select([]);
+      notify("Clip deleted.");
+    }
+  }, [selection, run, select, notify]);
+
+  const handleDuplicateSelected = useCallback(() => {
+    if (selection.length > 0) {
+      navigator.vibrate?.(8);
+      run((p) => selection.reduce((next, id) => duplicateClip(next, id), p));
+      notify("Clip duplicated.");
+    }
+  }, [selection, run, notify]);
+
+  const handleToggleKeyframe = useCallback(() => {
+    if (!selectedClip || !isInsideClip || clipSourceTime === null) {
+      notify("Select a clip and place playhead inside it to add keyframes.");
+      return;
+    }
+    navigator.vibrate?.(10);
+    if (hasKeyframeAtPlayhead) {
+      // Remove keyframe at current playhead
+      run((p) => {
+        const c = p.clips[selectedClip.id];
+        if (!c) return p;
+        const remaining = (c.keyframes || []).filter(
+          (kf) => Math.abs(kf.sourceTime - clipSourceTime) > c.speed / fps / 2 + 1e-4
+        );
+        return setTransformKeyframes(p, c.id, remaining);
+      });
+      notify("Keyframe removed at playhead");
+    } else {
+      // Add keyframe at current playhead
+      run((p) => {
+        const c = p.clips[selectedClip.id];
+        if (!c) return p;
+        return captureKeyframe(p, c.id, playbackState.time, c.transform, "smooth");
+      });
+      notify("Keyframe added at playhead");
+    }
+  }, [
+    selectedClip,
+    isInsideClip,
+    clipSourceTime,
+    hasKeyframeAtPlayhead,
+    notify,
+    run,
+    fps,
+    playbackState.time,
+  ]);
 
   const handleSelectDrawer = useCallback((tab: MobileToolDrawerTab) => {
     setIsAiSheetOpen(false);
@@ -115,22 +192,27 @@ export default function MobileEditorLayout({
     setIsAiSheetOpen((prev) => !prev);
   }, []);
 
+  const toggleQuality = useCallback(() => {
+    setPreviewQuality((prev) => (prev === 1080 ? 720 : 1080));
+    navigator.vibrate?.(6);
+  }, []);
+
   return (
-    <div className="flex md:hidden h-[100dvh] w-screen overflow-hidden flex-col bg-[#F8FAFC] text-[#0F172A] select-none overscroll-none font-sans antialiased">
+    <div className="flex md:hidden h-[100dvh] w-screen overflow-hidden flex-col bg-[#0E0E12] text-white select-none overscroll-none font-sans antialiased">
       <CaptionFonts />
 
-      {/* 1. TOP BAR (48px + Safe Area Top) */}
-      <header className="pt-[env(safe-area-inset-top)] min-h-[calc(48px+env(safe-area-inset-top))] bg-white border-b border-slate-200 px-1.5 flex items-center justify-between flex-shrink-0 z-30">
-        {/* Left: Back, Compact Title, Save Status */}
-        <div className="flex items-center gap-0.5 min-w-0 flex-1 mr-1">
+      {/* 1. TOP BAR (48px + Safe Area Top) matching CapCut Mobile */}
+      <header className="pt-[env(safe-area-inset-top)] min-h-[calc(48px+env(safe-area-inset-top))] bg-[#0E0E12] border-b border-[#26262E] px-2 flex items-center justify-between flex-shrink-0 z-30">
+        {/* Left: Back Arrow '<' & subtle project title / save check */}
+        <div className="flex items-center gap-1 min-w-0 flex-1 mr-1">
           {onExit && (
             <button
               type="button"
               onClick={onExit}
               aria-label="Back to Projects"
-              className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-700 active:bg-slate-100 transition-colors flex-shrink-0"
+              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-white/90 active:bg-white/10 active:scale-95 transition-all flex-shrink-0"
             >
-              <ArrowLeft size={18} />
+              <ArrowLeft size={19} className="text-white" />
             </button>
           )}
 
@@ -150,53 +232,68 @@ export default function MobileEditorLayout({
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
             }}
-            className="bg-transparent focus:bg-slate-100 border border-transparent focus:border-blue-600 rounded-lg px-2 py-1 text-base sm:text-xs font-semibold text-slate-900 outline-none min-w-0 flex-1 max-w-[148px] truncate transition-colors"
+            className="bg-transparent focus:bg-[#1E1E26] border border-transparent focus:border-[#00E5FF] rounded-lg px-2 py-0.5 text-xs font-semibold text-white/90 outline-none min-w-0 flex-1 max-w-[120px] sm:max-w-[150px] truncate transition-colors"
           />
 
           <button
             type="button"
             onClick={retrySave}
             aria-label={`Sync status: ${persistenceState}`}
-            className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-500 active:bg-slate-100 transition-colors flex-shrink-0"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-white/40 active:bg-white/10 transition-colors flex-shrink-0"
           >
             {persistenceState === "saving" || persistenceState === "loading" ? (
-              <LoaderCircle size={15} className="animate-spin text-blue-600" />
+              <LoaderCircle size={13} className="animate-spin text-[#00E5FF]" />
             ) : persistenceState === "failed" ? (
-              <AlertCircle size={15} className="text-rose-600" />
+              <AlertCircle size={13} className="text-rose-500" />
             ) : (
-              <Check size={15} className="text-emerald-600" />
+              <Check size={13} className="text-[#00E5FF]" />
             )}
           </button>
         </div>
 
-        {/* Right: Undo, Redo, Export */}
-        <div className="flex items-center gap-0.5 flex-shrink-0">
+        {/* Center: Resolution Badge Pill (e.g. '1080P · 30fps') */}
+        <div className="flex items-center justify-center flex-shrink-0 px-1">
+          <button
+            type="button"
+            onClick={toggleQuality}
+            aria-label={`Resolution: ${previewQuality}P at ${fps} FPS. Tap to change.`}
+            className="min-h-[28px] px-2.5 py-0.5 rounded-full bg-[#1C1C24] hover:bg-[#252530] border border-[#2E2E38] text-white/90 text-[11px] font-semibold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF]" />
+            <span>{previewQuality}P · {fps}fps</span>
+          </button>
+        </div>
+
+        {/* Right: Undo '↺', Redo '↻', and CapCut Cyan pill Export button */}
+        <div className="flex items-center gap-1 flex-shrink-0 ml-1">
           <button
             type="button"
             disabled={!store.canUndo}
             onClick={() => store.undo()}
             aria-label="Undo"
-            className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-700 active:bg-slate-100 disabled:opacity-30 transition-colors"
+            title="Undo (↺)"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 active:bg-white/10 disabled:opacity-30 transition-all active:scale-95"
           >
-            <Undo2 size={17} />
+            <Undo2 size={16} />
           </button>
           <button
             type="button"
             disabled={!store.canRedo}
             onClick={() => store.redo()}
             aria-label="Redo"
-            className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-700 active:bg-slate-100 disabled:opacity-30 transition-colors"
+            title="Redo (↻)"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 active:bg-white/10 disabled:opacity-30 transition-all active:scale-95"
           >
-            <Redo2 size={17} />
+            <Redo2 size={16} />
           </button>
           <button
             type="button"
             disabled={!hasClips}
             onClick={() => setExportOpen(true)}
             aria-label="Export Video"
-            className="min-h-[44px] min-w-[44px] ml-0.5 px-3 rounded-xl bg-[#0F172A] active:bg-slate-800 disabled:opacity-40 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-colors"
+            className="min-h-[30px] ml-1 bg-[#00E5FF] hover:bg-[#33EAFF] active:bg-[#00C4CC] disabled:opacity-30 text-black font-bold text-xs px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,229,255,0.4)] active:scale-95 transition-all"
           >
-            <Download size={14} />
+            <Download size={13} className="text-black stroke-[2.5]" />
             <span>Export</span>
           </button>
         </div>
@@ -204,20 +301,20 @@ export default function MobileEditorLayout({
 
       {/* Recovery / Conflict / Notice Banners */}
       {recoveryMessage && (
-        <div className="bg-blue-50 border-b border-blue-200 px-3 py-1 flex items-center justify-between text-[11px] text-blue-900 z-30 flex-shrink-0">
+        <div className="bg-[#1C2030] border-b border-blue-900/60 px-3 py-1 flex items-center justify-between text-[11px] text-blue-200 z-30 flex-shrink-0">
           <span className="truncate pr-2">{recoveryMessage}</span>
           <button
             type="button"
             onClick={dismissRecovery}
             aria-label="Dismiss recovery notice"
-            className="min-w-[44px] min-h-[44px] -my-2 flex items-center justify-center text-blue-700"
+            className="w-7 h-7 flex items-center justify-center text-blue-300"
           >
             <X size={14} />
           </button>
         </div>
       )}
       {(notice || conflict) && (
-        <div className="bg-amber-50 border-b border-amber-200 px-3 py-1 flex items-center justify-between text-[11px] text-amber-900 z-30 flex-shrink-0">
+        <div className="bg-[#2D2012] border-b border-amber-800/60 px-3 py-1 flex items-center justify-between text-[11px] text-amber-200 z-30 flex-shrink-0">
           <span className="truncate pr-2">
             {conflict
               ? "Saved in another window. Autosave paused."
@@ -227,7 +324,7 @@ export default function MobileEditorLayout({
             <button
               type="button"
               onClick={onReloadConflict}
-              className="min-h-[44px] -my-2 px-3 flex items-center text-[11px] font-semibold text-white bg-amber-600 rounded-lg"
+              className="px-2.5 py-0.5 text-[11px] font-semibold text-black bg-[#00E5FF] rounded-lg"
             >
               Reload
             </button>
@@ -236,7 +333,7 @@ export default function MobileEditorLayout({
               type="button"
               onClick={onDismissNotice}
               aria-label="Dismiss notice"
-              className="min-w-[44px] min-h-[44px] -my-2 flex items-center justify-center text-amber-700"
+              className="w-7 h-7 flex items-center justify-center text-amber-300"
             >
               <X size={14} />
             </button>
@@ -248,6 +345,8 @@ export default function MobileEditorLayout({
       <MobileCanvasStage
         quality={previewQuality}
         onChangeQuality={setPreviewQuality}
+        isFullscreen={isFullscreenPreview}
+        onToggleFullscreen={() => setIsFullscreenPreview(false)}
         onOpenImport={() => {
           setIsAiSheetOpen(false);
           setActiveDrawer("edit");
@@ -258,75 +357,117 @@ export default function MobileEditorLayout({
         }}
       />
 
-      {/* 3. TIMECODE & PLAYBACK BAR (40px layout strip with >=44px touch hits) */}
-      <div className="h-10 bg-white border-t border-slate-200 px-2 flex items-center justify-between flex-shrink-0 z-20">
-        {/* Left: Step Frame & Play/Pause */}
-        <div className="flex items-center">
+      {/* 3. MIDDLE TRANSPORT & KEYFRAME STRIP (between Canvas and Timeline) */}
+      <div className="h-11 bg-[#0E0E12] border-t border-[#26262E] px-3 flex items-center justify-between flex-shrink-0 z-20 select-none">
+        {/* Left: Timecode '00:00 / 00:15' */}
+        <div className="flex items-center gap-1 font-mono text-[11px] tabular-nums tracking-tight">
+          <span className="text-white font-semibold">
+            {formatTime(playbackState.time, fps)}
+          </span>
+          <span className="text-[#6E6E78]">/</span>
+          <span className="text-[#8E8E98]">{formatTime(duration, fps)}</span>
+        </div>
+
+        {/* Center: Round Play/Pause button with frame step chevrons */}
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => handleStepFrame(-1)}
             aria-label="Step back 1 frame"
-            className="min-w-[44px] min-h-[44px] -my-0.5 flex items-center justify-center text-slate-600 active:text-slate-900 active:bg-slate-100 rounded-lg transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white active:bg-white/10 transition-colors"
           >
-            <ChevronLeft size={18} />
+            <ChevronLeft size={16} />
           </button>
 
           <button
             type="button"
             onClick={handleTogglePlay}
             aria-label={playbackState.playing ? "Pause" : "Play"}
-            className="min-w-[44px] min-h-[44px] -my-0.5 flex items-center justify-center text-white active:scale-95 transition-transform"
+            className="w-10 h-10 bg-white/10 hover:bg-white/15 active:bg-white/20 text-white rounded-full flex items-center justify-center shadow-md active:scale-95 transition-all"
           >
-            <span className="w-8 h-8 rounded-full bg-[#0F172A] flex items-center justify-center shadow-sm">
-              {playbackState.playing ? (
-                <Pause size={15} fill="currentColor" />
-              ) : (
-                <Play size={15} fill="currentColor" className="ml-0.5" />
-              )}
-            </span>
+            {playbackState.playing ? (
+              <Pause size={17} fill="currentColor" />
+            ) : (
+              <Play size={17} fill="currentColor" className="ml-0.5" />
+            )}
           </button>
 
           <button
             type="button"
             onClick={() => handleStepFrame(1)}
             aria-label="Step forward 1 frame"
-            className="min-w-[44px] min-h-[44px] -my-0.5 flex items-center justify-center text-slate-600 active:text-slate-900 active:bg-slate-100 rounded-lg transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white active:bg-white/10 transition-colors"
           >
-            <ChevronRight size={18} />
+            <ChevronRight size={16} />
           </button>
         </div>
 
-        {/* Center: Monospace Timecode */}
-        <div className="flex items-center gap-1 font-mono text-[11px] tabular-nums tracking-tight px-2">
-          <span className="text-slate-900 font-semibold">
-            {formatTime(playbackState.time, fps)}
-          </span>
-          <span className="text-slate-400">/</span>
-          <span className="text-slate-500">{formatTime(duration, fps)}</span>
-        </div>
+        {/* Right: CapCut Keyframe Diamond button ('◇+' or solid cyan '◆') + Fullscreen button '⛶' */}
+        <div className="flex items-center gap-1.5">
+          {/* Keyframe Diamond Button */}
+          <button
+            type="button"
+            onClick={handleToggleKeyframe}
+            aria-label={
+              hasKeyframeAtPlayhead
+                ? "Remove Keyframe at playhead"
+                : "Add Keyframe at playhead"
+            }
+            title={
+              hasKeyframeAtPlayhead
+                ? "Remove Keyframe at playhead"
+                : "Add Keyframe at playhead (◇+)"
+            }
+            className={`min-h-[30px] px-2 rounded-lg flex items-center gap-1 text-xs font-semibold transition-all active:scale-95 ${
+              !selectedClip
+                ? "opacity-35 cursor-not-allowed text-white/40"
+                : hasKeyframeAtPlayhead
+                ? "bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/60 shadow-[0_0_8px_rgba(0,229,255,0.4)]"
+                : "bg-white/10 text-white/90 hover:text-white hover:bg-white/15 border border-white/15"
+            }`}
+          >
+            {hasKeyframeAtPlayhead ? (
+              <span className="text-[#00E5FF] text-base leading-none drop-shadow">
+                ◆
+              </span>
+            ) : (
+              <span className="text-white text-xs leading-none font-bold">
+                ◇+
+              </span>
+            )}
+          </button>
 
-        {/* Right: Split Clip Action */}
-        <button
-          type="button"
-          onClick={handleSplit}
-          aria-label="Split clip at playhead"
-          className="min-w-[44px] min-h-[44px] -my-0.5 px-2.5 flex items-center justify-center gap-1.5 text-slate-700 active:bg-slate-100 rounded-lg text-[11px] font-medium transition-colors"
-        >
-          <Scissors size={15} className="text-blue-600" />
-          <span>Split</span>
-        </button>
+          {/* Fullscreen button '⛶' */}
+          <button
+            type="button"
+            onClick={() => setIsFullscreenPreview((prev) => !prev)}
+            aria-label="Toggle Fullscreen Preview (⛶)"
+            title="Fullscreen Preview"
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 ${
+              isFullscreenPreview
+                ? "bg-[#00E5FF] text-black shadow-[0_0_8px_rgba(0,229,255,0.4)]"
+                : "bg-white/10 text-white/90 hover:text-white hover:bg-white/15 border border-white/15"
+            }`}
+          >
+            {isFullscreenPreview ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+          </button>
+        </div>
       </div>
 
       {/* 4. COMPACT MOBILE TOUCH TIMELINE (160px) */}
       <MobileTimeline />
 
-      {/* 5. BOTTOM FIXED TOOL DOCK (56px + Safe Area Bottom) */}
+      {/* 5. BOTTOM FIXED ACTION DOCK (56px + Safe Area Bottom) */}
       <MobileBottomBar
         activeDrawer={activeDrawer}
         isAiSheetOpen={isAiSheetOpen}
         onSelectDrawer={handleSelectDrawer}
         onOpenAiCopilot={handleOpenAiCopilot}
         hasSelection={selection.length > 0}
+        onDeselect={() => select([])}
+        onSplit={handleSplit}
+        onDelete={handleDeleteSelected}
+        onDuplicate={handleDuplicateSelected}
       />
 
       {/* SLIDING TOOL & AI COPILOT SHEETS */}

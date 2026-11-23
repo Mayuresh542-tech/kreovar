@@ -293,21 +293,21 @@ export default function MobileTimeline() {
 
   return (
     <section
-      className="h-[160px] flex-shrink-0 w-full bg-white border-t border-slate-200 relative overflow-hidden select-none"
-      aria-label="Mobile Touch Timeline"
+      className="h-[160px] flex-shrink-0 w-full bg-[#0E0E12] border-t border-[#26262E] relative overflow-hidden select-none"
+      aria-label="CapCut Mobile Touch Timeline"
     >
       {/* Hidden Tracks Unhide Bar */}
       {hiddenTracks.length > 0 && (
-        <div className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-3 py-1 bg-amber-50/95 backdrop-blur border-b border-amber-200 text-[10px] text-amber-800 shadow-xs">
+        <div className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-3 py-1 bg-[#1C1C24]/95 backdrop-blur border-b border-[#2E2E38] text-[10px] text-amber-300 shadow-md">
           <div className="flex items-center gap-1.5 font-medium">
-            <EyeOff size={11} className="text-amber-600" />
+            <EyeOff size={11} className="text-amber-400" />
             <span>{hiddenTracks.length} hidden {hiddenTracks.length === 1 ? "track" : "tracks"}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => run((p) => hiddenTracks.reduce((next, t) => changeTrack(next, t.id, { hidden: false }), p))}
-              className="bg-white border border-amber-300 rounded px-1.5 py-0.5 text-amber-900 font-semibold shadow-2xs hover:bg-amber-100"
+              className="bg-[#2A2A36] border border-[#3A3A4A] rounded px-1.5 py-0.5 text-white font-semibold hover:bg-white/10"
             >
               Unhide All
             </button>
@@ -316,7 +316,7 @@ export default function MobileTimeline() {
                 key={t.id}
                 type="button"
                 onClick={() => run((p) => changeTrack(p, t.id, { hidden: false }))}
-                className="bg-white border border-amber-300 rounded px-1.5 py-0.5 text-amber-900 font-semibold shadow-2xs hover:bg-amber-100"
+                className="bg-[#2A2A36] border border-[#3A3A4A] rounded px-1.5 py-0.5 text-white font-semibold hover:bg-white/10"
               >
                 Unhide {t.name}
               </button>
@@ -325,21 +325,27 @@ export default function MobileTimeline() {
         </div>
       )}
 
-      {/* Center-Fixed Static Vertical Red Playhead */}
+      {/* Center-Fixed Static Vertical White Playhead with CapCut Top Pointer Indicator */}
       <div
-        className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-red-500 z-30 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.65)]"
+        className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-white z-30 pointer-events-none shadow-[0_0_6px_rgba(255,255,255,0.85)]"
         aria-hidden="true"
       >
-        <div className="w-2.5 h-2.5 -ml-[4px] bg-red-500 rotate-45 rounded-[1px] -mt-1 shadow" />
+        {/* CapCut mobile white top pointer needle indicator */}
+        <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 flex flex-col items-center">
+          <div className="w-3.5 h-3 bg-white rounded-t-xs shadow flex items-center justify-center">
+            <div className="w-1 h-1 rounded-full bg-black/40" />
+          </div>
+          <div className="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[6px] border-t-white -mt-[0.5px]" />
+        </div>
       </div>
 
       {/* Floating Micro-Nudge & Alignment Bar for Selected Clip */}
       {selectedClip && (
-        <div className="absolute top-1 right-2 z-35 flex items-center gap-1 bg-slate-900/90 backdrop-blur-md px-2 py-0.5 rounded-lg border border-slate-700 shadow-md text-[10px] text-white">
-          <span className="font-semibold truncate max-w-[70px] text-slate-300">
+        <div className="absolute top-1 right-2 z-35 flex items-center gap-1 bg-[#1C1C24]/95 backdrop-blur-md px-2 py-0.5 rounded-lg border border-[#2E2E38] shadow-xl text-[10px] text-white">
+          <span className="font-semibold truncate max-w-[70px] text-white/90">
             {selectedClip.name}
           </span>
-          <span className="font-mono text-cyan-300 text-[9px] bg-slate-800 px-1 py-0.2 rounded">
+          <span className="font-mono text-[#00E5FF] text-[9px] bg-[#121218] px-1 py-0.2 rounded border border-[#26262E]">
             {selectedClip.startTime.toFixed(2)}s
           </span>
           <div className="flex items-center gap-0.5 ml-0.5">
@@ -351,7 +357,7 @@ export default function MobileTimeline() {
                 navigator.vibrate?.(6);
               }}
               title="Nudge earlier 0.1s"
-              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 active:bg-blue-600 text-slate-200 font-mono text-[9px]"
+              className="px-1.5 py-0.5 rounded bg-[#2A2A36] hover:bg-[#343444] active:bg-[#00E5FF] active:text-black text-white/90 font-mono text-[9px]"
             >
               -0.1s
             </button>
@@ -363,7 +369,7 @@ export default function MobileTimeline() {
                 notify(`Aligned "${selectedClip.name}" to playhead.`);
               }}
               title="Snap start to playhead"
-              className="px-1.5 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-0.5 text-[9px]"
+              className="px-1.5 py-0.5 rounded bg-[#00E5FF] hover:bg-[#33EAFF] text-black font-semibold flex items-center gap-0.5 text-[9px]"
             >
               <Target size={10} />
               <span>Snap</span>
@@ -376,7 +382,7 @@ export default function MobileTimeline() {
                 navigator.vibrate?.(6);
               }}
               title="Nudge later 0.1s"
-              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 active:bg-blue-600 text-slate-200 font-mono text-[9px]"
+              className="px-1.5 py-0.5 rounded bg-[#2A2A36] hover:bg-[#343444] active:bg-[#00E5FF] active:text-black text-white/90 font-mono text-[9px]"
             >
               +0.1s
             </button>
@@ -396,17 +402,17 @@ export default function MobileTimeline() {
       >
         <div className="relative h-full" style={{ width: `${trackAreaWidth}px` }}>
           {/* Ruler (22px) */}
-          <div className="h-[22px] border-b border-slate-200 bg-[#F1F5F9] relative">
+          <div className="h-[22px] border-b border-[#26262E] bg-[#141419] relative">
             {Array.from({ length: tickCount }).map((_, i) => {
               const sec = i * tickStep;
               const left = halfWidth + sec * pps;
               return (
                 <div
                   key={sec}
-                  className="absolute top-0 bottom-0 border-l border-slate-300 flex items-center pl-1"
+                  className="absolute top-0 bottom-0 border-l border-[#26262E] flex items-center pl-1"
                   style={{ left: `${left}px` }}
                 >
-                  <span className="text-[9px] font-mono text-slate-500">
+                  <span className="text-[9px] font-mono text-[#7E7E88]">
                     {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, "0")}
                   </span>
                 </div>
@@ -423,10 +429,10 @@ export default function MobileTimeline() {
                 return (
                   <div
                     key={`silence-${idx}-${silence.start}`}
-                    className="absolute top-0 bottom-0 bg-rose-500/15 border-x border-dashed border-rose-500/70 pointer-events-none flex flex-col items-center justify-start overflow-hidden select-none"
+                    className="absolute top-0 bottom-0 bg-rose-500/20 border-x border-dashed border-rose-500/80 pointer-events-none flex flex-col items-center justify-start overflow-hidden select-none"
                     style={{ left: `${left}px`, width: `${width}px` }}
                   >
-                    <span className="text-[8px] font-mono text-rose-800 bg-white/95 border border-rose-300 rounded px-1 mt-0.5 shadow-xs whitespace-nowrap">
+                    <span className="text-[8px] font-mono text-rose-300 bg-[#16161C]/90 border border-rose-500/40 rounded px-1 mt-0.5 shadow-xs whitespace-nowrap">
                       Cut {silence.duration.toFixed(2)}s
                     </span>
                   </div>
@@ -436,12 +442,12 @@ export default function MobileTimeline() {
           )}
 
           {/* 4 Compact Stacked Lanes (remaining ~138px) */}
-          <div className="flex flex-col justify-evenly h-[138px] py-1 gap-1 bg-white">
+          <div className="flex flex-col justify-evenly h-[138px] py-1 gap-1 bg-[#0E0E12]">
             {/* Track 1: Captions / Text Indicators (Amber Pills) */}
-            <div className="relative h-[24px] bg-[#F8FAFC]">
+            <div className="relative h-[24px] bg-[#131317]/60 border-y border-[#1E1E26]/40">
               {trackGroups.captionsAndText.length === 0 && (
                 <span
-                  className="absolute top-1 text-[9px] text-slate-500 font-mono flex items-center gap-1 pointer-events-none"
+                  className="absolute top-1 text-[9px] text-[#6E6E78] font-mono flex items-center gap-1 pointer-events-none"
                   style={{ left: `${halfWidth + 8}px` }}
                 >
                   <Captions size={10} /> Captions
@@ -459,10 +465,10 @@ export default function MobileTimeline() {
                       navigator.vibrate?.(6);
                     }}
                     style={{ left: `${left}px`, width: `${width}px` }}
-                    className={`absolute top-0 bottom-0 rounded-md bg-amber-100 border px-1.5 flex items-center overflow-hidden text-left transition-colors cursor-pointer ${
+                    className={`absolute top-0 bottom-0 rounded-md border px-1.5 flex items-center overflow-hidden text-left transition-colors cursor-pointer ${
                       isSelected
-                        ? "border-blue-600 ring-2 ring-blue-600 text-amber-950 z-20"
-                        : "border-amber-400 text-amber-950 z-10"
+                        ? "border-white ring-2 ring-white bg-[#362816] text-amber-100 z-20 shadow-lg"
+                        : "border-amber-700/60 bg-[#241B10] text-amber-200 z-10"
                     }`}
                   >
                     {isSelected && (
@@ -470,24 +476,29 @@ export default function MobileTimeline() {
                         <div
                           data-trim-handle
                           onPointerDown={(e) => handleTrimClip(e, clip, "left")}
-                          className="absolute left-0 top-0 bottom-0 w-3 bg-blue-600 flex items-center justify-center z-30 cursor-ew-resize"
+                          className="absolute left-0 top-0 bottom-0 w-3.5 bg-white rounded-l-md rounded-r-xs flex items-center justify-center z-30 cursor-ew-resize active:scale-105 shadow-[0_0_8px_rgba(0,0,0,0.6)]"
+                          title="Drag to trim start"
                         >
-                          <div className="w-[1.5px] h-3 bg-white rounded-full" />
+                          <div className="w-[1.5px] h-3 bg-[#16161C] rounded-full" />
                         </div>
                         <div
                           data-trim-handle
                           onPointerDown={(e) => handleTrimClip(e, clip, "right")}
-                          className="absolute right-0 top-0 bottom-0 w-3 bg-blue-600 flex items-center justify-center z-30 cursor-ew-resize"
+                          className="absolute right-0 top-0 bottom-0 w-3.5 bg-white rounded-r-md rounded-l-xs flex items-center justify-center z-30 cursor-ew-resize active:scale-105 shadow-[0_0_8px_rgba(0,0,0,0.6)]"
+                          title="Drag to trim end"
                         >
-                          <div className="w-[1.5px] h-3 bg-white rounded-full" />
+                          <div className="w-[1.5px] h-3 bg-[#16161C] rounded-full" />
                         </div>
                       </>
                     )}
                     <span className="relative z-10 text-[9px] font-medium truncate px-1 flex items-center gap-1">
-                      <span className="px-1 py-0.2 rounded bg-amber-200/90 text-[8px] font-bold text-amber-900 flex-shrink-0">
+                      <span className="px-1 py-0.2 rounded bg-amber-500/30 text-[8px] font-bold text-amber-300 flex-shrink-0">
                         CC
                       </span>
                       <span className="truncate">{clip.name}</span>
+                      <span className="ml-auto text-[8px] font-mono text-amber-400/80 bg-black/50 px-0.5 rounded">
+                        {clip.duration.toFixed(1)}s
+                      </span>
                     </span>
                   </div>
                 );
@@ -495,10 +506,10 @@ export default function MobileTimeline() {
             </div>
 
             {/* Track 2: Overlay / B-Roll Thumbnails (Cyan Border) */}
-            <div className="relative h-[28px] bg-[#F1F5F9]/75">
+            <div className="relative h-[28px] bg-[#131317]/60 border-b border-[#1E1E26]/40">
               {trackGroups.overlays.length === 0 && (
                 <span
-                  className="absolute top-1.5 text-[9px] text-slate-500 font-mono flex items-center gap-1 pointer-events-none"
+                  className="absolute top-1.5 text-[9px] text-[#6E6E78] font-mono flex items-center gap-1 pointer-events-none"
                   style={{ left: `${halfWidth + 8}px` }}
                 >
                   <Layers size={10} /> Overlay / B-Roll
@@ -517,10 +528,10 @@ export default function MobileTimeline() {
                       navigator.vibrate?.(6);
                     }}
                     style={{ left: `${left}px`, width: `${width}px` }}
-                    className={`absolute top-0 bottom-0 rounded-md bg-cyan-100 border overflow-hidden flex items-center px-1.5 cursor-pointer ${
+                    className={`absolute top-0 bottom-0 rounded-md border overflow-hidden flex items-center px-1.5 cursor-pointer ${
                       isSelected
-                        ? "border-blue-600 ring-2 ring-blue-600 z-20"
-                        : "border-cyan-400 z-10"
+                        ? "border-white ring-2 ring-white bg-[#10303E] z-20 shadow-lg"
+                        : "border-cyan-700/60 bg-[#0C1E28] z-10"
                     }`}
                   >
                     <CompactFilmstrip clip={clip} asset={asset} width={width} />
@@ -529,24 +540,29 @@ export default function MobileTimeline() {
                         <div
                           data-trim-handle
                           onPointerDown={(e) => handleTrimClip(e, clip, "left")}
-                          className="absolute left-0 top-0 bottom-0 w-3.5 bg-blue-600 flex items-center justify-center z-30 cursor-ew-resize"
+                          className="absolute left-0 top-0 bottom-0 w-3.5 bg-white rounded-l-md rounded-r-xs flex items-center justify-center z-30 cursor-ew-resize active:scale-105 shadow-[0_0_8px_rgba(0,0,0,0.6)]"
+                          title="Drag to trim start"
                         >
-                          <div className="w-[2px] h-3.5 bg-white rounded-full" />
+                          <div className="w-[1.5px] h-3.5 bg-[#16161C] rounded-full" />
                         </div>
                         <div
                           data-trim-handle
                           onPointerDown={(e) => handleTrimClip(e, clip, "right")}
-                          className="absolute right-0 top-0 bottom-0 w-3.5 bg-blue-600 flex items-center justify-center z-30 cursor-ew-resize"
+                          className="absolute right-0 top-0 bottom-0 w-3.5 bg-white rounded-r-md rounded-l-xs flex items-center justify-center z-30 cursor-ew-resize active:scale-105 shadow-[0_0_8px_rgba(0,0,0,0.6)]"
+                          title="Drag to trim end"
                         >
-                          <div className="w-[2px] h-3.5 bg-white rounded-full" />
+                          <div className="w-[1.5px] h-3.5 bg-[#16161C] rounded-full" />
                         </div>
                       </>
                     )}
-                    <span className="relative z-10 text-[9px] font-semibold text-cyan-950 truncate px-1 flex items-center gap-1">
-                      <span className="px-1 py-0.2 rounded bg-cyan-200/90 text-[8px] font-bold text-cyan-900 flex-shrink-0">
+                    <span className="relative z-10 text-[9px] font-semibold text-cyan-200 truncate px-1 flex items-center gap-1">
+                      <span className="px-1 py-0.2 rounded bg-cyan-500/30 text-[8px] font-bold text-[#00E5FF] flex-shrink-0">
                         B-ROLL
                       </span>
                       <span className="truncate">{clip.name}</span>
+                      <span className="ml-auto text-[8px] font-mono text-cyan-300/80 bg-black/60 px-0.5 rounded">
+                        {clip.duration.toFixed(1)}s
+                      </span>
                     </span>
                   </div>
                 );
@@ -554,10 +570,10 @@ export default function MobileTimeline() {
             </div>
 
             {/* Track 3: Main Video Thumbnail Strip + Waveform Bars */}
-            <div className="relative h-[38px] bg-[#F8FAFC]">
+            <div className="relative h-[38px] bg-[#15151C]/80 border-b border-[#1E1E26]/40">
               {trackGroups.mainVideo.length === 0 && (
                 <span
-                  className="absolute top-2.5 text-[10px] text-slate-500 font-mono flex items-center gap-1 pointer-events-none"
+                  className="absolute top-2.5 text-[10px] text-[#6E6E78] font-mono flex items-center gap-1 pointer-events-none"
                   style={{ left: `${halfWidth + 8}px` }}
                 >
                   <Film size={11} /> Main Video Track
@@ -576,10 +592,10 @@ export default function MobileTimeline() {
                       navigator.vibrate?.(6);
                     }}
                     style={{ left: `${left}px`, width: `${width}px` }}
-                    className={`absolute top-0 bottom-0 rounded-md bg-blue-100 border overflow-hidden flex items-end px-1.5 pb-1 ${
+                    className={`absolute top-0 bottom-0 rounded-md border overflow-hidden flex items-end px-1.5 pb-1 ${
                       isSelected
-                        ? "border-blue-600 ring-2 ring-blue-600 z-20"
-                        : "border-blue-400 z-10"
+                        ? "border-white ring-2 ring-white bg-[#222230] z-20 shadow-xl"
+                        : "border-[#38384A] bg-[#181822] z-10"
                     }`}
                   >
                     <CompactFilmstrip clip={clip} asset={asset} width={width} />
@@ -587,39 +603,44 @@ export default function MobileTimeline() {
                       clip={clip}
                       asset={asset}
                       width={width}
-                      colorClass="text-blue-600"
+                      colorClass="text-[#00E5FF]"
                     />
                     {isSelected && (
                       <>
                         <div
                           data-trim-handle
                           onPointerDown={(e) => handleTrimClip(e, clip, "left")}
-                          className="absolute left-0 top-0 bottom-0 w-4 bg-blue-600 flex items-center justify-center z-30 cursor-ew-resize"
+                          className="absolute left-0 top-0 bottom-0 w-3.5 bg-white rounded-l-md rounded-r-xs flex items-center justify-center z-30 cursor-ew-resize active:scale-105 shadow-[0_0_8px_rgba(0,0,0,0.6)]"
+                          title="Drag to trim start"
                         >
-                          <div className="w-[2px] h-4 bg-white rounded-full" />
+                          <div className="w-[1.5px] h-4 bg-[#16161C] rounded-full" />
                         </div>
                         <div
                           data-trim-handle
                           onPointerDown={(e) => handleTrimClip(e, clip, "right")}
-                          className="absolute right-0 top-0 bottom-0 w-4 bg-blue-600 flex items-center justify-center z-30 cursor-ew-resize"
+                          className="absolute right-0 top-0 bottom-0 w-3.5 bg-white rounded-r-md rounded-l-xs flex items-center justify-center z-30 cursor-ew-resize active:scale-105 shadow-[0_0_8px_rgba(0,0,0,0.6)]"
+                          title="Drag to trim end"
                         >
-                          <div className="w-[2px] h-4 bg-white rounded-full" />
+                          <div className="w-[1.5px] h-4 bg-[#16161C] rounded-full" />
                         </div>
                       </>
                     )}
-                    <span className="relative z-10 text-[10px] font-semibold text-blue-950 truncate px-2">
-                      {clip.name}
-                    </span>
+                    <div className="relative z-10 w-full flex items-center justify-between text-[10px] font-semibold text-white truncate px-1">
+                      <span className="truncate drop-shadow">{clip.name}</span>
+                      <span className="ml-1 text-[8px] font-mono text-white/90 bg-black/70 px-1 py-0.2 rounded flex-shrink-0">
+                        {clip.duration.toFixed(1)}s
+                      </span>
+                    </div>
                   </div>
                 );
               })}
             </div>
 
-            {/* Track 4: Audio / SFX Layers (Emerald Waveform Ribbon) */}
-            <div className="relative h-[26px] bg-[#F1F5F9]/75">
+            {/* Track 4: Audio / SFX Layers (Emerald/Purple Waveform Ribbon) */}
+            <div className="relative h-[26px] bg-[#131317]/60 border-b border-[#1E1E26]/40">
               {trackGroups.audioClips.length === 0 && (
                 <span
-                  className="absolute top-1 text-[9px] text-slate-500 font-mono flex items-center gap-1 pointer-events-none"
+                  className="absolute top-1 text-[9px] text-[#6E6E78] font-mono flex items-center gap-1 pointer-events-none"
                   style={{ left: `${halfWidth + 8}px` }}
                 >
                   <Music size={10} /> Audio &amp; SFX
@@ -651,52 +672,59 @@ export default function MobileTimeline() {
                     className={`absolute top-0 bottom-0 rounded-md border overflow-hidden flex items-center px-1.5 cursor-pointer ${
                       isSfx
                         ? isSelected
-                          ? "bg-violet-100 border-blue-600 ring-2 ring-blue-600 z-30"
-                          : "bg-violet-100 border-violet-400 z-25"
+                          ? "bg-[#2E1A3C] border-white ring-2 ring-white z-30 shadow-lg"
+                          : "bg-[#1E1228] border-purple-800/60 z-25"
                         : isSelected
-                        ? "bg-emerald-100 border-blue-600 ring-2 ring-blue-600 z-20"
-                        : "bg-emerald-100 border-emerald-400 z-10"
+                        ? "bg-[#143224] border-white ring-2 ring-white z-20 shadow-lg"
+                        : "bg-[#0E2218] border-emerald-800/60 z-10"
                     }`}
                   >
                     <CompactWaveform
                       clip={clip}
                       asset={asset}
                       width={width}
-                      colorClass={isSfx ? "text-violet-600" : "text-emerald-600"}
+                      colorClass={isSfx ? "text-purple-400" : "text-emerald-400"}
                     />
                     {isSelected && (
                       <>
                         <div
                           data-trim-handle
                           onPointerDown={(e) => handleTrimClip(e, clip, "left")}
-                          className="absolute left-0 top-0 bottom-0 w-3 bg-blue-600 flex items-center justify-center z-35 cursor-ew-resize"
+                          className="absolute left-0 top-0 bottom-0 w-3.5 bg-white rounded-l-md rounded-r-xs flex items-center justify-center z-35 cursor-ew-resize active:scale-105 shadow-[0_0_8px_rgba(0,0,0,0.6)]"
+                          title="Drag to trim start"
                         >
-                          <div className="w-[1.5px] h-3 bg-white rounded-full" />
+                          <div className="w-[1.5px] h-3 bg-[#16161C] rounded-full" />
                         </div>
                         <div
                           data-trim-handle
                           onPointerDown={(e) => handleTrimClip(e, clip, "right")}
-                          className="absolute right-0 top-0 bottom-0 w-3 bg-blue-600 flex items-center justify-center z-35 cursor-ew-resize"
+                          className="absolute right-0 top-0 bottom-0 w-3.5 bg-white rounded-r-md rounded-l-xs flex items-center justify-center z-35 cursor-ew-resize active:scale-105 shadow-[0_0_8px_rgba(0,0,0,0.6)]"
+                          title="Drag to trim end"
                         >
-                          <div className="w-[1.5px] h-3 bg-white rounded-full" />
+                          <div className="w-[1.5px] h-3 bg-[#16161C] rounded-full" />
                         </div>
                       </>
                     )}
                     <span
-                      className={`relative z-10 text-[9px] font-semibold truncate px-1 flex items-center gap-1 ${
-                        isSfx ? "text-violet-950" : "text-emerald-950"
+                      className={`relative z-10 text-[9px] font-semibold truncate px-1 flex items-center gap-1 w-full justify-between ${
+                        isSfx ? "text-purple-200" : "text-emerald-200"
                       }`}
                     >
-                      <span
-                        className={`px-1 py-0.2 rounded text-[8px] font-bold flex-shrink-0 ${
-                          isSfx
-                            ? "bg-violet-200/90 text-violet-900"
-                            : "bg-emerald-200/90 text-emerald-900"
-                        }`}
-                      >
-                        {isSfx ? "SFX" : "BGM"}
+                      <span className="flex items-center gap-1 truncate">
+                        <span
+                          className={`px-1 py-0.2 rounded text-[8px] font-bold flex-shrink-0 ${
+                            isSfx
+                              ? "bg-purple-500/30 text-purple-300"
+                              : "bg-emerald-500/30 text-emerald-300"
+                          }`}
+                        >
+                          {isSfx ? "SFX" : "BGM"}
+                        </span>
+                        <span className="truncate">{clip.name}</span>
                       </span>
-                      <span className="truncate">{clip.name}</span>
+                      <span className="text-[8px] font-mono text-white/80 bg-black/60 px-0.5 rounded flex-shrink-0">
+                        {clip.duration.toFixed(1)}s
+                      </span>
                     </span>
                   </div>
                 );
@@ -707,10 +735,10 @@ export default function MobileTimeline() {
           {/* Empty Helper Floating Callout */}
           {Object.keys(project.clips).length === 0 && (
             <div
-              className="absolute top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1.5 text-[11px] text-slate-600 bg-white/95 border border-slate-200 shadow-sm px-3 py-1 rounded-full"
+              className="absolute top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1.5 text-[11px] text-white/80 bg-[#1C1C24]/90 border border-[#2E2E38] shadow-md px-3 py-1 rounded-full"
               style={{ left: `${halfWidth + 16}px` }}
             >
-              <Sparkles size={11} className="text-blue-600" />
+              <Sparkles size={11} className="text-[#00E5FF]" />
               <span>Scrub horizontally · Pinch to zoom</span>
             </div>
           )}

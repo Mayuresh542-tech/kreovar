@@ -27,7 +27,18 @@ import {
   Target,
   Shield,
   Layers,
+  Gauge,
+  Volume2,
+  Wand2,
+  Smartphone,
+  Sliders,
+  RotateCw,
+  Sun,
+  Eye,
+  Zap,
 } from "lucide-react";
+import { SPEED_CURVE_PRESETS } from "@/app/lib/editor/speedCurves";
+import { applyMotionPreset, MOTION_PRESETS, type MotionPreset } from "@/app/lib/editor/keyframes";
 import type { MobileToolDrawerTab } from "./MobileBottomBar";
 import { useEditor } from "../workspace/EditorContext";
 import { usePlayback, useProject } from "@/app/lib/editor/store";
@@ -41,6 +52,7 @@ import {
   addCaption,
   addClip,
   addTrack,
+  addText,
   changeClipProperty,
   duplicateClip,
   moveClip,
@@ -550,9 +562,18 @@ export default function MobileDrawerSheet({
   const titles: Record<MobileToolDrawerTab, string> = {
     edit: "Edit & Media",
     captions: "Caption Studio",
+    text: "Text & Captions",
     broll: "B-Roll Footage (9:16)",
+    overlay: "Overlay & B-Roll",
     audio: "Audio & Sound FX",
     silence: "Silence Trimmer Studio",
+    effects: "Video Effects",
+    filters: "Filters & Color Grading",
+    format: "Canvas Format & Ratio",
+    speed: "Speed & Curve Ramping",
+    volume: "Volume & Fades",
+    animation: "Clip Animation",
+    transform: "Transform & Position",
   };
 
   return (
@@ -560,7 +581,7 @@ export default function MobileDrawerSheet({
       {/* Backdrop Blur */}
       <div
         onClick={onClose}
-        className="absolute inset-0 bg-slate-950/35 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         aria-hidden="true"
       />
 
@@ -568,12 +589,12 @@ export default function MobileDrawerSheet({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={titles[activeTab]}
+        aria-label={titles[activeTab] || "Tool Sheet"}
         style={{
-          height: expanded ? "75dvh" : "52dvh",
+          height: expanded ? "78dvh" : "54dvh",
           transform: `translateY(${translateY}px)`,
         }}
-        className="relative w-full bg-white/95 backdrop-blur-xl border-t border-slate-200 rounded-t-3xl shadow-2xl flex flex-col overflow-hidden transition-transform duration-200 ease-out pb-[env(safe-area-inset-bottom)]"
+        className="relative w-full bg-[#16161C] border-t border-[#26262E] rounded-t-3xl shadow-2xl flex flex-col overflow-hidden transition-transform duration-200 ease-out pb-[env(safe-area-inset-bottom)] text-white"
       >
         {/* Top Drag Handle */}
         <div
@@ -582,15 +603,15 @@ export default function MobileDrawerSheet({
           onTouchEnd={onHandleTouchEnd}
           className="pt-2 pb-1 px-4 flex flex-col items-center cursor-grab active:cursor-grabbing touch-none flex-shrink-0"
         >
-          <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-2" />
-          <div className="w-full flex items-center justify-between pb-2 border-b border-slate-200">
-            <span className="text-sm font-semibold text-slate-900">{titles[activeTab]}</span>
+          <div className="w-10 h-1 bg-[#3A3A46] rounded-full mx-auto my-2" />
+          <div className="w-full flex items-center justify-between pb-2 border-b border-[#26262E]">
+            <span className="text-sm font-semibold text-white">{titles[activeTab] || "Tools"}</span>
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setExpanded(!expanded)}
                 aria-label={expanded ? "Shrink drawer" : "Expand drawer"}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-900 active:bg-slate-100"
+                className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl text-[#A0A0A8] hover:text-white active:bg-white/10 transition-colors"
               >
                 {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
@@ -598,7 +619,7 @@ export default function MobileDrawerSheet({
                 type="button"
                 onClick={onClose}
                 aria-label="Close drawer"
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-900 active:bg-slate-100"
+                className="min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl text-[#A0A0A8] hover:text-white active:bg-white/10 transition-colors"
               >
                 <X size={18} />
               </button>
@@ -607,19 +628,39 @@ export default function MobileDrawerSheet({
         </div>
 
         {/* Scrollable Sheet Body */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 overscroll-contain scrollbar-thin scrollbar-thumb-slate-300">
-          {/* ======================= TAB: CAPTIONS ======================= */}
-          {activeTab === "captions" && (
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 overscroll-contain scrollbar-thin scrollbar-thumb-[#2E2E38] text-white">
+          {/* ======================= TAB: TEXT & CAPTIONS ======================= */}
+          {(activeTab === "captions" || activeTab === "text") && (
             <div className="space-y-4">
+              {/* Quick Add Custom Text Bar */}
+              <div className="p-3 rounded-2xl bg-[#1E1E26] border border-[#2E2E38] flex items-center justify-between shadow-xs">
+                <div>
+                  <p className="text-xs font-semibold text-white">Add Custom Text</p>
+                  <p className="text-[10px] text-[#A0A0A8]">Insert a stylish text layer at playhead</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    run((p) => addText(p, "Add Text", time, { size: 52, color: "#FFFFFF" }, false, 3));
+                    navigator.vibrate?.(8);
+                    notify("Added text layer at playhead.");
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#00E5FF] hover:bg-[#33EAFF] text-black font-bold text-xs flex items-center gap-1.5 shadow-[0_0_10px_rgba(0,229,255,0.3)] active:scale-95 transition-all"
+                >
+                  <Plus size={14} />
+                  <span>Add Text</span>
+                </button>
+              </div>
+
               {/* Prominent Script Mode Toggle */}
               <div className="space-y-1.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A0A0A8]">
                   Script Mode
                 </span>
                 <div
                   role="radiogroup"
                   aria-label="Caption Script Mode"
-                  className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200"
+                  className="grid grid-cols-3 gap-1.5 bg-[#121218] p-1 rounded-xl border border-[#26262E]"
                 >
                   {(
                     [
@@ -1256,8 +1297,8 @@ export default function MobileDrawerSheet({
             </div>
           )}
 
-          {/* ======================= TAB: B-ROLL (9:16) ======================= */}
-          {activeTab === "broll" && (
+          {/* ======================= TAB: B-ROLL & OVERLAY (9:16) ======================= */}
+          {(activeTab === "broll" || activeTab === "overlay") && (
             <div className="space-y-3">
               <form
                 onSubmit={(e) => {
@@ -1622,6 +1663,710 @@ export default function MobileDrawerSheet({
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ======================= TAB: SPEED CURVE RAMPING ======================= */}
+          {activeTab === "speed" && (
+            <div className="space-y-4">
+              {!activeClip ? (
+                <p className="text-xs text-[#A0A0A8] text-center py-8">
+                  Select a clip on the timeline to adjust speed ramping.
+                </p>
+              ) : (
+                <>
+                  {/* Preset Curve Ramping Section */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A0A0A8] flex items-center gap-1.5">
+                        <Gauge size={13} className="text-[#00E5FF]" />
+                        <span>Speed Curves (CapCut Bézier Profiles)</span>
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.values(SPEED_CURVE_PRESETS).map((preset) => {
+                        const isMatch = Math.abs(activeClip.speed - preset.p1.y) < 0.2;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => {
+                              const targetSpeed = preset.id === "hero" ? 2.5 : preset.id === "bullet" ? 0.3 : preset.id === "flash_in" ? 4.0 : preset.id === "flash_out" ? 3.0 : 1.8;
+                              run((p) => changeClipProperty(p, activeClip.id, { speed: targetSpeed }));
+                              navigator.vibrate?.(8);
+                              notify(`Applied "${preset.name}" curve profile (${targetSpeed}x).`);
+                            }}
+                            className={`p-2.5 rounded-xl border text-left transition-all active:scale-95 flex flex-col justify-between h-[88px] ${
+                              isMatch
+                                ? "bg-[#00E5FF]/10 border-[#00E5FF] shadow-[0_0_10px_rgba(0,229,255,0.2)]"
+                                : "bg-[#1E1E26] border-[#2E2E38] hover:border-[#3E3E4C]"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-white flex items-center gap-1">
+                                <Zap size={11} className="text-[#00E5FF]" />
+                                {preset.name}
+                              </span>
+                              <svg viewBox="0 0 32 16" className="w-8 h-4 overflow-visible">
+                                <path
+                                  d={`M 0,${16 - preset.p0.y * 3} C ${preset.p1.x * 32},${16 - preset.p1.y * 3} ${preset.p2.x * 32},${16 - preset.p2.y * 3} 32,${16 - preset.p3.y * 3}`}
+                                  fill="none"
+                                  stroke={isMatch ? "#00E5FF" : "#A0A0A8"}
+                                  strokeWidth="2"
+                                />
+                              </svg>
+                            </div>
+                            <p className="text-[10px] text-[#A0A0A8] line-clamp-2 leading-tight">
+                              {preset.description}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Constant Speed Multiplier */}
+                  <div className="p-3 rounded-2xl bg-[#1E1E26] border border-[#2E2E38] space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="font-semibold text-white">Constant Speed</span>
+                      <span className="font-mono text-[#00E5FF] font-bold">
+                        {activeClip.speed.toFixed(2)}×
+                      </span>
+                    </div>
+
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={10}
+                      step={0.1}
+                      value={activeClip.speed}
+                      onChange={(e) =>
+                        run((p) =>
+                          changeClipProperty(p, activeClip.id, {
+                            speed: Math.max(0.1, Number(e.target.value)),
+                          })
+                        )
+                      }
+                      aria-label="Constant Clip Speed"
+                      className="w-full h-2 bg-[#2A2A36] rounded-lg accent-[#00E5FF] cursor-pointer"
+                    />
+
+                    <div className="grid grid-cols-6 gap-1 pt-1">
+                      {[0.2, 0.5, 1.0, 1.5, 2.0, 5.0].map((spd) => (
+                        <button
+                          key={spd}
+                          type="button"
+                          onClick={() => {
+                            run((p) => changeClipProperty(p, activeClip.id, { speed: spd }));
+                            navigator.vibrate?.(6);
+                          }}
+                          className={`min-h-[34px] rounded-lg text-xs font-mono font-semibold transition-all ${
+                            Math.abs(activeClip.speed - spd) < 0.05
+                              ? "bg-[#00E5FF] text-black font-bold shadow-xs"
+                              : "bg-[#252532] text-white/80 hover:text-white border border-[#2E2E38]"
+                          }`}
+                        >
+                          {spd}×
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pitch Lock (Preserve pitch WSOLA) */}
+                  <div className="p-3 rounded-2xl bg-[#1E1E26] border border-[#2E2E38] flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-white">Pitch Lock (WSOLA)</p>
+                      <p className="text-[10px] text-[#A0A0A8]">
+                        Preserves original voice pitch without chipmunk or deep distortion
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextPitch = !activeClip.preservePitch;
+                        run((p) => changeClipProperty(p, activeClip.id, { preservePitch: nextPitch }));
+                        navigator.vibrate?.(6);
+                        notify(nextPitch ? "Pitch Lock enabled" : "Pitch Lock disabled");
+                      }}
+                      className={`min-w-[48px] h-7 px-2.5 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
+                        activeClip.preservePitch
+                          ? "bg-[#00E5FF] text-black shadow-[0_0_8px_rgba(0,229,255,0.4)]"
+                          : "bg-[#2A2A36] text-[#A0A0A8]"
+                      }`}
+                    >
+                      {activeClip.preservePitch ? "ON" : "OFF"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ======================= TAB: VIDEO EFFECTS ======================= */}
+          {activeTab === "effects" && (
+            <div className="space-y-4">
+              {!activeClip ? (
+                <p className="text-xs text-[#A0A0A8] text-center py-8">
+                  Select a clip on the timeline to apply video effects.
+                </p>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A0A0A8]">
+                      Trending CapCut Video Effects
+                    </span>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        {
+                          name: "Soft Blur",
+                          desc: "Dreamy focus",
+                          apply: { blur: 24, brightness: 5, contrast: 0, saturation: 0 },
+                        },
+                        {
+                          name: "Neon Glow",
+                          desc: "Vivid saturation",
+                          apply: { blur: 0, brightness: 15, contrast: 25, saturation: 45 },
+                        },
+                        {
+                          name: "Cyber Glitch",
+                          desc: "High staccato",
+                          apply: { blur: 0, brightness: 10, contrast: 50, saturation: 60 },
+                        },
+                        {
+                          name: "Dreamy Pop",
+                          desc: "Warm glow",
+                          apply: { blur: 12, brightness: 20, contrast: 10, saturation: 20 },
+                        },
+                        {
+                          name: "Film Grain",
+                          desc: "Moody cinema",
+                          apply: { blur: 0, brightness: -5, contrast: 30, saturation: -30 },
+                        },
+                        {
+                          name: "Reset Clean",
+                          desc: "Default tone",
+                          apply: { blur: 0, brightness: 0, contrast: 0, saturation: 0 },
+                        },
+                      ].map((eff) => (
+                        <button
+                          key={eff.name}
+                          type="button"
+                          onClick={() => {
+                            run((p) => changeClipProperty(p, activeClip.id, { effects: eff.apply }));
+                            navigator.vibrate?.(6);
+                            notify(`Applied "${eff.name}" effect.`);
+                          }}
+                          className="p-2.5 rounded-xl bg-[#1E1E26] hover:bg-[#252532] border border-[#2E2E38] text-left transition-all active:scale-95 flex flex-col justify-between h-[72px]"
+                        >
+                          <span className="text-xs font-semibold text-white flex items-center gap-1">
+                            <Sparkles size={11} className="text-[#00E5FF]" />
+                            {eff.name}
+                          </span>
+                          <span className="text-[9px] text-[#A0A0A8]">{eff.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Fine Adjustment Sliders */}
+                  <div className="p-3 rounded-2xl bg-[#1E1E26] border border-[#2E2E38] space-y-3">
+                    <span className="text-xs font-semibold text-white block">Fine Adjustments</span>
+
+                    {/* Blur Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] text-[#A0A0A8]">
+                        <span>Gaussian Blur</span>
+                        <span className="font-mono text-white">{activeClip.effects.blur}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={60}
+                        value={activeClip.effects.blur}
+                        onChange={(e) =>
+                          run((p) =>
+                            changeClipProperty(p, activeClip.id, {
+                              effects: { ...activeClip.effects, blur: Number(e.target.value) },
+                            })
+                          )
+                        }
+                        className="w-full h-1.5 bg-[#2A2A36] rounded-lg accent-[#00E5FF] cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Brightness Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] text-[#A0A0A8]">
+                        <span>Brightness</span>
+                        <span className="font-mono text-white">{activeClip.effects.brightness}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-100}
+                        max={100}
+                        value={activeClip.effects.brightness}
+                        onChange={(e) =>
+                          run((p) =>
+                            changeClipProperty(p, activeClip.id, {
+                              effects: { ...activeClip.effects, brightness: Number(e.target.value) },
+                            })
+                          )
+                        }
+                        className="w-full h-1.5 bg-[#2A2A36] rounded-lg accent-[#00E5FF] cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Contrast Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] text-[#A0A0A8]">
+                        <span>Contrast</span>
+                        <span className="font-mono text-white">{activeClip.effects.contrast}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-100}
+                        max={100}
+                        value={activeClip.effects.contrast}
+                        onChange={(e) =>
+                          run((p) =>
+                            changeClipProperty(p, activeClip.id, {
+                              effects: { ...activeClip.effects, contrast: Number(e.target.value) },
+                            })
+                          )
+                        }
+                        className="w-full h-1.5 bg-[#2A2A36] rounded-lg accent-[#00E5FF] cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Saturation Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] text-[#A0A0A8]">
+                        <span>Saturation</span>
+                        <span className="font-mono text-white">{activeClip.effects.saturation}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-100}
+                        max={100}
+                        value={activeClip.effects.saturation}
+                        onChange={(e) =>
+                          run((p) =>
+                            changeClipProperty(p, activeClip.id, {
+                              effects: { ...activeClip.effects, saturation: Number(e.target.value) },
+                            })
+                          )
+                        }
+                        className="w-full h-1.5 bg-[#2A2A36] rounded-lg accent-[#00E5FF] cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ======================= TAB: FILTERS & COLOR ======================= */}
+          {activeTab === "filters" && (
+            <div className="space-y-4">
+              {!activeClip ? (
+                <p className="text-xs text-[#A0A0A8] text-center py-8">
+                  Select a clip on the timeline to apply color grading filters.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A0A0A8]">
+                    Color Grading Presets
+                  </span>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {[
+                      { name: "Cinematic", color: "from-amber-600 to-cyan-800", fx: { brightness: 5, contrast: 20, saturation: -10, blur: 0 } },
+                      { name: "Warm Sun", color: "from-orange-500 to-amber-700", fx: { brightness: 10, contrast: 15, saturation: 35, blur: 0 } },
+                      { name: "Cool Cyan", color: "from-cyan-600 to-blue-800", fx: { brightness: 5, contrast: 15, saturation: -5, blur: 0 } },
+                      { name: "Vintage 90s", color: "from-yellow-700 to-rose-900", fx: { brightness: -5, contrast: 25, saturation: -35, blur: 0 } },
+                      { name: "B&W Mono", color: "from-zinc-500 to-zinc-900", fx: { brightness: 0, contrast: 35, saturation: -100, blur: 0 } },
+                      { name: "Cyberpunk", color: "from-fuchsia-600 to-cyan-600", fx: { brightness: 5, contrast: 40, saturation: 60, blur: 0 } },
+                    ].map((f) => (
+                      <button
+                        key={f.name}
+                        type="button"
+                        onClick={() => {
+                          run((p) => changeClipProperty(p, activeClip.id, { effects: f.fx }));
+                          navigator.vibrate?.(6);
+                          notify(`Applied "${f.name}" filter.`);
+                        }}
+                        className="relative h-20 rounded-xl overflow-hidden border border-[#2E2E38] text-left p-2.5 flex flex-col justify-end group active:scale-95 transition-all shadow-md"
+                      >
+                        <div className={`absolute inset-0 bg-gradient-to-br ${f.color} opacity-40 group-hover:opacity-60 transition-opacity`} />
+                        <span className="relative z-10 text-xs font-bold text-white drop-shadow">
+                          {f.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ======================= TAB: CANVAS FORMAT & RATIO ======================= */}
+          {activeTab === "format" && (
+            <div className="space-y-4">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A0A0A8]">
+                Canvas Aspect Ratio
+              </span>
+
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { ratio: "9:16", label: "TikTok / Reels", shape: "w-5 h-8" },
+                  { ratio: "16:9", label: "YouTube Landscape", shape: "w-8 h-5" },
+                  { ratio: "1:1", label: "Instagram Square", shape: "w-6 h-6" },
+                  { ratio: "4:5", label: "Portrait Feed", shape: "w-5 h-6.5" },
+                  { ratio: "4:3", label: "Standard Classic", shape: "w-7 h-5.5" },
+                ].map((item) => {
+                  const isActive = project.settings.aspectRatio === item.ratio;
+                  return (
+                    <button
+                      key={item.ratio}
+                      type="button"
+                      onClick={() => {
+                        run((p) => ({ ...p, settings: { ...p.settings, aspectRatio: item.ratio as any } }));
+                        navigator.vibrate?.(8);
+                        notify(`Canvas set to ${item.ratio}.`);
+                      }}
+                      className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 ${
+                        isActive
+                          ? "bg-[#00E5FF]/10 border-[#00E5FF] shadow-[0_0_10px_rgba(0,229,255,0.25)] text-[#00E5FF]"
+                          : "bg-[#1E1E26] border-[#2E2E38] text-white hover:border-[#3E3E4C]"
+                      }`}
+                    >
+                      <div className={`border-2 rounded-xs ${item.shape} ${isActive ? "border-[#00E5FF]" : "border-[#A0A0A8]"}`} />
+                      <span className="text-xs font-bold font-mono">{item.ratio}</span>
+                      <span className="text-[9px] text-[#A0A0A8] truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 1-Click Smart Reframing */}
+              <div className="p-3.5 rounded-2xl bg-[#1E1E26] border border-[#2E2E38] space-y-2">
+                <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-[#00E5FF]" /> 1-Click 9:16 Smart Reframing
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      run((p) => reframeProject(p, "fit-with-blur"));
+                      notify("Applied Fit with Blur (9:16)");
+                    }}
+                    className="p-2 rounded-xl bg-[#252532] border border-[#2E2E38] text-center flex flex-col items-center gap-1 active:scale-95 transition-all"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-[#00E5FF]" />
+                    <span className="text-[11px] font-semibold text-white">Fit + Blur</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      run((p) => reframeProject(p, "center-crop"));
+                      notify("Applied Center Crop (1.77x)");
+                    }}
+                    className="p-2 rounded-xl bg-[#252532] border border-[#2E2E38] text-center flex flex-col items-center gap-1 active:scale-95 transition-all"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-indigo-400" />
+                    <span className="text-[11px] font-semibold text-white">Center Crop</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      run((p) => reframeProject(p, "split-screen"));
+                      notify("Applied Split Screen (A+B Roll)");
+                    }}
+                    className="p-2 rounded-xl bg-[#252532] border border-[#2E2E38] text-center flex flex-col items-center gap-1 active:scale-95 transition-all"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-[11px] font-semibold text-white">Split Screen</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ======================= TAB: VOLUME & FADES ======================= */}
+          {activeTab === "volume" && (
+            <div className="space-y-4">
+              {!activeClip ? (
+                <p className="text-xs text-[#A0A0A8] text-center py-8">
+                  Select a clip on the timeline to adjust audio volume.
+                </p>
+              ) : (
+                <>
+                  <div className="p-3.5 rounded-2xl bg-[#1E1E26] border border-[#2E2E38] space-y-3">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-semibold text-white flex items-center gap-1.5">
+                        <Volume2 size={15} className="text-[#00E5FF]" /> Clip Volume
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[#00E5FF] font-bold">
+                          {Math.round(activeClip.volume * 100)}%
+                        </span>
+                        <span className="text-[10px] font-mono text-[#A0A0A8] bg-[#121218] px-1.5 py-0.5 rounded border border-[#2E2E38]">
+                          {activeClip.volume <= 0.001
+                            ? "-inf dB"
+                            : `${(20 * Math.log10(activeClip.volume)).toFixed(1)} dB`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <input
+                      type="range"
+                      min={0}
+                      max={200}
+                      value={Math.round(activeClip.volume * 100)}
+                      onChange={(e) =>
+                        run((p) =>
+                          changeClipProperty(p, activeClip.id, {
+                            volume: Number(e.target.value) / 100,
+                          })
+                        )
+                      }
+                      aria-label="Clip Volume"
+                      className="w-full h-2 bg-[#2A2A36] rounded-lg accent-[#00E5FF] cursor-pointer"
+                    />
+
+                    <div className="grid grid-cols-4 gap-1.5 pt-1">
+                      {[
+                        { label: "Mute", vol: 0 },
+                        { label: "50%", vol: 0.5 },
+                        { label: "100%", vol: 1.0 },
+                        { label: "150%", vol: 1.5 },
+                      ].map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => {
+                            run((p) => changeClipProperty(p, activeClip.id, { volume: item.vol }));
+                            navigator.vibrate?.(6);
+                          }}
+                          className={`min-h-[34px] rounded-lg text-xs font-semibold transition-all ${
+                            Math.abs(activeClip.volume - item.vol) < 0.05
+                              ? "bg-[#00E5FF] text-black font-bold"
+                              : "bg-[#252532] text-white/80 hover:text-white border border-[#2E2E38]"
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Fade In & Fade Out Durations */}
+                  <div className="p-3.5 rounded-2xl bg-[#1E1E26] border border-[#2E2E38] space-y-3">
+                    <span className="text-xs font-semibold text-white block">Equal-Power Fades</span>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] text-[#A0A0A8]">
+                        <span>Fade In Duration</span>
+                        <span className="font-mono text-white">{(activeClip.fadeIn || 0).toFixed(1)}s</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={3}
+                        step={0.1}
+                        value={activeClip.fadeIn || 0}
+                        onChange={(e) =>
+                          run((p) =>
+                            changeClipProperty(p, activeClip.id, {
+                              fadeIn: Number(e.target.value),
+                            })
+                          )
+                        }
+                        className="w-full h-1.5 bg-[#2A2A36] rounded-lg accent-[#00E5FF] cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] text-[#A0A0A8]">
+                        <span>Fade Out Duration</span>
+                        <span className="font-mono text-white">{(activeClip.fadeOut || 0).toFixed(1)}s</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={3}
+                        step={0.1}
+                        value={activeClip.fadeOut || 0}
+                        onChange={(e) =>
+                          run((p) =>
+                            changeClipProperty(p, activeClip.id, {
+                              fadeOut: Number(e.target.value),
+                            })
+                          )
+                        }
+                        className="w-full h-1.5 bg-[#2A2A36] rounded-lg accent-[#00E5FF] cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ======================= TAB: CLIP ANIMATION ======================= */}
+          {activeTab === "animation" && (
+            <div className="space-y-4">
+              {!activeClip ? (
+                <p className="text-xs text-[#A0A0A8] text-center py-8">
+                  Select a clip on the timeline to apply animation presets.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A0A0A8]">
+                    Motion Presets (In / Out / Combo)
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: "pop", label: "Pop In", desc: "Elastic scale overshoot" },
+                      { id: "slide-up", label: "Slide Up", desc: "Smooth vertical slide" },
+                      { id: "slide-left", label: "Slide Left", desc: "Horizontal entrance" },
+                      { id: "float", label: "Floating Wave", desc: "Subtle rhythmic hover" },
+                      { id: "spin-in", label: "Spin In", desc: "Rotational scale entrance" },
+                    ].map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          run((p) => applyMotionPreset(p, activeClip.id, item.id as MotionPreset));
+                          navigator.vibrate?.(8);
+                          notify(`Applied "${item.label}" motion preset.`);
+                        }}
+                        className="p-3 rounded-xl bg-[#1E1E26] hover:bg-[#252532] border border-[#2E2E38] text-left transition-all active:scale-95 flex flex-col justify-between h-[76px]"
+                      >
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <Film size={12} className="text-[#00E5FF]" />
+                          {item.label}
+                        </span>
+                        <span className="text-[10px] text-[#A0A0A8]">{item.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ======================= TAB: TRANSFORM & POSITION ======================= */}
+          {activeTab === "transform" && (
+            <div className="space-y-4">
+              {!activeClip ? (
+                <p className="text-xs text-[#A0A0A8] text-center py-8">
+                  Select a visual clip to adjust transform properties.
+                </p>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-[#1E1E26] border border-[#2E2E38] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-white">Visual Transform</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        run((p) =>
+                          changeClipProperty(p, activeClip.id, {
+                            transform: { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 },
+                          })
+                        );
+                        navigator.vibrate?.(6);
+                        notify("Reset clip transform.");
+                      }}
+                      className="text-[10px] text-[#00E5FF] font-semibold hover:underline"
+                    >
+                      Reset
+                    </button>
+                  </div>
+
+                  {/* Scale */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[11px] text-[#A0A0A8]">
+                      <span>Scale</span>
+                      <span className="font-mono text-white">{(activeClip.transform.scale || 1).toFixed(2)}×</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={3.0}
+                      step={0.05}
+                      value={activeClip.transform.scale || 1}
+                      onChange={(e) =>
+                        run((p) =>
+                          changeClipProperty(p, activeClip.id, {
+                            transform: { ...activeClip.transform, scale: Number(e.target.value) },
+                          })
+                        )
+                      }
+                      className="w-full h-1.5 bg-[#2A2A36] rounded-lg accent-[#00E5FF] cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Rotation */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[11px] text-[#A0A0A8]">
+                      <span>Rotation</span>
+                      <span className="font-mono text-white">{Math.round(activeClip.transform.rotation || 0)}°</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={-180}
+                      max={180}
+                      value={Math.round(activeClip.transform.rotation || 0)}
+                      onChange={(e) =>
+                        run((p) =>
+                          changeClipProperty(p, activeClip.id, {
+                            transform: { ...activeClip.transform, rotation: Number(e.target.value) },
+                          })
+                        )
+                      }
+                      className="w-full h-1.5 bg-[#2A2A36] rounded-lg accent-[#00E5FF] cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Quick Alignment Pills */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        run((p) =>
+                          changeClipProperty(p, activeClip.id, {
+                            transform: { ...activeClip.transform, x: 0 },
+                          })
+                        );
+                        navigator.vibrate?.(6);
+                        notify("Centered horizontally.");
+                      }}
+                      className="min-h-[36px] rounded-xl bg-[#252532] border border-[#2E2E38] text-xs font-semibold text-white hover:text-[#00E5FF]"
+                    >
+                      Center X
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        run((p) =>
+                          changeClipProperty(p, activeClip.id, {
+                            transform: { ...activeClip.transform, y: 0 },
+                          })
+                        );
+                        navigator.vibrate?.(6);
+                        notify("Centered vertically.");
+                      }}
+                      className="min-h-[36px] rounded-xl bg-[#252532] border border-[#2E2E38] text-xs font-semibold text-white hover:text-[#00E5FF]"
+                    >
+                      Center Y
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

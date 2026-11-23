@@ -51,6 +51,7 @@ import {
 import {
   addAsset,
   addClip,
+  addText,
   addTrack,
   addTransition,
   changeClipProperty,
@@ -464,9 +465,12 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
 
   const titles: Record<EditorToolTab, string> = {
     media: "Project Media",
+    audio: "Audio & SFX Library",
+    text: "Titles & Typography",
     captions: "Caption Studio",
     broll: "B-Roll Stock Footage",
-    audio: "Audio & SFX Library",
+    transitions: "Transitions Studio",
+    filters: "Filters & Visual Effects",
     silence: "Silence Trimmer Studio",
     effects: "Effects & Zooms",
     settings: "Project Settings",
@@ -475,36 +479,38 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
 
   return (
     <aside
-      className="w-80 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden text-slate-900 z-20 select-none"
+      className="w-80 flex-shrink-0 bg-[#18181C] border-r border-[#2E2E33] flex flex-col h-full overflow-hidden text-white z-20 select-none"
       aria-label="Secondary Asset & Tool Drawer"
     >
       {/* Drawer Header */}
-      <header className="h-12 px-4 flex items-center justify-between border-b border-slate-200 bg-slate-50/80 flex-shrink-0">
+      <header className="h-12 px-4 flex items-center justify-between border-b border-[#2E2E33] bg-[#18181C] flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-semibold text-sm text-slate-900 truncate">
-            {titles[activeTab]}
+          <span className="font-semibold text-sm text-white truncate">
+            {titles[activeTab] || "Library"}
           </span>
-          <span className="text-[10px] bg-slate-200/80 text-slate-600 px-1.5 py-0.5 rounded font-mono">
+          <span className="text-[10px] bg-[#222226] text-[#00E5FF] border border-[#2E2E33] px-2 py-0.5 rounded font-mono">
             {activeTab === "media"
               ? `${Object.keys(project.assets).length} assets`
               : activeTab === "captions"
               ? "47+ styles"
               : activeTab === "silence"
               ? "Acoustic & Gap"
-              : "Kreovar"}
+              : activeTab === "audio"
+              ? "Sound FX"
+              : "Studio"}
           </span>
         </div>
         <button
           onClick={onClose}
           aria-label="Close panel"
-          className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 transition-colors"
+          className="p-1 rounded-lg text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
         >
           <X size={16} />
         </button>
       </header>
 
       {/* Drawer Body */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-[#2E2E33] scrollbar-track-transparent bg-[#18181C]">
         {/* ======================= TAB: CAPTIONS ======================= */}
         {activeTab === "captions" && (
           <div className="space-y-4">
@@ -737,12 +743,13 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
         )}
 
         {/* ======================= TAB: MEDIA ======================= */}
+        {/* ======================= TAB: MEDIA (CapCut Dark Media Grid) ======================= */}
         {activeTab === "media" && (
           <div className="space-y-4">
             {/* Upload Zone */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="p-5 border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl bg-slate-50 hover:bg-blue-50/30 text-center cursor-pointer transition-colors group"
+              className="p-4 border-2 border-dashed border-[#2E2E33] hover:border-[#00E5FF] rounded-xl bg-[#121214] hover:bg-[#16161C] text-center cursor-pointer transition-colors group"
             >
               <input
                 ref={fileInputRef}
@@ -754,12 +761,12 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
               />
               <Upload
                 size={22}
-                className="mx-auto text-slate-400 group-hover:text-blue-600 group-hover:scale-110 transition-all"
+                className="mx-auto text-[#A0A0A8] group-hover:text-[#00E5FF] group-hover:scale-110 transition-all"
               />
-              <p className="mt-2 text-xs font-semibold text-slate-800">
+              <p className="mt-2 text-xs font-semibold text-white">
                 {isUploading ? `Uploading (${uploadProgress}%)` : "Upload Raw Footage"}
               </p>
-              <p className="text-[10px] text-slate-500 mt-1">
+              <p className="text-[10px] text-[#A0A0A8] mt-1">
                 MP4, MOV, WAV, MP3, PNG up to 100MB
               </p>
             </div>
@@ -769,30 +776,30 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
               <div className="relative flex-1">
                 <Search
                   size={13}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#A0A0A8]"
                 />
                 <input
                   type="text"
                   placeholder="Filter media..."
                   value={mediaQuery}
                   onChange={(e) => setMediaQuery(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white"
+                  className="w-full bg-[#121214] border border-[#2E2E33] rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-[#6E6E78] focus:outline-none focus:border-[#00E5FF]"
                 />
               </div>
               <select
                 value={mediaFilter}
                 onChange={(e) => setMediaFilter(e.target.value as any)}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-blue-600"
+                className="bg-[#121214] border border-[#2E2E33] rounded-lg px-2 py-1.5 text-xs text-[#A0A0A8] focus:outline-none focus:border-[#00E5FF] cursor-pointer"
               >
-                <option value="all">All</option>
-                <option value="video">Video</option>
-                <option value="audio">Audio</option>
-                <option value="image">Image</option>
+                <option value="all" className="bg-[#18181C] text-white">All</option>
+                <option value="video" className="bg-[#18181C] text-white">Video</option>
+                <option value="audio" className="bg-[#18181C] text-white">Audio</option>
+                <option value="image" className="bg-[#18181C] text-white">Image</option>
               </select>
             </div>
 
-            {/* Media Asset Grid */}
-            <div className="space-y-2">
+            {/* Dark Media Grid with Clean Thumbnails & '+' Button */}
+            <div className="grid grid-cols-2 gap-2.5">
               {Object.values(project.assets)
                 .filter(
                   (a) =>
@@ -815,64 +822,81 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                       );
                       e.dataTransfer.effectAllowed = "copy";
                     }}
-                    className="p-2 rounded-xl bg-white border border-slate-200 flex items-center justify-between group hover:border-slate-300 transition-colors cursor-grab active:cursor-grabbing"
+                    className="p-1.5 rounded-xl bg-[#222226] border border-[#2E2E33] hover:border-[#00E5FF]/60 flex flex-col group transition-all relative overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-lg hover:shadow-black/50"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {asset.thumbnail ? (
-                          <img
-                            src={asset.thumbnail}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        ) : asset.kind === "audio" ? (
-                          <Music size={16} className="text-violet-600" />
-                        ) : asset.kind === "image" ? (
-                          <ImageIcon size={16} className="text-pink-600" />
-                        ) : (
-                          <Film size={16} className="text-blue-600" />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-900 truncate">
-                          {asset.name}
-                        </p>
-                        <p className="text-[10px] text-slate-500 font-mono">
-                          {asset.kind.toUpperCase()}
-                          {asset.duration > 0 ? ` · ${asset.duration.toFixed(1)}s` : ""}
-                        </p>
-                      </div>
+                    <div className="w-full h-20 rounded-lg bg-[#121214] border border-[#2E2E33] flex items-center justify-center overflow-hidden relative">
+                      {asset.thumbnail ? (
+                        <img
+                          src={asset.thumbnail}
+                          alt=""
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : asset.kind === "audio" ? (
+                        <Music size={22} className="text-[#00E5FF]" />
+                      ) : asset.kind === "image" ? (
+                        <ImageIcon size={22} className="text-pink-400" />
+                      ) : (
+                        <Film size={22} className="text-[#00E5FF]" />
+                      )}
+
+                      {/* Duration Badge */}
+                      {asset.duration > 0 && (
+                        <span className="absolute bottom-1 right-1 bg-black/80 text-white font-mono text-[9px] px-1 py-0.5 rounded backdrop-blur-xs">
+                          {asset.duration.toFixed(1)}s
+                        </span>
+                      )}
+
+                      {/* Kind Badge */}
+                      <span className="absolute top-1 left-1 bg-black/70 text-[#00E5FF] font-mono text-[8px] font-bold px-1 py-0.2 rounded uppercase tracking-wider">
+                        {asset.kind}
+                      </span>
+
+                      {/* Clean Hover '+' Button to Insert Clip at Playhead */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlaceMedia(asset);
+                        }}
+                        title="Insert clip at playhead (+)"
+                        aria-label={`Insert ${asset.name} at playhead`}
+                        className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-[#00E5FF] hover:bg-[#33EAFF] text-black flex items-center justify-center font-bold shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                          <Plus size={18} className="stroke-[3]" />
+                        </div>
+                      </button>
                     </div>
 
-                    <button
-                      onClick={() => handlePlaceMedia(asset)}
-                      title="Add to timeline"
-                      className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 hover:border-blue-600 transition-colors"
-                    >
-                      <Plus size={14} />
-                    </button>
+                    <div className="mt-1.5 px-0.5 min-w-0">
+                      <p className="text-[11px] font-medium text-white truncate" title={asset.name}>
+                        {asset.name}
+                      </p>
+                      <p className="text-[9px] text-[#A0A0A8] font-mono truncate">
+                        {asset.kind.toUpperCase()}{asset.duration > 0 ? ` · ${asset.duration.toFixed(1)}s` : ""}
+                      </p>
+                    </div>
                   </div>
                 ))}
-
-              {Object.keys(project.assets).length === 0 && (
-                <div className="text-center py-6 px-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2.5">
-                  <p className="text-xs text-slate-600">
-                    No assets uploaded yet.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      loadDemoProjectIntoStore(store);
-                      notify("Loaded 15-second creator demo project.");
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs border border-blue-200 transition-colors cursor-pointer"
-                  >
-                    <Sparkles size={13} />
-                    <span>Try Demo Project</span>
-                  </button>
-                </div>
-              )}
             </div>
+
+            {Object.keys(project.assets).length === 0 && (
+              <div className="text-center py-6 px-4 bg-[#222226] rounded-xl border border-[#2E2E33] space-y-2.5">
+                <p className="text-xs text-[#A0A0A8]">
+                  No assets uploaded yet.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadDemoProjectIntoStore(store);
+                    notify("Loaded 15-second creator demo project.");
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#18181C] hover:bg-[#2A2A30] text-[#00E5FF] font-semibold text-xs border border-[#2E2E33] hover:border-[#00E5FF]/40 transition-colors cursor-pointer"
+                >
+                  <Sparkles size={13} />
+                  <span>Try Demo Project</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1031,6 +1055,141 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                     <Plus size={13} />
                   </button>
                 </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ======================= TAB: TEXT & TITLES ======================= */}
+        {activeTab === "text" && (
+          <div className="space-y-4">
+            <span className="text-[11px] font-semibold text-[#A0A0A8] uppercase tracking-wider block">
+              Title &amp; Typography Presets
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { name: "Default Title", text: "Heading Text", color: "#FFFFFF", size: 48, font: "Inter", desc: "Clean primary title" },
+                { name: "Bold Headline", text: "BREAKING NEWS", color: "#00E5FF", size: 54, font: "Montserrat", desc: "High-impact punch" },
+                { name: "Cyber Glow", text: "CYBER GLOW", color: "#38BDF8", size: 46, font: "Orbitron", desc: "Sci-fi neon glow" },
+                { name: "Minimal Subtitle", text: "Minimal Caption", color: "#E2E8F0", size: 36, font: "Inter", desc: "Clean lower subtitle" },
+                { name: "Lower Third", text: "Speaker Name // Creator", color: "#FDE047", size: 32, font: "Poppins", desc: "Identity banner" },
+                { name: "Neon Flame", text: "VIRAL HOOK", color: "#F43F5E", size: 52, font: "Impact", desc: "Red viral attention" },
+              ].map((preset, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl border border-[#2E2E33] bg-[#222226] hover:border-[#00E5FF]/60 hover:bg-[#2A2A30] flex flex-col justify-between group transition-all relative overflow-hidden"
+                >
+                  <div>
+                    <p className="text-xs font-bold text-white truncate">{preset.name}</p>
+                    <p className="text-[10px] text-[#A0A0A8] truncate mt-0.5">{preset.desc}</p>
+                    <div
+                      className="mt-2 py-2 px-1 rounded bg-[#121214] border border-[#2E2E33] text-center font-bold text-xs truncate"
+                      style={{ color: preset.color }}
+                    >
+                      {preset.text}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const curTime = playback.getSnapshot().time;
+                      run((p) =>
+                        addText(
+                          p,
+                          preset.text,
+                          curTime,
+                          {
+                            color: preset.color,
+                            size: preset.size,
+                            font: preset.font,
+                          },
+                          false,
+                          3
+                        )
+                      );
+                      notify(`Added "${preset.name}" at ${curTime.toFixed(1)}s.`);
+                    }}
+                    title="Insert text at playhead"
+                    className="mt-2.5 w-full py-1.5 rounded-lg bg-[#18181C] hover:bg-[#00E5FF] hover:text-black text-[#00E5FF] border border-[#00E5FF]/40 hover:border-[#00E5FF] text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
+                  >
+                    <Plus size={13} className="stroke-[2.5]" />
+                    <span>Insert</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ======================= TAB: TRANSITIONS ======================= */}
+        {activeTab === "transitions" && (
+          <div className="space-y-4">
+            <span className="text-[11px] font-semibold text-[#A0A0A8] uppercase tracking-wider block">
+              CapCut Video Transitions
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { name: "Cross Dissolve", kind: "dissolve" as TransitionKind, desc: "Smooth blend between scenes" },
+                { name: "Fade to Black", kind: "fade" as TransitionKind, desc: "Classic cinematic scene end" },
+                { name: "Whip Slide", kind: "slide" as TransitionKind, desc: "Fast dynamic side wipe" },
+                { name: "Zoom Cross", kind: "zoom" as TransitionKind, desc: "High-energy push zoom" },
+              ].map((tr) => (
+                <button
+                  key={tr.kind}
+                  type="button"
+                  onClick={() => handleAddTransition(tr.kind)}
+                  className="p-3 rounded-xl border border-[#2E2E33] bg-[#222226] hover:border-[#00E5FF]/60 hover:bg-[#2A2A30] text-left transition-all cursor-pointer group"
+                >
+                  <p className="text-xs font-semibold text-white group-hover:text-[#00E5FF] transition-colors">{tr.name}</p>
+                  <span className="text-[10px] text-[#A0A0A8] mt-1 block">
+                    {tr.desc}
+                  </span>
+                  <div className="mt-2 text-[9px] font-mono text-[#00E5FF] bg-[#121214] border border-[#2E2E33] px-1.5 py-0.5 rounded w-fit">
+                    1-Click Apply
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ======================= TAB: FILTERS & ZOOMS ======================= */}
+        {activeTab === "filters" && (
+          <div className="space-y-4">
+            <span className="text-[11px] font-semibold text-[#A0A0A8] uppercase tracking-wider block">
+              Camera Punch-in Zooms
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { name: "Center Punch", scale: 1.25, desc: "Quick focus" },
+                { name: "Emphasis Zoom", scale: 1.4, desc: "Keyword hit" },
+                { name: "Extreme Punch", scale: 1.6, desc: "High drama" },
+                { name: "Slow Push-In", scale: 1.15, desc: "Story drift" },
+              ].map((zoom, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    if (selectedClip) {
+                      run((p) =>
+                        changeClipProperty(p, selectedClip.id, {
+                          transform: {
+                            ...selectedClip.transform,
+                            scale: zoom.scale,
+                          },
+                        })
+                      );
+                      notify(`Applied ${zoom.name} to selected clip.`);
+                    } else {
+                      notify("Select a clip on the timeline first.");
+                    }
+                  }}
+                  className="p-2.5 rounded-xl border border-[#2E2E33] bg-[#222226] hover:border-[#00E5FF]/60 hover:bg-[#2A2A30] text-left transition-all cursor-pointer group"
+                >
+                  <p className="text-xs font-semibold text-white group-hover:text-[#00E5FF] transition-colors">{zoom.name}</p>
+                  <span className="text-[10px] text-[#A0A0A8] font-mono">
+                    {zoom.scale}× · {zoom.desc}
+                  </span>
+                </button>
               ))}
             </div>
           </div>

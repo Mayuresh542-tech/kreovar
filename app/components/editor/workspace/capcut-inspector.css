@@ -1,0 +1,228 @@
+/* CapCut Studio Dark Theme Styles for Inspector */
+
+.capcut-inspector {
+  background-color: #18181C;
+  color: #FFFFFF;
+  border-left: 1px solid #2E2E33;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  scrollbar-width: thin;
+  scrollbar-color: #2E2E33 #18181C;
+}
+
+.capcut-inspector *::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.capcut-inspector *::-webkit-scrollbar-track {
+  background: #18181C;
+}
+
+.capcut-inspector *::-webkit-scrollbar-thumb {
+  background: #2E2E33;
+  border-radius: 3px;
+}
+
+.capcut-inspector *::-webkit-scrollbar-thumb:hover {
+  background: #3E3E46;
+}
+
+/* Tab Bar */
+.capcut-tab {
+  position: relative;
+  font-size: 12px;
+  font-weight: 500;
+  color: #A0A0A8;
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+}
+
+.capcut-tab:hover {
+  color: #FFFFFF;
+}
+
+.capcut-tab.active {
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.capcut-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background-color: #00E5FF;
+  border-radius: 1px;
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+}
+
+/* Card Sections */
+.capcut-card {
+  background-color: #222226;
+  border: 1px solid #2E2E33;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.capcut-card-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Range Sliders */
+.capcut-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: #2E2E33;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  accent-color: #00E5FF;
+}
+
+.capcut-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #00E5FF;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(0, 229, 255, 0.6);
+  transition: transform 0.1s ease;
+}
+
+.capcut-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.capcut-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: #00E5FF;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(0, 229, 255, 0.6);
+}
+
+/* Diamond Keyframe Buttons */
+.capcut-diamond-btn {
+  background: none;
+  border: none;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: #A0A0A8;
+  transition: all 0.15s ease;
+}
+
+.capcut-diamond-btn:hover {
+  color: #00E5FF;
+  transform: scale(1.15);
+}
+
+.capcut-diamond-btn.active {
+  color: #00E5FF;
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.7);
+}
+
+/* Segmented Control */
+.capcut-segmented {
+  display: flex;
+  background: #121214;
+  border: 1px solid #2E2E33;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.capcut-segment-btn {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #A0A0A8;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.capcut-segment-btn:hover {
+  color: #FFFFFF;
+}
+
+.capcut-segment-btn.active {
+  background: #2E2E33;
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Inputs and Selects */
+.capcut-input {
+  background: #121214;
+  border: 1px solid #2E2E33;
+  color: #FFFFFF;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.capcut-input:focus {
+  border-color: #00E5FF;
+  box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.3);
+}
+
+.capcut-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Preset Chips */
+.capcut-chip {
+  background: #18181C;
+  border: 1px solid #2E2E33;
+  color: #A0A0A8;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.capcut-chip:hover {
+  color: #FFFFFF;
+  border-color: #40404A;
+}
+
+.capcut-chip.active {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: #00E5FF;
+  color: #00E5FF;
+  font-weight: 600;
+}
