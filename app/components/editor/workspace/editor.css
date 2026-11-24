@@ -108,10 +108,10 @@
 .vx-transition-art { background:linear-gradient(110deg,#DBEAFE 45%,#BFDBFE 55%);color:#1E3A8A;font-weight:700; }
 .vx-feature-note { border:1px solid #E2E8F0;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:9px;line-height:1.6;background:#FFFFFF;color:#0F172A; }
 .vx-feature-note textarea { width:100%;min-height:90px;background:#F8FAFC;border:1px solid #CBD5E1;color:#0F172A; }
-.vx-preview { flex:1;min-width:0;display:flex;flex-direction:column;background:#0A0A0C; }
-.vx-stage { flex:1;min-height:0;min-width:0;display:flex;align-items:center;justify-content:center;overflow:auto;padding:24px;background:#0A0A0C; }
+.vx-preview { flex:1;min-width:0;display:flex;flex-direction:column;background:#F8FAFC; }
+.vx-stage { flex:1;min-height:0;min-width:0;display:flex;align-items:center;justify-content:center;overflow:auto;padding:24px;background:#F1F5F9; }
 .vx-stage:fullscreen { background:#000000; }
-.vx-canvas-frame { position:relative;flex-shrink:0;background:#000000;box-shadow:0 6px 30px rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.06); }
+.vx-canvas-frame { position:relative;flex-shrink:0;background:#000000;box-shadow:0 1px 4px rgba(15,23,42,0.08);border:1px solid #E2E8F0; }
 .vx-canvas-frame canvas { display:block;width:100%;height:100%;touch-action:none; }
 .vx-canvas-empty { position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#94A3B8;pointer-events:none;text-align:center;padding:20px; }
 .vx-canvas-empty strong { font-size:15px;color:#FFFFFF; }.vx-canvas-empty span { font-size:11px; }

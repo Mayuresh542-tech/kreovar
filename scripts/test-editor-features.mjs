@@ -525,3 +525,193 @@ test('AI placement presets work at every ratio and preserve text, words, timing,
  const p=fixture();assert.throws(()=>applyTextPlacement(p,['clip-1'],'title-center'),/only/);assert.throws(()=>validateAiPlan({summary:'Bad',decisions:[{op:'addText',text:'Title',startTime:0,placementId:'invented'}]},p),/Unknown/);
  const plan=validateAiPlan({summary:'Title',decisions:[{op:'addText',text:'Exact title',startTime:0,placementId:'hook-top'}]},p);const after=applyEditDecisionList(p,plan.list),clip=Object.values(after.clips).find(c=>c.contentId);assert.equal(clip.transform.y,-.28);assert.equal(after.textLayers[clip.contentId].text,'Exact title');
 });
+
+test("timeline ripple delete closes downstream gaps and respects locked tracks and undo", () => {
+  let p = fixture();
+  // clip-1 is on track-video at 0..10s
+  p = operations.addClip(p, "asset-1", "track-video", 10, { id: "clip-2", duration: 5, sourceStart: 0, sourceEnd: 5 });
+  p = operations.addClip(p, "asset-1", "track-video", 15, { id: "clip-3", duration: 4, sourceStart: 0, sourceEnd: 4 });
+  const store = new EditorStore(p);
+  
+  // Ripple delete clip-2 (duration 5s, start 10s)
+  store.execute(q => operations.rippleDeleteClips(q, ["clip-2"]));
+  let snap = store.getSnapshot();
+  assert.equal(snap.clips["clip-2"], undefined, "clip-2 must be deleted");
+  assert.equal(snap.clips["clip-1"].startTime, 0, "clip-1 before deletion stays unchanged");
+  assert.equal(snap.clips["clip-3"].startTime, 10, "clip-3 shifts left by 5s from 15s to 10s");
+  
+  // Undo restores clip-2 and clip-3 position
+  store.undo();
+  assert.deepEqual(store.getSnapshot().clips, p.clips);
+  
+  // Redo re-applies ripple delete
+  store.redo();
+  assert.equal(store.getSnapshot().clips["clip-2"], undefined);
+  assert.equal(store.getSnapshot().clips["clip-3"].startTime, 10);
+  
+  // Single clip ripple delete helper
+  const pSingle = operations.rippleDeleteClip(p, "clip-1");
+  assert.equal(pSingle.clips["clip-1"], undefined);
+  assert.equal(pSingle.clips["clip-2"].startTime, 0, "clip-2 pulled to 0");
+  assert.equal(pSingle.clips["clip-3"].startTime, 5, "clip-3 pulled to 5");
+  
+  // Locked track rejects clip deletion and ripple delete leaves project unchanged
+  p.tracks["track-video"].locked = true;
+  assert.throws(() => operations.removeClip(p, "clip-2"), /Unlock/i);
+  assert.deepEqual(operations.rippleDeleteClips(p, ["clip-2"]), p);
+});
+
+test("magnetic snapping evaluates boundaries with CapCut hysteresis detent and playhead support", () => {
+  let p = fixture(); // clip-1 at 0..10s
+  p = operations.addClip(p, "asset-1", "track-video", 15, { id: "clip-2", duration: 5 });
+  const pps = 50; // 50 px per second -> 10px snap = 0.2s, 16px break = 0.32s
+  
+  // 1. Moving clip approaching 10.0s edge from 9.85s (dist = 0.15s * 50 = 7.5px <= 10px snap threshold)
+  const snap1 = operations.findSnapPoint(p, 9.85, ["moving-clip"], 0, pps, 0, false, 10, 16);
+  assert.equal(snap1.snapped, true, "Should snap to 10.0s edge within threshold");
+  assert.equal(snap1.time, 10.0, "Snapped time should be exactly 10.0s");
+  assert.equal(snap1.snapLineTime, 10.0, "Snap line time should be at 10.0s boundary");
+  
+  // 2. Hysteresis resistance: once snapped, dragging away to 9.75s (dist = 0.25s * 50 = 12.5px > 10px but < 16px break threshold)
+  const snap2 = operations.findSnapPoint(p, 9.75, ["moving-clip"], 0, pps, 0, true, 10, 16);
+  assert.equal(snap2.snapped, true, "Should remain held in hysteresis detent");
+  assert.equal(snap2.time, 10.0);
+  
+  // 3. Breaking detent: dragging further to 9.60s (dist = 0.40s * 50 = 20px > 16px)
+  const snap3 = operations.findSnapPoint(p, 9.60, ["moving-clip"], 0, pps, 0, true, 10, 16);
+  assert.equal(snap3.snapped, false, "Should break snap when beyond break threshold");
+  assert.equal(snap3.snapLineTime, null);
+  
+  // 4. Trailing edge snapping: moving clip of duration 4s placed at 6.05s (trailing edge at 10.05s, dist = 0.05s * 50 = 2.5px)
+  const snapTrailing = operations.findSnapPoint(p, 6.05, ["moving-clip"], 0, pps, 4.0, false, 10, 16);
+  assert.equal(snapTrailing.snapped, true);
+  assert.equal(snapTrailing.time, 6.0, "Start time adjusted so trailing edge snaps to 10.0s (10.0 - 4.0 = 6.0)");
+  assert.equal(snapTrailing.snapLineTime, 10.0);
+  
+  // 5. Playhead snapping to clip boundaries
+  const playheadSnap = operations.snapPlayhead(p, 9.9, pps, false, 10, 16);
+  assert.equal(playheadSnap.snapped, true);
+  assert.equal(playheadSnap.time, 10.0);
+  assert.equal(playheadSnap.snapLineTime, 10.0);
+});
+
+test("track lock, mute, hide and removal protect project layers and playback safely", () => {
+  let p = fixture();
+  const trackId = "track-video";
+  
+  // 1. Lock toggle protects track from mutations
+  assert.equal(p.tracks[trackId].locked, false);
+  p = operations.toggleTrackLock(p, trackId);
+  assert.equal(p.tracks[trackId].locked, true);
+  assert.throws(() => operations.trimClip(p, "clip-1", "right", 8), /Unlock/i);
+  assert.throws(() => operations.splitClip(p, "clip-1", 5), /Unlock/i);
+  assert.throws(() => operations.moveClip(p, "clip-1", 2), /Unlock/i);
+  
+  p = operations.toggleTrackLock(p, trackId);
+  assert.equal(p.tracks[trackId].locked, false);
+  
+  // 2. Mute toggle excludes audio from mix
+  assert.equal(p.tracks[trackId].muted, false);
+  p = operations.toggleTrackMute(p, trackId);
+  assert.equal(p.tracks[trackId].muted, true);
+  const { clipGain } = load("app/lib/editor/audioMix.ts");
+  assert.equal(clipGain(p, p.clips["clip-1"], 2), 0, "Muted track clip produces 0 gain");
+  
+  p = operations.toggleTrackMute(p, trackId);
+  assert.equal(p.tracks[trackId].muted, false);
+  assert.equal(clipGain(p, p.clips["clip-1"], 2), 1, "Unmuted track produces full gain");
+  
+  // 3. Hide toggle excludes visual clips from rendering
+  assert.equal(p.tracks[trackId].hidden, false);
+  p = operations.toggleTrackHidden(p, trackId);
+  assert.equal(p.tracks[trackId].hidden, true);
+  const { visibleLayers } = loader({ "app/lib/editor/media.ts": {} })("app/lib/editor/compositor.ts");
+  const visible = visibleLayers(p, 2);
+  assert.equal(visible.some(l => l.clip.trackId === trackId), false, "Hidden track excluded from visible layers");
+  
+  p = operations.toggleTrackHidden(p, trackId);
+  assert.equal(p.tracks[trackId].hidden, false);
+  assert.equal(visibleLayers(p, 2).some(l => l.clip.trackId === trackId), true);
+  
+  // 4. Track addition and safe removal
+  p = operations.addTrack(p, "audio");
+  const newAudioTrackId = p.trackOrder[p.trackOrder.length - 1];
+  assert.ok(p.tracks[newAudioTrackId]);
+  p = operations.removeTrack(p, newAudioTrackId);
+  assert.equal(p.tracks[newAudioTrackId], undefined);
+});
+
+test("keyframe interpolation computes continuous transform curves across source-clock time", () => {
+  const { readKeyframes, keyframeTransform, setTransformKeyframes, captureKeyframe, applyMotionPreset } = load("app/lib/editor/keyframes.ts");
+  let p = fixture();
+  const clipId = "clip-1";
+  
+  // 1. Validation of keyframe format
+  const validFrames = [
+    { sourceTime: 0, value: { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 }, easing: "linear" },
+    { sourceTime: 5, value: { x: 0.5, y: -0.2, scale: 2, rotation: 90, opacity: 0.5 }, easing: "smooth" },
+    { sourceTime: 10, value: { x: -0.5, y: 0.4, scale: 1.5, rotation: 180, opacity: 1 }, easing: "overshoot" }
+  ];
+  assert.equal(readKeyframes(validFrames).length, 3);
+  assert.throws(() => readKeyframes([{ sourceTime: -1, value: validFrames[0].value, easing: "linear" }]), /Invalid/);
+  assert.throws(() => readKeyframes([{ sourceTime: 0, value: { ...validFrames[0].value, scale: 15 }, easing: "linear" }]), /Invalid/);
+  assert.throws(() => readKeyframes([validFrames[0], validFrames[0]]), /unique/);
+  
+  // 2. Set keyframes and interpolate values
+  p = setTransformKeyframes(p, clipId, validFrames);
+  const clip = p.clips[clipId];
+  
+  // At sourceTime 0 (playhead at 0):
+  const t0 = keyframeTransform(clip, 0);
+  assert.equal(t0.x, 0);
+  assert.equal(t0.scale, 1);
+  assert.equal(t0.rotation, 0);
+  assert.equal(t0.opacity, 1);
+  
+  // At midpoint sourceTime 2.5 (playhead at 2.5s):
+  // smooth easing at p=0.5: q = 0.5^2 * (3 - 2*0.5) = 0.25 * 2 = 0.5
+  const tMid = keyframeTransform(clip, 2.5);
+  assert.ok(Math.abs(tMid.x - 0.25) < 1e-4);
+  assert.ok(Math.abs(tMid.y - (-0.1)) < 1e-4);
+  assert.ok(Math.abs(tMid.scale - 1.5) < 1e-4);
+  assert.ok(Math.abs(tMid.rotation - 45) < 1e-4);
+  assert.ok(Math.abs(tMid.opacity - 0.75) < 1e-4);
+  
+  // At sourceTime 5 (playhead at 5):
+  const t5 = keyframeTransform(clip, 5);
+  assert.equal(t5.x, 0.5);
+  assert.equal(t5.scale, 2);
+  assert.equal(t5.rotation, 90);
+  assert.equal(t5.opacity, 0.5);
+  
+  // Beyond keyframes (clamped to boundary values)
+  const tBeyond = keyframeTransform(clip, 15);
+  assert.equal(tBeyond.x, -0.5);
+  assert.equal(tBeyond.rotation, 180);
+  
+  // 3. Source-clock animation survives speed changes:
+  // Speed doubled: clip plays 2x faster, so playhead at 2.5 reaches sourceTime 5
+  const speedClip = { ...clip, speed: 2 };
+  const tSpeed = keyframeTransform(speedClip, 2.5);
+  assert.equal(tSpeed.x, 0.5, "At 2x speed, time 2.5 reaches sourceTime 5");
+  
+  // 4. captureKeyframe adds keyframe at playhead position
+  let captured = captureKeyframe(fixture(), clipId, 3.0, { x: 0.2, y: 0.1, scale: 1.2, rotation: 15, opacity: 0.9 }, "smooth");
+  assert.ok(captured.clips[clipId].keyframes.length >= 1);
+  assert.ok(captured.clips[clipId].keyframes.some(k => Math.abs(k.sourceTime - 3.0) < 0.1));
+  
+  // 5. applyMotionPreset applies standard presets ('slide-up', 'pop', 'spin-in', etc.)
+  for (const preset of ["slide-up", "slide-left", "pop", "float", "spin-in"]) {
+    const presetProj = applyMotionPreset(fixture(), clipId, preset);
+    assert.ok(presetProj.clips[clipId].keyframes.length >= 2, `Preset ${preset} generates keyframes`);
+  }
+  
+  // Undo/redo with EditorStore
+  const store = new EditorStore(fixture());
+  store.execute(q => applyMotionPreset(q, clipId, "pop"));
+  assert.ok(store.getSnapshot().clips[clipId].keyframes.length > 0);
+  store.undo();
+  assert.equal(store.getSnapshot().clips[clipId].keyframes, undefined);
+  store.redo();
+  assert.ok(store.getSnapshot().clips[clipId].keyframes.length > 0);
+});

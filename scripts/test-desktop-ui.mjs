@@ -131,3 +131,14 @@ test("Task 5: EditorPropertiesInspector.tsx Parity with CapCut Audio & Speed Tab
   assert.ok(inspector.includes("Smooth slow-mo"), "Speed controls must include Smooth slow-mo note");
   assert.ok(inspector.includes("calculateTimelineDurationFromSource"), "Speed controls must compute dynamic duration");
 });
+
+test("Task 6: CanvasStage.tsx implements thin preview outline (border border-slate-200)", () => {
+  const canvasStage = fs.readFileSync(path.join(ROOT, "app/components/editor/CanvasStage.tsx"), "utf-8");
+  assert.ok(canvasStage.includes("border border-slate-200"), "Preview canvas stage container must have thin border border-slate-200 outline");
+});
+
+test("Task 7: Project Hub (app/projects/[id]/page.tsx) banner 'CapCut-Grade Video Editor 3.0' is removed", () => {
+  const projectPage = fs.readFileSync(path.join(ROOT, "app/projects/[id]/page.tsx"), "utf-8");
+  assert.ok(!projectPage.includes("CapCut-Grade Video Editor 3.0"), "Banner 'CapCut-Grade Video Editor 3.0' must be removed from Project Hub");
+});
+

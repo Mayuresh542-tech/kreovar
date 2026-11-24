@@ -547,7 +547,7 @@ export default function CanvasStage({
       >
         <div
           ref={frameRef}
-          className="relative bg-slate-950 rounded-lg shadow-[0_8px_28px_rgba(15,23,42,0.12)] overflow-hidden border border-slate-300 will-change-transform"
+          className="relative bg-black rounded-lg shadow-xs overflow-hidden border border-slate-200 will-change-transform"
         >
           {/* Video Canvas */}
           <canvas
@@ -624,7 +624,7 @@ export default function CanvasStage({
           <div
             ref={outlineRef}
             style={{ display: "none" }}
-            className="absolute border-2 border-blue-600 pointer-events-auto cursor-move z-30"
+            className="absolute border border-sky-500 pointer-events-auto cursor-move z-30"
             onPointerDown={(e) => {
               if (selection[0]) handleGesture(e, "move", selection[0]);
             }}
