@@ -8,6 +8,7 @@ import type {MediaRepository} from "./media";
 import type {ExportOptions,ExportProgress} from "./export";
 import {clipGain,speechWindows} from "./audioMix";
 import {readOriginal} from "./original";
+import {getSpeedCurvePreset, mapTimelineTimeToSourceTime} from "./speedCurves";
 
 export function frameSchedule(duration:number,fps:number,maxSeconds?:number){
  assertVideoDuration(duration,maxSeconds);if(![24,30,60].includes(fps))throw new Error("Choose 24, 30 or 60 fps.");
@@ -17,7 +18,19 @@ export function clipAudioSlice(clip:Clip,timestamp:number,duration:number){
  const offset=Math.max(0,clip.sourceStart-timestamp),start=Math.max(timestamp,clip.sourceStart),length=Math.min(duration-offset,clip.sourceEnd-start);
  return {offset,length,when:clip.startTime+(start-clip.sourceStart)/clip.speed};
 }
-export function sourceFrameTimestamp(clip:Pick<Clip,"sourceStart"|"sourceEnd"|"startTime"|"duration"|"speed">,frameTime:number,hold=false){
+export function sourceFrameTimestamp(clip:Pick<Clip,"sourceStart"|"sourceEnd"|"startTime"|"duration"|"speed"|"speedCurveId">,frameTime:number,hold=false){
+ if(clip.speedCurveId && clip.speedCurveId !== "standard") {
+  const preset = getSpeedCurvePreset(clip.speedCurveId);
+  const effectiveTime = hold ? clip.startTime + clip.duration - 0.001 : frameTime;
+  const remapped = mapTimelineTimeToSourceTime({
+   timelineTime: effectiveTime,
+   clipStartTime: clip.startTime,
+   sourceStartTime: clip.sourceStart,
+   duration: clip.duration,
+   curve: preset
+  });
+  return clamp(remapped, clip.sourceStart, Math.max(clip.sourceStart, clip.sourceEnd - 0.001));
+ }
  return clamp(clip.sourceStart+(hold?clip.duration-.001:frameTime-clip.startTime)*clip.speed,clip.sourceStart,Math.max(clip.sourceStart,clip.sourceEnd-.001));
 }
 export function dedupeSequentialTimestamps(timestamps:number[],epsilon=1e-6){
@@ -329,7 +342,7 @@ export async function renderOffline(project:EditorProject,options:ExportOptions,
    compositor.render(canvas,project,frame.time);
    // video.add() snapshots canvas synchronously into WebCodecs VideoFrame before yielding for encoder backpressure.
    encodePromise=video.add(frame.time,frame.duration);
-   compositor.clearFrames();
+   compositor.clearFrames?.();
    // Overlap decoding/preparing frame `index + 1` with `encodePromise` backpressure wait.
    nextPreparedPromise=index+1<schedule.length?prepareFrame(index+1):null;
    if(index%5===0||index===schedule.length-1)onProgress({stage:"Rendering frame "+(index+1)+" of "+schedule.length+"…",progress:5+index/schedule.length*90});

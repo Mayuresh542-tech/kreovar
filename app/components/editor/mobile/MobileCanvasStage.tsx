@@ -718,9 +718,9 @@ export default function MobileCanvasStage({
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-[#0E0E12]/90 z-10 gap-3 border border-[#26262E]">
             <Film size={28} className="text-[#A0A0A8]" />
             <div>
-              <p className="text-xs font-semibold text-white">Start Your CapCut Edit</p>
+              <p className="text-xs font-semibold text-white">Start Your Video Edit</p>
               <p className="text-[11px] text-[#A0A0A8] mt-0.5">
-                Import media clips or let AI Copilot edit for you
+                Import media clips or let AI Editor create for you
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
@@ -728,9 +728,9 @@ export default function MobileCanvasStage({
                 <button
                   type="button"
                   onClick={onOpenImport}
-                  className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-[#22222A] hover:bg-[#2C2C36] border border-[#2E2E38] text-white text-xs font-medium flex items-center gap-1.5 active:scale-95 transition-all"
+                  className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-medium flex items-center gap-1.5 active:scale-95 transition-all"
                 >
-                  <Upload size={13} className="text-[#00E5FF]" />
+                  <Upload size={13} className="text-white" />
                   <span>Add Media</span>
                 </button>
               )}
@@ -738,10 +738,10 @@ export default function MobileCanvasStage({
                 <button
                   type="button"
                   onClick={onOpenAiCopilot}
-                  className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-[#00E5FF] hover:bg-[#33EAFF] text-black text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,229,255,0.35)] active:scale-95 transition-all"
+                  className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 text-xs font-semibold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
                 >
-                  <Sparkles size={13} />
-                  <span>AI Copilot</span>
+                  <Sparkles size={13} className="text-slate-900" />
+                  <span>AI Editor</span>
                 </button>
               )}
             </div>

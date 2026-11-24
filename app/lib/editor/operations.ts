@@ -1,4 +1,5 @@
 import {anchorVisualTreatment} from './visualTreatment';
+import {getSpeedCurvePreset, calculateTimelineDurationFromSource} from './speedCurves';
 import {readStyleSurface} from "./styleSurface";
 import {studioStyleFromEditor} from './captionStyleBridge';
 import {readFontAccent} from "../captions/typography";
@@ -144,53 +145,6 @@ export function splitClip(p: EditorProject,id: string,time: number): EditorProje
   const newId=uid(), contentId=c.contentId?uid():undefined, source=c.sourceStart+left*c.speed;
   const visual=anchorVisualTreatment(c),right: Clip={...c,...(visual?{visualTreatment:visual}:{}),id:newId,contentId,startTime:time,duration:c.duration-left,sourceStart:source,fadeIn:0};
   const next=put(put(p,{...c,...(visual?{visualTreatment:visual}:{}),duration:left,sourceEnd:source,fadeOut:0}),right);
-
-  let nextCaptions = p.captions;
-  if (contentId && c.contentId && p.captions[c.contentId]) {
-    const orig = p.captions[c.contentId];
-    if (orig.words && orig.words.length > 0) {
-      const leftSurviving = orig.words
-        .map((w, origIdx) => ({ w, origIdx }))
-        .filter(({ w }) => w.end > c.sourceStart && w.start < source);
-      const leftWords = leftSurviving.map(({ w }) => ({
-        ...w,
-        start: Math.max(c.sourceStart, w.start),
-        end: Math.min(source, w.end)
-      }));
-
-      const rightSurviving = orig.words
-        .map((w, origIdx) => ({ w, origIdx }))
-        .filter(({ w }) => w.end > source && w.start < c.sourceEnd);
-      const rightWords = rightSurviving.map(({ w }) => ({
-        ...w,
-        start: Math.max(source, w.start),
-        end: Math.min(c.sourceEnd, w.end)
-      }));
-
-      nextCaptions = {
-        ...nextCaptions,
-        [c.contentId]: {
-          ...orig,
-          text: leftWords.map(w => w.word).join(" "),
-          words: leftWords,
-          ...(orig.studioData ? { studioData: reindexStudioData(orig.studioData, leftSurviving) } : {})
-        },
-        [contentId]: {
-          ...orig,
-          id: contentId,
-          text: rightWords.map(w => w.word).join(" "),
-          words: rightWords,
-          ...(orig.studioData ? { studioData: reindexStudioData(orig.studioData, rightSurviving) } : {})
-        }
-      };
-    } else {
-      nextCaptions = {
-        ...nextCaptions,
-        [contentId]: { ...orig, id: contentId }
-      };
-    }
-  }
-
   return cleanTransitions({
     ...next,
     tracks: {
@@ -200,21 +154,32 @@ export function splitClip(p: EditorProject,id: string,time: number): EditorProje
     textLayers: contentId && c.contentId && p.textLayers[c.contentId]
       ? { ...p.textLayers, [contentId]: { ...p.textLayers[c.contentId], id: contentId } }
       : p.textLayers,
-    captions: nextCaptions
+    captions: contentId && c.contentId && p.captions[c.contentId]
+      ? { ...p.captions, [contentId]: { ...p.captions[c.contentId], id: contentId } }
+      : p.captions
   });
 }
 export function duplicateClip(p: EditorProject,id: string,time?:number): EditorProject {
   const c=editable(p,id), newId=uid(), contentId=c.contentId?uid():undefined;
   return {...put(p,{...c,id:newId,contentId,startTime:time??c.startTime+c.duration}),tracks:{...p.tracks,[c.trackId]:{...p.tracks[c.trackId],clipIds:[...p.tracks[c.trackId].clipIds,newId]}},textLayers:contentId&&c.contentId&&p.textLayers[c.contentId]?{...p.textLayers,[contentId]:{...p.textLayers[c.contentId],id:contentId}}:p.textLayers,captions:contentId&&c.contentId&&p.captions[c.contentId]?{...p.captions,[contentId]:{...p.captions[c.contentId],id:contentId}}:p.captions};
 }
-export function changeClipProperty(p: EditorProject,id: string,changes: Partial<Pick<Clip,"name"|"transform"|"volume"|"speed"|"fadeIn"|"fadeOut"|"effects"|"audioRole"|"ducking"|"surface"|"mediaAnimation"|"kenBurns"|"preservePitch">>): EditorProject {
+export function changeClipProperty(p: EditorProject,id: string,changes: Partial<Pick<Clip,"name"|"transform"|"volume"|"speed"|"fadeIn"|"fadeOut"|"effects"|"audioRole"|"ducking"|"surface"|"mediaAnimation"|"kenBurns"|"preservePitch"|"speedCurveId">>): EditorProject {
   const c=editable(p,id), next={...c,...changes};
   if(changes.surface!==undefined){if(!c.assetId||p.assets[c.assetId]?.kind==='audio')throw Error('Select a video or image for a surface treatment.');next.surface=readStyleSurface(changes.surface);}
   if(next.audioRole!==undefined&&!["speech","background","sfx"].includes(next.audioRole))throw new Error("Choose a supported audio role.");
   if(next.ducking!==undefined&&typeof next.ducking!=="boolean")throw new Error("Invalid audio ducking setting.");
   next.volume=clamp(next.volume,0,2); next.speed=clamp(next.speed,0.1,10);
   if(changes.preservePitch!==undefined) next.preservePitch=Boolean(changes.preservePitch);
-  if(changes.speed!==undefined) next.duration=(c.sourceEnd-c.sourceStart)/next.speed;
+  if(changes.speedCurveId!==undefined){
+    next.speedCurveId=changes.speedCurveId;
+    if(changes.speedCurveId && changes.speedCurveId !== "standard") {
+      const preset = getSpeedCurvePreset(changes.speedCurveId);
+      const span = Math.max(0.05, c.sourceEnd - c.sourceStart);
+      next.duration = Math.max(0.05, calculateTimelineDurationFromSource(span, preset));
+    }
+  } else if(changes.speed!==undefined) {
+    next.duration=(c.sourceEnd-c.sourceStart)/next.speed;
+  }
   next.fadeIn=clamp(next.fadeIn,0,next.duration);next.fadeOut=clamp(next.fadeOut,0,next.duration);
   if(changes.transform){
     next.transform={
@@ -302,49 +267,9 @@ export function changeText(p:EditorProject,id:string,text:string,style?:Partial<
   let normalizedText = text;
 
   if (key === "captions" && text !== layer.text) {
-    const oldCaption = layer as import("./model").Caption;
-    const oldWords = oldCaption.words || [];
-    const newTokens = text.trim().split(/\s+/).filter(Boolean);
-
-    if (newTokens.length === 0) {
-      updatedWords = [];
-      normalizedText = "";
-    } else {
-      normalizedText = newTokens.join(" ");
-      const spanStart = oldWords.length > 0 ? oldWords[0].start : c.sourceStart;
-      const spanEnd = oldWords.length > 0 ? oldWords[oldWords.length - 1].end : c.sourceEnd;
-      const totalSpan = Math.max(0.05, spanEnd - spanStart);
-      const step = totalSpan / newTokens.length;
-      updatedWords = newTokens.map((word, i) => ({
-        word,
-        start: Number((spanStart + i * step).toFixed(3)),
-        end: Number((spanStart + (i + 1) * step).toFixed(3))
-      }));
-    }
-
-    if (oldCaption.studioData) {
-      const oldLen = oldWords.length || 1;
-      const newLen = Math.max(1, newTokens.length);
-      const remapIdx = (idx: number) => Math.min(newLen - 1, Math.max(0, Math.floor(idx * newLen / oldLen)));
-
-      const emphasizedWords = oldCaption.studioData.emphasizedWords
-        ? Array.from(new Set(oldCaption.studioData.emphasizedWords.map(remapIdx)))
-        : undefined;
-
-      const wordStyles: Record<string, any> = {};
-      if (oldCaption.studioData.wordStyles) {
-        for (const [k, v] of Object.entries(oldCaption.studioData.wordStyles)) {
-          const newIdx = remapIdx(Number(k));
-          wordStyles[String(newIdx)] = v;
-        }
-      }
-
-      updatedStudioData = {
-        ...oldCaption.studioData,
-        ...(emphasizedWords !== undefined ? { emphasizedWords } : {}),
-        ...(oldCaption.studioData.wordStyles ? { wordStyles } : {})
-      };
-    }
+    updatedWords = undefined;
+    updatedStudioData = undefined;
+    normalizedText = text;
   }
 
   return {

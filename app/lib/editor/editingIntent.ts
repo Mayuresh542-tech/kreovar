@@ -35,6 +35,8 @@ export interface EditingConstraints {
  requestedCaptionStyling?: CaptionStylingDirective;
  requestedAudioDucking?: boolean;
  requestedAspectRatio?: '16:9' | '9:16' | '1:1';
+ requestedReframeMode?: import('./reframing').ReframeMode;
+ requestedHookHighlight?: boolean;
  requestedKenBurns?: boolean | 'push' | 'pull' | 'pan-left' | 'pan-right';
  requestedKineticStickers?: boolean;
  requestedSpeed?: SpeedDirective;
@@ -104,6 +106,7 @@ export function extractEditingConstraints(instruction = '', preserveList: string
  const removeZooms = /\b(?:remove\s+(?:the\s+)?zooms?|clear\s+(?:all\s+)?zooms?|delete\s+(?:the\s+)?zooms?|zoom\s+hata)\b/i.test(text);
  const removeSfx = /\b(?:remove\s+(?:all\s+)?(?:sound\s+effects?|sfx)|delete\s+(?:all\s+)?(?:sound\s+effects?|sfx)|clear\s+(?:all\s+)?(?:sound\s+effects?|sfx)|sfx\s+hata|sound\s+effects?\s+hata)\b/i.test(text);
  const removeBroll = /\b(?:remove\s+(?:all\s+)?(?:b[ -]?roll|stock\s+footage)|delete\s+(?:all\s+)?(?:b[ -]?roll|stock\s+footage)|clear\s+(?:all\s+)?(?:b[ -]?roll|stock\s+footage)|broll\s+hata)\b/i.test(text);
+ const requestedHookHighlight = /\b(?:find\s+(?:the\s+)?hook|best\s+opening|hook\s+teaser|viral\s+intro|highlight\s+(?:the\s+)?hook|viral\s+hook|teaser\s+cut)\b/i.test(text);
  const requestedSilenceCut = /\b(?:(?:cut|remove|trim|delete|clear|drop)\s+(?:the\s+)?(?:all\s+)?(?:silent\s+|awkward\s+|dead\s+|long\s+|inter-word\s+|empty\s+)?(?:silences?|pauses?|hesitations?|gaps?|dead\s*(?:air|space)|quiet\s+parts?)|tighten\s+(?:the\s+)?pacing|silence\s+cut\b|podcast\s+cut\b|beech\s+ke\s+pauses?\s+hata\s*(?:do|dena)?|silence\s+cut\s+kar\s*(?:do|dena)?|jahan\s+main\s+chup\s+(?:hoon|tha|hu)\s+woh\s+part\s+trim\s*(?:karo|do)?|dead\s*(?:space|air)\s+remove\s*(?:karo|do)?|pauses?\s*(?:ko)?\s*(?:hata|cut|trim)\s*(?:do|karo|dena)?|chup\s+(?:rehne\s+wale\s+)?parts?\s*(?:ko)?\s*(?:hata\s*(?:do|karo|dena)?|trim\s*karo)|khali\s+(?:jagah|parts?)\s+hata\s*(?:do|karo)?)/i.test(text);
 
  const protectedIntervals: Array<{ start: number; end: number }> = [];
@@ -188,6 +191,16 @@ export function extractEditingConstraints(instruction = '', preserveList: string
   requestedAspectRatio = '16:9';
  } else if (/\b(?:1:1|square)\b/i.test(text)) {
   requestedAspectRatio = '1:1';
+ }
+
+ // Reframe mode extraction
+ let requestedReframeMode: import('./reframing').ReframeMode | undefined;
+ if (/\b(?:fit[\s-]with[\s-]blur|blur(?:red)?\s*(?:background|wings|sides|bars))\b/i.test(text)) {
+  requestedReframeMode = 'fit-with-blur';
+ } else if (/\b(?:split[\s-]screen|top\s*(?:and|&)\s*bottom|half\s*(?:and|&)\s*half)\b/i.test(text)) {
+  requestedReframeMode = 'split-screen';
+ } else if (/\b(?:center[\s-]crop|convert\s+to\s+9:16|crop\s+to\s+vertical|vertical\s+crop|fill\s+vertical)\b/i.test(text)) {
+  requestedReframeMode = 'center-crop';
  }
 
  let requestedKenBurns: boolean | 'push' | 'pull' | 'pan-left' | 'pan-right' | undefined;
@@ -288,6 +301,8 @@ export function extractEditingConstraints(instruction = '', preserveList: string
   requestedCaptionStyling,
   requestedAudioDucking,
   requestedAspectRatio,
+  requestedReframeMode,
+  requestedHookHighlight,
   requestedKenBurns,
   requestedKineticStickers,
   requestedSpeed,
@@ -305,9 +320,9 @@ export function readEditingIntent(value: unknown, originalInstruction = ''): Par
  if (intent === undefined) return undefined; // Compatibility with existing provider responses.
  if (!intent || typeof intent !== "object") throw new Error("Invalid editing intent.");
  const data = intent as Record<string, unknown>;
- const text = (v: unknown, max: number) => { if (typeof v !== "string" || !v.trim()) return ""; return v.trim().slice(0, max); };
-  const list = (v: unknown) => { if (!Array.isArray(v)) return []; return v.filter((t): t is string => typeof t === "string" && t.trim().length > 0).slice(0, 8).map(t => text(t, 160)); };
-  const goal = text(data.goal, 400) || "Perform requested edits", preserve = list(data.preserve), questions = list(data.questions);
+ const text = (v: unknown, max: number) => { if (typeof v !== "string" || !v.trim() || v.length > max) throw new Error("Invalid editing intent text."); return v.trim(); };
+ const list = (v: unknown) => { if (!Array.isArray(v) || v.length > 8 || v.some(t => typeof t !== "string")) throw new Error("Invalid editing intent list."); return v.map(t => text(t, 160)); };
+ const goal = text(data.goal, 400), preserve = list(data.preserve), questions = list(data.questions);
  const constraints = extractEditingConstraints(originalInstruction, preserve);
  return {
   goal,

@@ -18,6 +18,7 @@ import {
 export type ReframeMode = "fit-with-blur" | "center-crop" | "split-screen";
 
 export interface ReframeOptions {
+  focusX?: number;
   /** Eye-line vertical focus offset (defaults to -0.14 for upper-third face lock) */
   focusY?: number;
   /** Scale multiplier for center-crop punch in (defaults to 1.77x) */
@@ -26,6 +27,10 @@ export interface ReframeOptions {
   blurAmount?: number;
   /** Brightness adjustment for background wings (defaults to -10) */
   blurBrightness?: number;
+  /** Background scale factor (defaults to 3.16) */
+  backgroundScale?: number;
+  /** Top split ratio for split-screen (defaults to 0.5) */
+  topRatio?: number;
   /** Scale multiplier for split-screen halves (defaults to 1.0) */
   splitScale?: number;
   /** Asset ID to use for bottom half in split-screen mode */
@@ -43,15 +48,17 @@ export const OVERLAY_TRACK_ID = "track-overlay";
  */
 export function calculateCenterCropTransform(
   cropScale = 1.77,
-  focusY = -0.14
-): Transform & { focusY: number } {
+  focusY = -0.14,
+  focusX = 0
+): Transform & { focusY: number; focusX?: number } {
   return {
-    x: 0,
+    x: focusX,
     y: focusY,
     scale: cropScale,
     rotation: 0,
     opacity: 1,
     focusY,
+    focusX,
   };
 }
 
@@ -97,7 +104,7 @@ export function calculateFitWithBlur(
   // Background scale factor needed to completely cover 1080x1920:
   // 16:9 clip in 9:16 has height 607.5 at scale 1.
   // 1920 / 607.5 = 3.1605x punch-in to fill canvas height.
-  const bgScale = 3.16;
+  const bgScale = options.backgroundScale ?? 3.16;
 
   // Locate the primary visual/video track
   const videoTrack =
@@ -204,10 +211,11 @@ export function calculateCenterCrop(
   options: ReframeOptions = {}
 ): EditorProject {
   const p = cleanupReframeBackground(project);
-  const cropScale = options.cropScale ?? 1.77;
+  const cropScale = options.cropScale ?? options.backgroundScale ?? 1.77;
   const focusY = options.focusY ?? -0.14;
+  const focusX = options.focusX ?? 0;
 
-  const targetTransform = calculateCenterCropTransform(cropScale, focusY);
+  const targetTransform = calculateCenterCropTransform(cropScale, focusY, focusX);
   const nextClips: Record<string, Clip> = { ...p.clips };
 
   for (const trackId of p.trackOrder) {

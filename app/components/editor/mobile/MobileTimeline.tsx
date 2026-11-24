@@ -325,27 +325,27 @@ export default function MobileTimeline() {
         </div>
       )}
 
-      {/* Center-Fixed Static Vertical White Playhead with CapCut Top Pointer Indicator */}
+      {/* Center-Fixed Static Vertical Red Playhead with CapCut Top Pointer Indicator */}
       <div
-        className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-white z-30 pointer-events-none shadow-[0_0_6px_rgba(255,255,255,0.85)]"
+        className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-red-500 z-30 pointer-events-none shadow-xs"
         aria-hidden="true"
       >
-        {/* CapCut mobile white top pointer needle indicator */}
+        {/* CapCut mobile red top pointer needle indicator */}
         <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 flex flex-col items-center">
-          <div className="w-3.5 h-3 bg-white rounded-t-xs shadow flex items-center justify-center">
-            <div className="w-1 h-1 rounded-full bg-black/40" />
+          <div className="w-3.5 h-3 bg-red-500 rounded-t-xs shadow flex items-center justify-center">
+            <div className="w-1 h-1 rounded-full bg-white/60" />
           </div>
-          <div className="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[6px] border-t-white -mt-[0.5px]" />
+          <div className="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[6px] border-t-red-500 -mt-[0.5px]" />
         </div>
       </div>
 
       {/* Floating Micro-Nudge & Alignment Bar for Selected Clip */}
       {selectedClip && (
-        <div className="absolute top-1 right-2 z-35 flex items-center gap-1 bg-[#1C1C24]/95 backdrop-blur-md px-2 py-0.5 rounded-lg border border-[#2E2E38] shadow-xl text-[10px] text-white">
-          <span className="font-semibold truncate max-w-[70px] text-white/90">
+        <div className="absolute top-1 right-2 z-35 flex items-center gap-1 bg-white/95 backdrop-blur-md px-2 py-0.5 rounded-lg border border-slate-200 shadow-md text-[10px] text-slate-800">
+          <span className="font-semibold truncate max-w-[70px] text-slate-800">
             {selectedClip.name}
           </span>
-          <span className="font-mono text-[#00E5FF] text-[9px] bg-[#121218] px-1 py-0.2 rounded border border-[#26262E]">
+          <span className="font-mono text-slate-700 text-[9px] bg-slate-100 px-1 py-0.2 rounded border border-slate-200">
             {selectedClip.startTime.toFixed(2)}s
           </span>
           <div className="flex items-center gap-0.5 ml-0.5">
@@ -357,7 +357,7 @@ export default function MobileTimeline() {
                 navigator.vibrate?.(6);
               }}
               title="Nudge earlier 0.1s"
-              className="px-1.5 py-0.5 rounded bg-[#2A2A36] hover:bg-[#343444] active:bg-[#00E5FF] active:text-black text-white/90 font-mono text-[9px]"
+              className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-mono text-[9px]"
             >
               -0.1s
             </button>
@@ -369,7 +369,7 @@ export default function MobileTimeline() {
                 notify(`Aligned "${selectedClip.name}" to playhead.`);
               }}
               title="Snap start to playhead"
-              className="px-1.5 py-0.5 rounded bg-[#00E5FF] hover:bg-[#33EAFF] text-black font-semibold flex items-center gap-0.5 text-[9px]"
+              className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-white font-semibold flex items-center gap-0.5 text-[9px]"
             >
               <Target size={10} />
               <span>Snap</span>
@@ -382,7 +382,7 @@ export default function MobileTimeline() {
                 navigator.vibrate?.(6);
               }}
               title="Nudge later 0.1s"
-              className="px-1.5 py-0.5 rounded bg-[#2A2A36] hover:bg-[#343444] active:bg-[#00E5FF] active:text-black text-white/90 font-mono text-[9px]"
+              className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-mono text-[9px]"
             >
               +0.1s
             </button>
@@ -398,21 +398,21 @@ export default function MobileTimeline() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onPointerDown={handleMouseDown}
-        className="w-full h-full overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x no-scrollbar relative cursor-grab active:cursor-grabbing"
+        className="w-full h-full overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x no-scrollbar relative cursor-grab active:cursor-grabbing bg-slate-50"
       >
         <div className="relative h-full" style={{ width: `${trackAreaWidth}px` }}>
           {/* Ruler (22px) */}
-          <div className="h-[22px] border-b border-[#26262E] bg-[#141419] relative">
+          <div className="h-[22px] border-b border-slate-200 bg-white relative">
             {Array.from({ length: tickCount }).map((_, i) => {
               const sec = i * tickStep;
               const left = halfWidth + sec * pps;
               return (
                 <div
                   key={sec}
-                  className="absolute top-0 bottom-0 border-l border-[#26262E] flex items-center pl-1"
+                  className="absolute top-0 bottom-0 border-l border-slate-200 flex items-center pl-1"
                   style={{ left: `${left}px` }}
                 >
-                  <span className="text-[9px] font-mono text-[#7E7E88]">
+                  <span className="text-[9px] font-mono text-slate-500">
                     {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, "0")}
                   </span>
                 </div>
@@ -442,12 +442,12 @@ export default function MobileTimeline() {
           )}
 
           {/* 4 Compact Stacked Lanes (remaining ~138px) */}
-          <div className="flex flex-col justify-evenly h-[138px] py-1 gap-1 bg-[#0E0E12]">
-            {/* Track 1: Captions / Text Indicators (Amber Pills) */}
-            <div className="relative h-[24px] bg-[#131317]/60 border-y border-[#1E1E26]/40">
+          <div className="flex flex-col justify-evenly h-[138px] py-1 gap-1 bg-slate-50">
+            {/* Track 1: Captions / Text Indicators (Clean Blue Pills) */}
+            <div className="relative h-[24px] bg-white border-y border-slate-200">
               {trackGroups.captionsAndText.length === 0 && (
                 <span
-                  className="absolute top-1 text-[9px] text-[#6E6E78] font-mono flex items-center gap-1 pointer-events-none"
+                  className="absolute top-1 text-[9px] text-slate-400 font-mono flex items-center gap-1 pointer-events-none"
                   style={{ left: `${halfWidth + 8}px` }}
                 >
                   <Captions size={10} /> Captions
@@ -467,8 +467,8 @@ export default function MobileTimeline() {
                     style={{ left: `${left}px`, width: `${width}px` }}
                     className={`absolute top-0 bottom-0 rounded-md border px-1.5 flex items-center overflow-hidden text-left transition-colors cursor-pointer ${
                       isSelected
-                        ? "border-white ring-2 ring-white bg-[#362816] text-amber-100 z-20 shadow-lg"
-                        : "border-amber-700/60 bg-[#241B10] text-amber-200 z-10"
+                        ? "border-blue-600 ring-2 ring-blue-600 bg-blue-100 text-blue-950 z-20 shadow-md font-semibold"
+                        : "border-blue-200 bg-blue-50 text-blue-900 z-10"
                     }`}
                   >
                     {isSelected && (
@@ -476,27 +476,27 @@ export default function MobileTimeline() {
                         <div
                           data-trim-handle
                           onPointerDown={(e) => handleTrimClip(e, clip, "left")}
-                          className="absolute left-0 top-0 bottom-0 w-3.5 bg-white rounded-l-md rounded-r-xs flex items-center justify-center z-30 cursor-ew-resize active:scale-105 shadow-[0_0_8px_rgba(0,0,0,0.6)]"
+                          className="absolute left-0 top-0 bottom-0 w-3.5 bg-blue-600 rounded-l-md rounded-r-xs flex items-center justify-center z-30 cursor-ew-resize active:scale-105 shadow-sm"
                           title="Drag to trim start"
                         >
-                          <div className="w-[1.5px] h-3 bg-[#16161C] rounded-full" />
+                          <div className="w-[1.5px] h-3 bg-white rounded-full" />
                         </div>
                         <div
                           data-trim-handle
                           onPointerDown={(e) => handleTrimClip(e, clip, "right")}
-                          className="absolute right-0 top-0 bottom-0 w-3.5 bg-white rounded-r-md rounded-l-xs flex items-center justify-center z-30 cursor-ew-resize active:scale-105 shadow-[0_0_8px_rgba(0,0,0,0.6)]"
+                          className="absolute right-0 top-0 bottom-0 w-3.5 bg-blue-600 rounded-r-md rounded-l-xs flex items-center justify-center z-30 cursor-ew-resize active:scale-105 shadow-sm"
                           title="Drag to trim end"
                         >
-                          <div className="w-[1.5px] h-3 bg-[#16161C] rounded-full" />
+                          <div className="w-[1.5px] h-3 bg-white rounded-full" />
                         </div>
                       </>
                     )}
                     <span className="relative z-10 text-[9px] font-medium truncate px-1 flex items-center gap-1">
-                      <span className="px-1 py-0.2 rounded bg-amber-500/30 text-[8px] font-bold text-amber-300 flex-shrink-0">
+                      <span className="px-1 py-0.2 rounded bg-blue-200 text-[8px] font-bold text-blue-900 flex-shrink-0">
                         CC
                       </span>
                       <span className="truncate">{clip.name}</span>
-                      <span className="ml-auto text-[8px] font-mono text-amber-400/80 bg-black/50 px-0.5 rounded">
+                      <span className="ml-auto text-[8px] font-mono text-blue-800 bg-blue-100 px-0.5 rounded">
                         {clip.duration.toFixed(1)}s
                       </span>
                     </span>
@@ -505,11 +505,11 @@ export default function MobileTimeline() {
               })}
             </div>
 
-            {/* Track 2: Overlay / B-Roll Thumbnails (Cyan Border) */}
-            <div className="relative h-[28px] bg-[#131317]/60 border-b border-[#1E1E26]/40">
+            {/* Track 2: Overlay / B-Roll Thumbnails */}
+            <div className="relative h-[28px] bg-white border-b border-slate-200">
               {trackGroups.overlays.length === 0 && (
                 <span
-                  className="absolute top-1.5 text-[9px] text-[#6E6E78] font-mono flex items-center gap-1 pointer-events-none"
+                  className="absolute top-1.5 text-[9px] text-slate-400 font-mono flex items-center gap-1 pointer-events-none"
                   style={{ left: `${halfWidth + 8}px` }}
                 >
                   <Layers size={10} /> Overlay / B-Roll
@@ -570,10 +570,10 @@ export default function MobileTimeline() {
             </div>
 
             {/* Track 3: Main Video Thumbnail Strip + Waveform Bars */}
-            <div className="relative h-[38px] bg-[#15151C]/80 border-b border-[#1E1E26]/40">
+            <div className="relative h-[38px] bg-white border-b border-slate-200">
               {trackGroups.mainVideo.length === 0 && (
                 <span
-                  className="absolute top-2.5 text-[10px] text-[#6E6E78] font-mono flex items-center gap-1 pointer-events-none"
+                  className="absolute top-2.5 text-[10px] text-slate-400 font-mono flex items-center gap-1 pointer-events-none"
                   style={{ left: `${halfWidth + 8}px` }}
                 >
                   <Film size={11} /> Main Video Track
@@ -636,11 +636,11 @@ export default function MobileTimeline() {
               })}
             </div>
 
-            {/* Track 4: Audio / SFX Layers (Emerald/Purple Waveform Ribbon) */}
-            <div className="relative h-[26px] bg-[#131317]/60 border-b border-[#1E1E26]/40">
+            {/* Track 4: Audio / SFX Layers */}
+            <div className="relative h-[26px] bg-white border-b border-slate-200">
               {trackGroups.audioClips.length === 0 && (
                 <span
-                  className="absolute top-1 text-[9px] text-[#6E6E78] font-mono flex items-center gap-1 pointer-events-none"
+                  className="absolute top-1 text-[9px] text-slate-400 font-mono flex items-center gap-1 pointer-events-none"
                   style={{ left: `${halfWidth + 8}px` }}
                 >
                   <Music size={10} /> Audio &amp; SFX

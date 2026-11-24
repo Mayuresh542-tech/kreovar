@@ -80,7 +80,7 @@ export function aiProjectSnapshot(value: unknown): EditorProject {
   });
   const clips = record<Clip>(p.clips, value => {
     const c = object(value);
-    return { id: id(c.id),...(c.mediaAnimation===undefined?{}:{mediaAnimation:readMediaAnimation(c.mediaAnimation)}),...(c.kenBurns===undefined?{}:{kenBurns:choice(c.kenBurns,["ken-burns-push","ken-burns-pull","ken-burns-pan-left","ken-burns-pan-right"] as const)}),...(c.visualTreatment===undefined?{}:{visualTreatment:readVisualTreatment(c.visualTreatment)}),...(c.keyframes===undefined?{}:{keyframes:readKeyframes(c.keyframes)}),...(c.graphic===undefined?{}:{graphic:readMotionGraphic(c.graphic)}),...(c.shape===undefined?{}:{shape:readShape(c.shape)}),...(c.surface===undefined?{}:{surface:readStyleSurface(c.surface)}), ...(c.zooms===undefined?{}:{zooms:array(c.zooms,12).map(value=>{const z=object(value);return validateZoom({sourceStart:number(z.sourceStart),sourceEnd:number(z.sourceEnd),fromScale:number(z.fromScale,1,2),toScale:number(z.toScale,1,2),easing:choice(z.easing,["linear","smooth"]),returnToStart:boolean(z.returnToStart),focusX:number(z.focusX,-.4,.4),focusY:number(z.focusY,-.4,.4)});})}), ...(c.assetId ? { assetId: id(c.assetId) } : {}), ...(c.contentId ? { contentId: id(c.contentId) } : {}), trackId: id(c.trackId), name: string(c.name), startTime: number(c.startTime), duration: number(c.duration, 1 / 120), sourceStart: number(c.sourceStart), sourceEnd: number(c.sourceEnd), transform: transform(c.transform), effects: effects(c.effects), volume: number(c.volume, 0, 2), speed: number(c.speed, .25, 4), fadeIn: number(c.fadeIn), fadeOut: number(c.fadeOut),...(c.audioRole===undefined?{}:{audioRole:choice(c.audioRole,["speech","background","sfx"] as const)}),...(c.ducking===undefined?{}:{ducking:boolean(c.ducking)}) };
+    return { id: id(c.id),...(c.mediaAnimation===undefined?{}:{mediaAnimation:readMediaAnimation(c.mediaAnimation)}),...(c.kenBurns===undefined?{}:{kenBurns:choice(c.kenBurns,["ken-burns-push","ken-burns-pull","ken-burns-pan-left","ken-burns-pan-right"] as const)}),...(c.visualTreatment===undefined?{}:{visualTreatment:readVisualTreatment(c.visualTreatment)}),...(c.keyframes===undefined?{}:{keyframes:readKeyframes(c.keyframes)}),...(c.graphic===undefined?{}:{graphic:readMotionGraphic(c.graphic)}),...(c.shape===undefined?{}:{shape:readShape(c.shape)}),...(c.surface===undefined?{}:{surface:readStyleSurface(c.surface)}), ...(c.zooms===undefined?{}:{zooms:array(c.zooms,12).map(value=>{const z=object(value);return validateZoom({sourceStart:number(z.sourceStart),sourceEnd:number(z.sourceEnd),fromScale:number(z.fromScale,1,2),toScale:number(z.toScale,1,2),easing:choice(z.easing,["linear","smooth"]),returnToStart:boolean(z.returnToStart),focusX:number(z.focusX,-.4,.4),focusY:number(z.focusY,-.4,.4)});})}), ...(c.assetId ? { assetId: id(c.assetId) } : {}), ...(c.contentId ? { contentId: id(c.contentId) } : {}), trackId: id(c.trackId), name: string(c.name), startTime: number(c.startTime), duration: number(c.duration, 1 / 120), sourceStart: number(c.sourceStart), sourceEnd: number(c.sourceEnd), transform: transform(c.transform), effects: effects(c.effects), volume: number(c.volume, 0, 2), speed: number(c.speed, .25, 4), fadeIn: number(c.fadeIn), fadeOut: number(c.fadeOut),...(c.audioRole===undefined?{}:{audioRole:choice(c.audioRole,["speech","background","sfx"] as const)}),...(c.ducking===undefined?{}:{ducking:boolean(c.ducking)}),...(c.speedCurveId===undefined?{}:{speedCurveId:choice(c.speedCurveId,["hero","bullet","montage","jump_cut","flash_in","flash_out","standard"] as const)}) };
   });
   for(const c of Object.values(clips))if(c.visualTreatment && !tracks[c.trackId]?.locked)setVisualTreatment({assets,tracks,clips} as EditorProject,c.id,c.visualTreatment);
   const readText = (value: unknown): TextLayer => {
@@ -142,13 +142,29 @@ function decision(value: unknown): EditDecision {
     case "addText": return { op: d.op,...(d.placementId===undefined?{}:{placementId:textPlacementId(d.placementId)}), text: string(d.text, 5000), startTime: number(d.startTime), ...(d.style ? { style: style({ ...defaultStyle, ...object(d.style) }) } : {}) };
     case "addCaption": return { op: d.op,...(d.placementId===undefined?{}:{placementId:textPlacementId(d.placementId)}), text: string(d.text, 5000), startTime: number(d.startTime), duration: number(d.duration, 1 / 120),...(d.templateId===undefined?{}:{templateId:templateId(d.templateId)}),...(d.words===undefined?{}:{words:array(d.words,500).map(value=>{const w=object(value);return {word:string(w.word,200),start:number(w.start),end:number(w.end)};})}) };
     case "setAspectRatio": return { op: d.op, aspectRatio: choice(d.aspectRatio, ratios) as Ratio };
+    case "reframeProject": return {
+      op: d.op,
+      mode: choice(d.mode, ["fit-with-blur", "center-crop", "split-screen"] as const),
+      ...(d.focusX === undefined ? {} : { focusX: number(d.focusX, -0.5, 0.5) }),
+      ...(d.focusY === undefined ? {} : { focusY: number(d.focusY, -0.5, 0.5) }),
+      ...(d.blurAmount === undefined ? {} : { blurAmount: number(d.blurAmount, 0, 50) }),
+      ...(d.backgroundScale === undefined ? {} : { backgroundScale: number(d.backgroundScale, 1, 3.5) }),
+      ...(d.topRatio === undefined ? {} : { topRatio: number(d.topRatio, 0.2, 0.8) })
+    };
+    case "applySpeedCurve": return {
+      op: d.op,
+      clipId: id(d.clipId),
+      presetId: choice(d.presetId, ["hero", "bullet", "montage", "jump_cut", "flash_in", "flash_out", "standard"] as const),
+      ...(d.preservePitch === undefined ? {} : { preservePitch: boolean(d.preservePitch) })
+    };
     case "addTransition": return { op: d.op, fromClipId: id(d.fromClipId), toClipId: id(d.toClipId), kind: choice(d.kind, ["fade", "dissolve", "slide", "zoom"]), duration: number(d.duration, 1 / 120, 5) };
     case "changeClipProperty": {
       const c = object(d.changes), changes: Extract<EditDecision, { op: "changeClipProperty" }>["changes"] = {};
-      if (Object.keys(c).some(key => !["transform", "effects", "volume", "speed", "preservePitch", "fadeIn", "fadeOut", "audioRole", "ducking", "surface"].includes(key)) || !Object.keys(c).length) throw new Error("Unsupported clip property.");
+      if (Object.keys(c).some(key => !["transform", "effects", "volume", "speed", "preservePitch", "fadeIn", "fadeOut", "audioRole", "ducking", "surface", "speedCurveId"].includes(key)) || !Object.keys(c).length) throw new Error("Unsupported clip property.");
       if(c.audioRole!==undefined)changes.audioRole=choice(c.audioRole,["speech","background","sfx"] as const);
       if(c.ducking!==undefined)changes.ducking=boolean(c.ducking);
       if(c.preservePitch!==undefined)changes.preservePitch=boolean(c.preservePitch);
+      if(c.speedCurveId!==undefined)changes.speedCurveId=choice(c.speedCurveId,["hero","bullet","montage","jump_cut","flash_in","flash_out","standard"] as const);
       if (c.transform !== undefined) changes.transform = transform(c.transform);
       if (c.effects !== undefined) changes.effects = effects(c.effects);
       if (c.volume !== undefined) changes.volume = number(c.volume, 0, 2);

@@ -398,21 +398,21 @@ export default function EditorLayout({
   };
 
   return (
-    <div className="hidden md:flex h-screen w-screen overflow-hidden bg-[#121214] text-[#FFFFFF] flex-col font-sans select-none antialiased">
+    <div className="hidden md:flex h-screen w-screen overflow-hidden bg-[#121214] text-white flex-col font-sans select-none antialiased">
       <CaptionFonts />
 
       {/* ========================================================================= */}
-      {/* 1. TOP NAVIGATION BAR (CapCut Desktop Dark Studio UI)                    */}
+      {/* 1. TOP NAVIGATION BAR (CapCut Desktop Dark Studio UI)                     */}
       {/* ========================================================================= */}
-      <header className="h-14 bg-[#18181C] border-b border-[#2E2E33] px-3 flex items-center justify-between flex-shrink-0 z-30 select-none">
-        {/* Left: Back, Brand, Project Title, Save State, AI Copilot */}
+      <header className="h-14 bg-[#18181C] border-b border-[#2E2E33] px-3 flex items-center justify-between flex-shrink-0 z-30 select-none text-white">
+        {/* Left: Back, Brand, Project Title, Save State, AI Editor */}
         <div className="flex items-center gap-3 min-w-0">
           {onExit && (
             <button
               onClick={onExit}
               title="Back to Projects"
               aria-label="Back to Projects"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
             >
               <ArrowLeft size={16} />
             </button>
@@ -442,17 +442,17 @@ export default function EditorLayout({
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
             }}
-            className="bg-[#121214] hover:bg-[#222226] focus:bg-[#121214] border border-[#2E2E33] focus:border-[#00E5FF] rounded-lg px-2.5 py-1 text-xs font-semibold text-white outline-none w-44 sm:w-56 truncate transition-colors placeholder-[#A0A0A8]"
+            className="bg-[#121214] hover:bg-[#222226] focus:bg-[#18181C] border border-[#2E2E33] focus:border-[#00E5FF] rounded-lg px-2.5 py-1 text-xs font-semibold text-white outline-none w-44 sm:w-56 truncate transition-colors placeholder-[#6E6E78]"
           />
 
           {/* Cloud Auto-Save Status Indicator */}
           <button
             onClick={retrySave}
             title="Save status / Click to sync with cloud"
-            className="flex items-center gap-1.5 text-[11px] font-mono text-[#A0A0A8] hover:text-white px-2.5 py-1 rounded-lg bg-[#222226] hover:bg-[#2A2A30] border border-[#2E2E33] transition-colors"
+            className="flex items-center gap-1.5 text-[11px] font-mono text-[#A0A0A8] hover:text-white px-2.5 py-1 rounded-lg bg-[#121214] hover:bg-[#222226] border border-[#2E2E33] transition-colors cursor-pointer"
           >
             {persistenceState === "saving" || persistenceState === "loading" ? (
-              <LoaderCircle size={12} className="animate-spin text-[#00E5FF]" />
+              <LoaderCircle size={12} className="animate-spin text-blue-500" />
             ) : persistenceState === "failed" ? (
               <AlertCircle size={12} className="text-rose-500" />
             ) : (
@@ -472,16 +472,16 @@ export default function EditorLayout({
             </span>
           </button>
 
-          {/* AI Copilot Quick Button with Sparkles */}
+          {/* AI Editor Quick Button with Sparkles */}
           <button
             onClick={() => {
               window.dispatchEvent(new CustomEvent("veelox:toggle-ai-chat"));
             }}
-            title="AI Copilot Studio Assistant"
-            className="flex items-center gap-1.5 bg-[#222226] hover:bg-[#2A2A30] border border-[#2E2E33] hover:border-[#00E5FF]/50 text-[#00E5FF] font-semibold text-xs px-3 py-1.5 rounded-lg shadow-sm transition-all active:scale-95 group"
+            title="AI Editor Studio Assistant"
+            className="flex items-center gap-1.5 bg-[#222226] hover:bg-[#2A2A30] border border-[#2E2E33] text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition-all active:scale-95 group cursor-pointer"
           >
-            <Sparkles size={13} className="text-[#00E5FF] group-hover:scale-110 group-hover:rotate-12 transition-transform" />
-            <span className="hidden sm:inline">AI Copilot</span>
+            <Sparkles size={13} className="text-white group-hover:scale-110 group-hover:rotate-12 transition-transform" />
+            <span className="hidden sm:inline">AI Editor</span>
           </button>
         </div>
 
@@ -492,7 +492,7 @@ export default function EditorLayout({
             onClick={() => setShortcutsOpen(true)}
             title="Keyboard Shortcuts (?)"
             aria-label="Keyboard Shortcuts"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
           >
             <Keyboard size={15} />
           </button>
@@ -503,7 +503,7 @@ export default function EditorLayout({
             onClick={() => store.undo()}
             title="Undo (Ctrl+Z)"
             aria-label="Undo"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] disabled:opacity-25 disabled:hover:bg-transparent transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] disabled:opacity-25 disabled:hover:bg-transparent transition-colors cursor-pointer"
           >
             <Undo2 size={15} />
           </button>
@@ -514,7 +514,7 @@ export default function EditorLayout({
             onClick={() => store.redo()}
             title="Redo (Ctrl+Shift+Z)"
             aria-label="Redo"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] disabled:opacity-25 disabled:hover:bg-transparent transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] disabled:opacity-25 disabled:hover:bg-transparent transition-colors cursor-pointer"
           >
             <Redo2 size={15} />
           </button>
@@ -522,7 +522,7 @@ export default function EditorLayout({
           <div className="h-4 w-[1px] bg-[#2E2E33] mx-1" />
 
           {/* Aspect Ratio Selector (9:16, 16:9, 1:1, 4:5, 4:3) */}
-          <div className="flex items-center bg-[#222226] border border-[#2E2E33] rounded-lg px-2.5 py-1.5 text-xs text-white">
+          <div className="flex items-center bg-[#121214] border border-[#2E2E33] rounded-lg px-2.5 py-1.5 text-xs text-white">
             <span className="text-[#A0A0A8] mr-1.5 font-medium hidden sm:inline">Ratio</span>
             <select
               value={project.settings.aspectRatio}
@@ -561,9 +561,9 @@ export default function EditorLayout({
               type="button"
               onClick={() => setReframeOpen((prev) => !prev)}
               title="1-Click 16:9 to 9:16 Smart Reframing"
-              className="flex items-center gap-1.5 bg-[#222226] hover:bg-[#2A2A30] border border-[#2E2E33] hover:border-[#3E3E45] text-white font-medium text-xs px-2.5 py-1.5 rounded-lg shadow-sm transition-all active:scale-95"
+              className="flex items-center gap-1.5 bg-[#121214] hover:bg-[#222226] border border-[#2E2E33] hover:border-[#3E3E45] text-white font-medium text-xs px-2.5 py-1.5 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer"
             >
-              <Smartphone size={13} className="text-[#00E5FF]" />
+              <Smartphone size={13} className="text-[#A0A0A8]" />
               <span className="hidden md:inline">Reframe 9:16</span>
               <ChevronDown
                 size={11}
@@ -571,7 +571,7 @@ export default function EditorLayout({
               />
             </button>
             {reframeOpen && (
-              <div className="absolute right-0 mt-1.5 w-64 bg-[#18181C] border border-[#2E2E33] rounded-xl shadow-2xl z-50 p-1.5 text-xs space-y-1">
+              <div className="absolute right-0 mt-1.5 w-64 bg-[#18181C] border border-[#2E2E33] rounded-xl shadow-xl z-50 p-1.5 text-xs space-y-1">
                 <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#A0A0A8]">
                   Smart 9:16 Conversion
                 </div>
@@ -585,7 +585,7 @@ export default function EditorLayout({
                   className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-[#222226] flex flex-col gap-0.5 text-white transition-colors"
                 >
                   <span className="font-semibold flex items-center gap-1.5 text-white">
-                    <span className="w-2 h-2 rounded-full bg-[#00E5FF]" /> Fit with Blur
+                    <span className="w-2 h-2 rounded-full bg-blue-500" /> Fit with Blur
                   </span>
                   <span className="text-[11px] text-[#A0A0A8]">
                     Scales to fit width; blurred background wings fill top &amp; bottom
@@ -632,7 +632,7 @@ export default function EditorLayout({
             value={previewQuality}
             onChange={(e) => setPreviewQuality(Number(e.target.value))}
             aria-label="Preview Resolution"
-            className="bg-[#222226] border border-[#2E2E33] rounded-lg px-2.5 py-1.5 text-xs text-[#A0A0A8] font-medium focus:outline-none focus:border-[#00E5FF] cursor-pointer hidden sm:block"
+            className="bg-[#121214] border border-[#2E2E33] rounded-lg px-2.5 py-1.5 text-xs text-white font-medium focus:outline-none focus:border-[#3E3E45] cursor-pointer hidden sm:block"
           >
             <option value={540} className="bg-[#18181C] text-white">540p Draft</option>
             <option value={720} className="bg-[#18181C] text-white">720p HD</option>
@@ -644,7 +644,7 @@ export default function EditorLayout({
             onClick={() => setExportOpen(true)}
             disabled={!projectDuration(project)}
             title="Export Video"
-            className="bg-[#00E5FF] text-black font-bold hover:bg-[#33EAFF] px-4 py-1.5 rounded-lg flex items-center gap-1.5 shadow-md shadow-[#00E5FF]/20 transition-all disabled:opacity-40 disabled:hover:bg-[#00E5FF] active:scale-95 text-xs cursor-pointer"
+            className="bg-[#00E5FF] text-black font-bold hover:bg-[#33EAFF] px-4 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-40 active:scale-95 text-xs cursor-pointer"
           >
             <Download size={14} className="stroke-[2.5]" />
             <span>Export</span>
@@ -654,15 +654,15 @@ export default function EditorLayout({
 
       {/* Recovery / Conflict / Notice Banners */}
       {recoveryMessage && (
-        <div className="bg-[#1C1C22] border-b border-[#2E2E33] px-4 py-1.5 flex items-center justify-between text-xs text-[#00E5FF] z-30">
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-1.5 flex items-center justify-between text-xs text-blue-800 z-30">
           <span>{recoveryMessage}</span>
-          <button onClick={dismissRecovery} className="p-0.5 text-[#A0A0A8] hover:text-white">
+          <button onClick={dismissRecovery} className="p-0.5 text-slate-500 hover:text-slate-900 cursor-pointer">
             <X size={14} />
           </button>
         </div>
       )}
       {(notice || conflict) && (
-        <div className="bg-[#241E14] border-b border-amber-900/50 px-4 py-1.5 flex items-center justify-between text-xs text-amber-300 z-30">
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 flex items-center justify-between text-xs text-amber-900 z-30">
           <span>
             {conflict
               ? "This project was saved in another window. Cloud autosave paused to protect your edit."
@@ -671,12 +671,12 @@ export default function EditorLayout({
           {conflict ? (
             <button
               onClick={onReloadConflict}
-              className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-0.5 rounded font-semibold"
+              className="text-xs bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-0.5 rounded font-semibold cursor-pointer"
             >
               Reload Saved
             </button>
           ) : (
-            <button onClick={onDismissNotice} className="p-0.5 text-amber-400 hover:text-white">
+            <button onClick={onDismissNotice} className="p-0.5 text-amber-600 hover:text-amber-900 cursor-pointer">
               <X size={14} />
             </button>
           )}
@@ -684,9 +684,9 @@ export default function EditorLayout({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. MIDDLE REGION: TOOLBAR + ASSET DRAWER + CANVAS + AI CHAT COPILOT      */}
+      {/* 2. MIDDLE REGION: TOOLBAR + ASSET DRAWER + CANVAS + AI EDITOR            */}
       {/* ========================================================================= */}
-      <div className="flex-1 flex flex-row min-h-0 overflow-hidden relative">
+      <div className="flex-1 flex flex-row min-h-0 overflow-hidden relative bg-[#121214]">
         {/* Left: Mini-Bar Tool Navigation (Width: 64px) */}
         <ToolSidebar
           activeTab={activeTab}
@@ -708,7 +708,7 @@ export default function EditorLayout({
         {/* Center: Video Preview Canvas Stage */}
         <CanvasStage quality={previewQuality} />
 
-        {/* Right: Persistent Conversational AI Copilot (Width: 360px) */}
+        {/* Right: Persistent Conversational AI Editor (Width: 360px) */}
         <EditorAIChat />
       </div>
 
@@ -724,7 +724,7 @@ export default function EditorLayout({
         onDoubleClick={() => setTimelineHeight(300)}
         className="h-2 w-full bg-[#18181C] hover:bg-[#222226] border-t border-b border-[#2E2E33] cursor-row-resize flex items-center justify-center transition-colors group z-20"
       >
-        <div className="w-10 h-1 bg-[#3E3E45] group-hover:bg-[#00E5FF] rounded-full transition-colors" />
+        <div className="w-10 h-1 bg-[#2E2E33] group-hover:bg-[#A0A0A8] rounded-full transition-colors" />
       </div>
 
       {/* ========================================================================= */}
@@ -740,7 +740,7 @@ export default function EditorLayout({
       {/* Keyboard Shortcuts Dialog */}
       {shortcutsOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={() => setShortcutsOpen(false)}
         >
           <div
@@ -752,7 +752,7 @@ export default function EditorLayout({
           >
             <div className="flex items-center justify-between border-b border-[#2E2E33] pb-3 flex-shrink-0">
               <div className="flex items-center gap-2">
-                <Keyboard size={20} className="text-[#00E5FF]" />
+                <Keyboard size={20} className="text-[#A0A0A8]" />
                 <div>
                   <h2 id="shortcuts-title" className="font-semibold text-sm text-white">
                     NLE Keyboard Shortcuts &amp; Navigation
@@ -764,7 +764,7 @@ export default function EditorLayout({
               </div>
               <button
                 onClick={() => setShortcutsOpen(false)}
-                className="text-[#A0A0A8] hover:text-white p-1 rounded-lg hover:bg-[#222226] transition-colors"
+                className="text-[#A0A0A8] hover:text-white p-1 rounded-lg hover:bg-[#222226] transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -801,7 +801,7 @@ export default function EditorLayout({
                               {def.description}
                             </div>
                           </div>
-                          <span className="text-[#00E5FF] font-mono font-bold text-[10px] bg-[#00E5FF]/10 border border-[#00E5FF]/30 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
+                          <span className="text-white font-mono font-bold text-[10px] bg-[#18181C] border border-[#2E2E33] px-2 py-0.5 rounded shadow-2xs whitespace-nowrap shrink-0">
                             {def.keys}
                           </span>
                         </div>
@@ -821,7 +821,7 @@ export default function EditorLayout({
                   setShortcutsOpen(false);
                   notify("Loaded 15-second creator demo project.");
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#222226] hover:bg-[#2A2A30] text-[#00E5FF] font-semibold border border-[#2E2E33] hover:border-[#00E5FF]/40 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#222226] hover:bg-[#2A2A30] text-white font-semibold border border-[#2E2E33] transition-colors cursor-pointer"
               >
                 <Sparkles size={13} />
                 <span>Try Demo Project</span>

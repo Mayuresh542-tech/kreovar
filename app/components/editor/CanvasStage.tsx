@@ -116,6 +116,7 @@ export default function CanvasStage({
     let request = 0;
     let last = performance.now();
     let waiting = false;
+    let waitingStart = 0;
     let lastRender = 0;
     let lastProject: typeof project | undefined;
     let lastTime = -1;
@@ -159,7 +160,13 @@ export default function CanvasStage({
 
         if (waiting !== !ready) {
           waiting = !ready;
-          setBuffering(waiting);
+          if (waiting) {
+            if (!waitingStart) waitingStart = now;
+            if (state.playing && now - waitingStart > 500) setBuffering(true);
+          } else {
+            waitingStart = 0;
+            setBuffering(false);
+          }
         }
 
         const cvs = canvasRef.current;
@@ -206,7 +213,7 @@ export default function CanvasStage({
 
         if (state.playing && ready) {
           playback.set(next, isLoopingRef.current || next < curDuration);
-        } else if (!ready) {
+        } else if (!state.playing) {
           compositor.pause();
         }
       } catch (error) {
@@ -482,75 +489,82 @@ export default function CanvasStage({
 
   return (
     <section
-      className="vx-stage flex-1 bg-[#EDF1F6] flex flex-col items-center justify-between relative p-3 min-w-0 h-full overflow-hidden select-none"
+      className="vx-stage flex-1 bg-[#121214] flex flex-col items-center justify-between relative min-w-0 h-full overflow-hidden select-none"
       aria-label="Central Video Preview Stage"
     >
-      {/* Top Floating Stage HUD / Aspect Controls */}
-      <div className="w-full max-w-4xl flex items-center justify-between z-20 px-2 py-1 text-xs">
-        {/* Aspect Ratio Quick Toggle Pill */}
-        <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md border border-slate-200 px-2 py-1 rounded-xl shadow-sm">
-          <button
-            onClick={() =>
-              run((p) => ({
-                ...p,
-                settings: {
-                  ...p.settings,
-                  aspectRatio: aspectRatio === "9:16" ? "16:9" : "9:16",
-                },
-              }))
-            }
-            title="Toggle between 9:16 Portrait and 16:9 Widescreen"
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100 transition-colors"
-          >
-            {aspectRatio === "9:16" ? (
-              <Smartphone size={13} className="text-blue-600" />
-            ) : (
-              <Monitor size={13} className="text-blue-600" />
-            )}
-            <span>{aspectRatio}</span>
-          </button>
-
-          <span className="text-[11px] text-slate-600 px-1">
-            {aspectRatio === "9:16" ? "Reels / Shorts" : "Widescreen"}
-          </span>
+      {/* Top Preview Header (CapCut Desktop Parity: "Previewing — video") */}
+      <div className="w-full flex items-center justify-between z-20 px-4 py-2 text-xs bg-[#18181C] border-b border-[#2E2E33] text-white">
+        <div className="flex items-center gap-2 font-medium">
+          <span className="text-[13px] font-semibold text-white tracking-tight">Previewing — video</span>
         </div>
 
-        {/* Framing & Safe Area Overlays */}
-        <div className="flex items-center gap-1.5 bg-white/95 backdrop-blur-md border border-slate-200 px-2 py-1 rounded-xl shadow-sm text-slate-500">
-          {/* Safe Areas Guide */}
-          <button
-            onClick={() => setShowSafeAreas(!showSafeAreas)}
-            title="Toggle TikTok / Reels UI Safe Areas"
-            aria-pressed={showSafeAreas}
-            className={`p-1 rounded-lg transition-colors ${
-              showSafeAreas
-                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                : "hover:text-slate-900 hover:bg-slate-100"
-            }`}
-          >
-            <Shield size={14} />
-          </button>
+        {/* Right HUD: Aspect Ratio & Safe Area Overlays */}
+        <div className="flex items-center gap-2">
+          {/* Aspect Ratio Quick Toggle Pill */}
+          <div className="flex items-center gap-1.5 bg-[#222226] border border-[#2E2E33] px-2.5 py-1 rounded-lg text-white">
+            <button
+              onClick={() =>
+                run((p) => ({
+                  ...p,
+                  settings: {
+                    ...p.settings,
+                    aspectRatio: aspectRatio === "9:16" ? "16:9" : "9:16",
+                  },
+                }))
+              }
+              title="Toggle between 9:16 Portrait and 16:9 Widescreen"
+              className="flex items-center gap-1.5 text-white font-semibold hover:text-[#00E5FF] transition-colors"
+            >
+              {aspectRatio === "9:16" ? (
+                <Smartphone size={13} className="text-white" />
+              ) : (
+                <Monitor size={13} className="text-white" />
+              )}
+              <span>{aspectRatio}</span>
+            </button>
 
-          {/* Center Crosshair */}
-          <button
-            onClick={() => setShowCrosshair(!showCrosshair)}
-            title="Toggle Center Alignment Guides"
-            aria-pressed={showCrosshair}
-            className={`p-1 rounded-lg transition-colors ${
-              showCrosshair
-                ? "bg-blue-50 text-blue-700 border border-blue-200"
-                : "hover:text-slate-900 hover:bg-slate-100"
-            }`}
-          >
-            <Crosshair size={14} />
-          </button>
+            <span className="text-[11px] text-[#A0A0A8] px-0.5">
+              {aspectRatio === "9:16" ? "Portrait (9:16)" : "Landscape (16:9)"}
+            </span>
+          </div>
 
-          <div className="h-3 w-[1px] bg-slate-200 mx-0.5" />
+          {/* Framing & Safe Area Overlays */}
+          <div className="flex items-center gap-1 bg-[#222226] border border-[#2E2E33] px-2 py-1 rounded-lg text-[#A0A0A8]">
+            {/* Safe Areas Guide */}
+            <button
+              onClick={() => setShowSafeAreas(!showSafeAreas)}
+              title="Toggle TikTok / Reels UI Safe Areas"
+              aria-pressed={showSafeAreas}
+              className={`p-1 rounded transition-colors ${
+                showSafeAreas
+                  ? "bg-[#2E2E33] text-white"
+                  : "hover:text-white hover:bg-[#2A2A30]"
+              }`}
+            >
+              <Shield size={13} />
+            </button>
 
-          {/* Buffering or Quality Badge */}
-          <span className="text-[10px] font-mono text-slate-600">
-            {buffering ? "Buffering…" : `${quality}p`}
-          </span>
+            {/* Center Crosshair */}
+            <button
+              onClick={() => setShowCrosshair(!showCrosshair)}
+              title="Toggle Center Alignment Guides"
+              aria-pressed={showCrosshair}
+              className={`p-1 rounded transition-colors ${
+                showCrosshair
+                  ? "bg-[#2E2E33] text-white"
+                  : "hover:text-white hover:bg-[#2A2A30]"
+              }`}
+            >
+              <Crosshair size={13} />
+            </button>
+
+            <div className="h-3 w-[1px] bg-[#2E2E33] mx-0.5" />
+
+            {/* Buffering or Quality Badge */}
+            <span className="text-[10px] font-mono text-[#A0A0A8]">
+              {buffering ? "Buffering…" : `${quality}p`}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -700,22 +714,22 @@ export default function CanvasStage({
                 Your Next Story Starts Here
               </strong>
               <p className="text-slate-300 text-xs mt-1 max-w-xs">
-                Import raw A-roll footage from the Media tab or ask Kreovar AI Copilot to generate your video.
+                Import raw A-roll footage from the Media tab or ask Kreovar AI Editor to generate your video.
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Transport Control Bar */}
-      <div className="w-full max-w-2xl bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl px-4 py-2 flex items-center justify-between shadow-sm z-20 mt-2">
+      {/* Transport Control Bar (CapCut Desktop Parity: Integrated Dark Player Bar) */}
+      <div className="w-full bg-[#18181C] border-t border-[#2E2E33] px-4 py-2 flex items-center justify-between z-20 text-white">
         {/* Left: Step Frame & Go to Start */}
-        <div className="flex items-center gap-1.5 text-slate-600">
+        <div className="flex items-center gap-1.5 text-[#A0A0A8]">
           <button
             onClick={() => playback.set(0, false)}
             title="Go to Start (Home)"
             aria-label="Go to Start"
-            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg hover:text-white hover:bg-[#222226] transition-colors"
           >
             <RotateCcw size={14} />
           </button>
@@ -723,43 +737,42 @@ export default function CanvasStage({
             onClick={() => stepFrame(-1)}
             title="Step 1 Frame Back (←)"
             aria-label="Previous Frame"
-            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg hover:text-white hover:bg-[#222226] transition-colors"
           >
             <SkipBack size={15} />
           </button>
+          <button
+            onClick={() => stepFrame(1)}
+            title="Step 1 Frame Forward (→)"
+            aria-label="Next Frame"
+            className="p-1.5 rounded-lg hover:text-white hover:bg-[#222226] transition-colors"
+          >
+            <SkipForward size={15} />
+          </button>
         </div>
 
-        {/* Center: Play / Pause */}
-        <div className="flex items-center gap-4">
+        {/* Center: Play / Pause & Timecode */}
+        <div className="flex items-center gap-3">
           <button
             onClick={() => void togglePlay()}
             disabled={!duration}
             title="Play / Pause (Space)"
             aria-label={playing ? "Pause" : "Play"}
-            className="w-10 h-10 rounded-full bg-[#0F172A] hover:bg-slate-800 text-white flex items-center justify-center shadow-md transition-all hover:scale-105 disabled:opacity-40"
+            className="w-8 h-8 rounded-full bg-[#2A2A30] hover:bg-[#383842] text-white flex items-center justify-center transition-all hover:scale-105 disabled:opacity-40"
           >
-            {playing ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
+            {playing ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
           </button>
 
-          {/* Timecode Display */}
-          <div className="flex items-center font-mono text-xs text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg">
-            <span className="text-slate-900 font-bold">{formatTime(time, fps)}</span>
-            <span className="text-slate-400 mx-1.5">/</span>
-            <span className="text-slate-600">{formatTime(duration, fps)}</span>
+          {/* Timecode Display (CapCut Format: 00:00:00 / 00:00:00) */}
+          <div className="flex items-center font-mono text-xs bg-[#222226] border border-[#2E2E33] px-2.5 py-1 rounded-md">
+            <span className="text-white font-semibold">{formatTime(time, fps)}</span>
+            <span className="text-[#6E6E78] mx-1">/</span>
+            <span className="text-[#A0A0A8]">{formatTime(duration, fps)}</span>
           </div>
         </div>
 
-        {/* Right: Step Forward, Loop, Zoom, Fullscreen */}
-        <div className="flex items-center gap-1.5 text-slate-600">
-          <button
-            onClick={() => stepFrame(1)}
-            title="Step 1 Frame Forward (→)"
-            aria-label="Next Frame"
-            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors"
-          >
-            <SkipForward size={15} />
-          </button>
-
+        {/* Right: Loop, Zoom, Fullscreen, Quick AI Editor Launcher */}
+        <div className="flex items-center gap-1.5 text-[#A0A0A8]">
           {/* Loop Toggle */}
           <button
             onClick={() => setIsLooping(!isLooping)}
@@ -767,8 +780,8 @@ export default function CanvasStage({
             aria-pressed={isLooping}
             className={`p-1.5 rounded-lg transition-colors ${
               isLooping
-                ? "text-blue-600 bg-blue-50 border border-blue-200"
-                : "hover:text-slate-900 hover:bg-slate-100"
+                ? "text-white bg-[#2E2E33]"
+                : "hover:text-white hover:bg-[#222226]"
             }`}
           >
             <Repeat size={14} />
@@ -781,7 +794,7 @@ export default function CanvasStage({
               setZoom(e.target.value === "fit" ? "fit" : Number(e.target.value))
             }
             aria-label="Stage Scale"
-            className="bg-slate-50 border border-slate-200 text-[11px] text-slate-700 rounded-lg px-2 py-1 focus:outline-none focus:border-blue-600 ml-1"
+            className="bg-[#222226] border border-[#2E2E33] text-[11px] text-white rounded-md px-2 py-1 focus:outline-none focus:border-white ml-1"
           >
             <option value="fit">Fit</option>
             <option value={0.5}>50%</option>
@@ -801,9 +814,20 @@ export default function CanvasStage({
             }}
             title="Fullscreen Canvas"
             aria-label="Fullscreen"
-            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg hover:text-white hover:bg-[#222226] transition-colors"
           >
             {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+          </button>
+
+          {/* Quick AI Editor Launcher (CapCut EditPilot Parity) */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("veelox:toggle-ai-chat"))}
+            title="Open AI Editor"
+            aria-label="Open AI Editor"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#222226] hover:bg-[#2A2A30] border border-[#2E2E33] hover:border-[#3E3E45] text-white text-xs font-semibold transition-colors ml-1 cursor-pointer"
+          >
+            <Sparkles size={12} className="text-white" />
+            <span className="hidden sm:inline">AI Editor</span>
           </button>
         </div>
       </div>

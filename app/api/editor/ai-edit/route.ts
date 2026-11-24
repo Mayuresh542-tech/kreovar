@@ -38,7 +38,7 @@ async function postHandler(req: NextRequest) {
       if (bytes > MAX_BODY) { await reader.cancel(); return NextResponse.json({ error: "This project is too large for AI editing. Use a smaller project." }, { status: 413 }); }
       chunks.push(value);
     }
-    let project: EditorProject, instruction: string, selectedClipIds: string[],playheadTime=0,footageFrames:FootageFrame[]=[],fallbackFootageFrames:FootageFrame[]|undefined,completeEdit=false,pipelineStage:EditStage|undefined,editingBudget:EditingBudget|undefined,conversationHistory:{instructions:string;summary:string}[]|undefined,videoFile:{uri?:string;data?:string;mimeType:string}|undefined;
+    let project: EditorProject, instruction: string, selectedClipIds: string[],playheadTime=0,footageFrames:FootageFrame[]=[],fallbackFootageFrames:FootageFrame[]|undefined,completeEdit=false,pipelineStage:EditStage|undefined,editingBudget:EditingBudget|undefined,conversationHistory:{instructions:string;summary:string}[]|undefined,videoFile:{uri?:string;data?:string;mimeType:string}|undefined,detectedSilences:Array<{start:number;end:number;duration:number;source:'acoustic'|'transcript'|'hybrid'}>|undefined;
     try {
       const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
       if(body.pipelineStage!==undefined){if(!EDIT_STAGES.includes(body.pipelineStage))throw Error("Unknown editing stage.");pipelineStage=body.pipelineStage;}
@@ -66,6 +66,26 @@ async function postHandler(req: NextRequest) {
         }
       }
       if(body.playheadTime!==undefined){if(typeof body.playheadTime!=="number"||!Number.isFinite(body.playheadTime)||body.playheadTime<0)throw new Error("Invalid playhead time.");playheadTime=Math.min(projectDuration(project),body.playheadTime);}
+      if (body.detectedSilences !== undefined) {
+        if (!Array.isArray(body.detectedSilences)) throw new Error("Invalid detected silences format.");
+        const dur = projectDuration(project);
+        detectedSilences = body.detectedSilences
+          .slice(0, 100)
+          .filter((s: unknown) => s && typeof s === 'object')
+          .map((s: Record<string, unknown>) => {
+            const start = typeof s.start === 'number' && Number.isFinite(s.start) ? Math.max(0, Math.min(dur, s.start)) : 0;
+            const end = typeof s.end === 'number' && Number.isFinite(s.end) ? Math.max(0, Math.min(dur, s.end)) : 0;
+            const duration = typeof s.duration === 'number' && Number.isFinite(s.duration) ? Math.max(0, s.duration) : Math.max(0, end - start);
+            const source = (s.source === 'acoustic' || s.source === 'transcript' || s.source === 'hybrid') ? s.source : 'transcript';
+            return {
+              start: Math.round(start * 1000) / 1000,
+              end: Math.round(end * 1000) / 1000,
+              duration: Math.round(duration * 1000) / 1000,
+              source: source as 'acoustic' | 'transcript' | 'hybrid'
+            };
+          })
+          .filter((s: { start: number; end: number; duration: number; source: 'acoustic' | 'transcript' | 'hybrid' }) => s.end > s.start && s.duration > 0.02);
+      }
     } catch (error) {
       return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid edit request." }, { status: 400 });
     }
@@ -83,7 +103,7 @@ async function postHandler(req: NextRequest) {
     if (state.busy || state.count >= maxRequests) return NextResponse.json({ error: "Please wait a minute before requesting another AI edit." }, { status: 429, headers: { "Retry-After": "60" } });
     state.count++; state.busy = true;
     release = () => { state.busy = false; };
-    const plan = await planAiEdit(project, instruction, selectedClipIds, data.user.id, AbortSignal.any([req.signal, AbortSignal.timeout(80000)]),playheadTime,{footageFrames,fallbackFootageFrames,completeEdit,pipelineStage,editingBudget,conversationHistory,videoFile});
+    const plan = await planAiEdit(project, instruction, selectedClipIds, data.user.id, AbortSignal.any([req.signal, AbortSignal.timeout(80000)]),playheadTime,{footageFrames,fallbackFootageFrames,completeEdit,pipelineStage,editingBudget,conversationHistory,videoFile,detectedSilences});
     return NextResponse.json(plan, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if(error instanceof EditTokenBudgetError)return NextResponse.json({error:error.message,code:error.code},{status:error.status,headers:{'Cache-Control':'no-store'}});

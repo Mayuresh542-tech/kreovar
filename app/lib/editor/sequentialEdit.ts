@@ -48,7 +48,7 @@ export interface StageOutput {
  decisions?:EditDecision[]; assets?:MediaAsset[];
  prepared?:{assetId:string;role:AssetRole;decisions:EditDecision[];media?:MediaAsset;sourceLabel?:string;selection?:{candidateId:string;startTime:number;relevanceScore:number|null;reason:string}}[];
  requests?:AiToolRequest[]; operations?:EditOperation[];
- analysis?:{duration:number;footageIds:string[];speechSegments:number;sampledFrames:number;assetIds:string[]};
+ analysis?:{duration:number;footageIds:string[];speechSegments:number;sampledFrames:number;assetIds:string[];viralHooks?:Array<{start:number;end:number;text:string;type:string;score:number;recommendation:string}>};
  evidence?:{clipId:string;contentId?:string;assetId?:string;kind:string;signature:string;visible?:boolean}[];
  degradationNotices?: PipelineDegradationNotice[];
  skippedNotes?: string[];

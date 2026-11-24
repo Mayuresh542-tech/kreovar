@@ -60,6 +60,8 @@ function describe(d: EditDecision, project: EditorProject): string {
     case "addCaption": return `Add caption “${d.text}” at ${seconds(d.startTime)}s for ${seconds(d.duration)}s`;
     case "addTransition": return `Add ${d.kind} transition (${d.duration}s)`;
     case "setAspectRatio": return `Set project framing to ${d.aspectRatio}`;
+    case "reframeProject": return `Reframe project layout to 9:16 using ${d.mode}`;
+    case "applySpeedCurve": return `Apply ${d.presetId} speed ramp to ${name}`;
     case "changeClipProperty": return `Adjust ${name}: ${Object.entries(d.changes).map(([key, value]) => key === "speed" ? `speed ${value}×` : key === "volume" ? `volume ${Math.round(Number(value) * 100)}%` : key === "fadeIn" ? `fade in ${value}s` : key === "fadeOut" ? `fade out ${value}s` : key === "transform" ? `framing (${Object.entries(value).map(([k, v]) => `${k} ${v}`).join(", ")})` : `effects (${Object.entries(value).map(([k, v]) => `${k} ${v}`).join(", ")})`).join("; ")}`;
   }
 }

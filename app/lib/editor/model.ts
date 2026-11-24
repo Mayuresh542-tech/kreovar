@@ -41,6 +41,7 @@ export interface Clip {
   zooms?: import("./zoom").ZoomMotion[];
   audioRole?:AudioRole; ducking?:boolean;
   preservePitch?: boolean;
+  speedCurveId?: "hero" | "bullet" | "montage" | "jump_cut" | "flash_in" | "flash_out" | "standard";
   id: string; assetId?: string; contentId?: string; trackId: string; name: string;
   startTime: number; duration: number; sourceStart: number; sourceEnd: number;
   transform: Transform; volume: number; speed: number; fadeIn: number; fadeOut: number;
@@ -141,6 +142,7 @@ export const VALID_CAPTION_PRESETS = [
   'study-viral-hinglish-pop',
   'study-zero-gravity',
   // Canonical aliases & trending studio templates
+  'viral-hinglish-pop',
   'hormozi-punch',
   'viral-beast',
   'quiet-luxury',

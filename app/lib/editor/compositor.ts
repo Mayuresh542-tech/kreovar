@@ -18,6 +18,7 @@ import { MediaRepository, waitMedia } from "./media";
 
 import {captionMotionFrame} from "./captionMotion";
 import {clipGain,speechWindows} from "./audioMix";
+import {getSpeedCurvePreset, mapTimelineTimeToSourceTime, evaluateVelocityAtTime} from "./speedCurves";
 
 interface Entry { assetKey:string; element:HTMLMediaElement|HTMLImageElement; ready:boolean; error?:Error; source?:MediaElementAudioSourceNode; gain?:GainNode; playPending?:boolean; playError?:Error }
 export interface VisualBounds { id:string; x:number; y:number; width:number; height:number; rotation:number }
@@ -174,7 +175,7 @@ export class Compositor {
     const task=(async()=>{
       element.crossOrigin="anonymous";
       const url=await this.repository.resolve(asset);if(this.closed||this.entries.get(c.id)!==entry)return;
-      if(element instanceof HTMLMediaElement){element.preload="auto";element.muted=true;if(element instanceof HTMLVideoElement)element.playsInline=true;
+      if(typeof HTMLMediaElement!=="undefined"&&element instanceof HTMLMediaElement){element.preload="auto";element.muted=true;if(typeof HTMLVideoElement!=="undefined"&&element instanceof HTMLVideoElement)element.playsInline=true;
         const loaded=waitMedia(element);element.src=url;element.load();await loaded;this.connectAudio(entry);
       }else{await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{element.onload=null;element.onerror=null;reject(new Error(`Loading ${asset.name} timed out.`));},20000);element.onload=()=>{clearTimeout(timer);resolve();};element.onerror=()=>{clearTimeout(timer);reject(new Error(`Cannot load ${asset.name}. Remote media requires CORS permission.`));};element.src=url;});}
       entry.ready=true;
@@ -194,7 +195,21 @@ export class Compositor {
     for(const c of clips){const e=this.entries.get(c.id);if(e?.error)throw e.error;}
     await Promise.all(clips.map(async c=>{const e=this.entries.get(c.id)?.element;if(e instanceof HTMLMediaElement){const target=this.sourceTime(c,time);if(Math.abs(e.currentTime-target)>.01){const seek=waitMedia(e,"seeked");e.currentTime=Math.min(target,Math.max(0,e.duration-.001));await seek;}}}));
   }
-  private sourceTime(c:Clip,time:number,hold=false){return clamp(c.sourceStart+(hold?c.duration-0.001:time-c.startTime)*c.speed,c.sourceStart,Math.max(c.sourceStart,c.sourceEnd-0.001));}
+  private sourceTime(c:Clip,time:number,hold=false){
+    if(c.speedCurveId && c.speedCurveId !== "standard"){
+      const preset=getSpeedCurvePreset(c.speedCurveId);
+      const effectiveTime=hold?c.startTime+c.duration-0.001:time;
+      const remapped=mapTimelineTimeToSourceTime({
+        timelineTime:effectiveTime,
+        clipStartTime:c.startTime,
+        sourceStartTime:c.sourceStart,
+        duration:c.duration,
+        curve:preset
+      });
+      return clamp(remapped,c.sourceStart,Math.max(c.sourceStart,c.sourceEnd-0.001));
+    }
+    return clamp(c.sourceStart+(hold?c.duration-0.001:time-c.startTime)*c.speed,c.sourceStart,Math.max(c.sourceStart,c.sourceEnd-0.001));
+  }
   sync(p:EditorProject,time:number,playing:boolean):boolean {
     const now=typeof performance!=="undefined"?performance.now():Date.now();
     if(!playing&&this.lastSyncTime>=0&&Math.abs(time-this.lastSyncTime)>0.001){
@@ -230,9 +245,22 @@ export class Compositor {
             }
           }
         }else{
-          if(!element.seeking&&delta>(playing?.22*c.speed:.015)){element.currentTime=target;ready=false;}
-          if(element.seeking||element.readyState<2)ready=false;
-          element.playbackRate=c.speed;
+          let targetRate = c.speed;
+          if (c.speedCurveId && c.speedCurveId !== "standard") {
+            const preset = getSpeedCurvePreset(c.speedCurveId);
+            const localT = Math.max(0, Math.min(c.duration, time - c.startTime));
+            targetRate = evaluateVelocityAtTime(localT, c.duration, preset);
+          }
+          if(!element.seeking&&delta>(playing?0.65:0.02)){
+            element.currentTime=target;
+            if(!this.cachedFrames.has(c.id))ready=false;
+          }else if(playing&&delta>0.04){
+            const driftRatio=target>element.currentTime?Math.min(1.15,1+delta*0.2):Math.max(0.85,1-delta*0.2);
+            element.playbackRate=clamp(targetRate*driftRatio, 0.25, 4.0);
+          }else{
+            element.playbackRate=clamp(targetRate, 0.25, 4.0);
+          }
+          if(!this.cachedFrames.has(c.id)&&(element.seeking||element.readyState<2))ready=false;
           if('preservesPitch' in element){(element as any).preservesPitch=c.preservePitch!==false;}
           else if('webkitPreservesPitch' in element){(element as any).webkitPreservesPitch=c.preservePitch!==false;}
           if(entry.gain&&this.context)entry.gain.gain.setTargetAtTime(hold?0:clipGain(p,c,time,windows),this.context.currentTime,.008);
@@ -244,7 +272,8 @@ export class Compositor {
     for(const id of wanted){const entry=this.entries.get(id),element=entry?.element,c=p.clips[id];
       if(!entry||!(element instanceof HTMLMediaElement)||!c)continue;
       const active=time>=c.startTime&&time<c.startTime+c.duration&&!holdIds.has(id);
-      if(!playing||!ready||!active){element.pause();continue;}
+      if(!playing||!active){element.pause();continue;}
+      if(!ready)continue;
       if(element.paused&&!entry.playPending){entry.playPending=true;void element.play().catch(error=>{if(this.closed||this.entries.get(id)!==entry||error?.name==="AbortError")return;entry.playError=new Error(`${c.name}: ${error.message}`);}).finally(()=>{entry.playPending=false;});}
     }
     for(const id of this.entries.keys())if(!wanted.has(id))this.release(id);
@@ -297,10 +326,10 @@ export class Compositor {
             for(const word of words){if(wordIndex===motion.active){ctx.save();ctx.textAlign="left";ctx.fillStyle=caption?.highlightColor||"#d9ff43";ctx.fillText(word,offset,y);ctx.restore();}offset+=ctx.measureText(word+" ").width;wordIndex++;}
           }
         });
-      }else if(frame||element instanceof HTMLVideoElement||element instanceof HTMLImageElement){
-        const isVideo=element instanceof HTMLVideoElement;
-        const ew=frame?frame.width:isVideo?element.videoWidth:(element as HTMLImageElement).naturalWidth,eh=frame?frame.height:isVideo?element.videoHeight:(element as HTMLImageElement).naturalHeight;
-        if(isVideo && element.readyState>=2 && ew>0 && eh>0){
+      }else if(frame||(typeof HTMLVideoElement!=="undefined"&&element instanceof HTMLVideoElement)||(typeof HTMLImageElement!=="undefined"&&element instanceof HTMLImageElement)||(element&&((element as any).naturalWidth!==undefined||(element as any).videoWidth!==undefined))){
+        const isVideo=typeof HTMLVideoElement!=="undefined"&&element instanceof HTMLVideoElement;
+        const ew=frame?frame.width:isVideo?(element as HTMLVideoElement).videoWidth:(element as any)?.naturalWidth||0,eh=frame?frame.height:isVideo?(element as HTMLVideoElement).videoHeight:(element as any)?.naturalHeight||0;
+        if(isVideo && (element as HTMLVideoElement).readyState>=2 && ew>0 && eh>0){
           if(typeof document!=="undefined"){
             let cached=this.cachedFrames.get(c.id);
             if(!cached||cached.width!==ew||cached.height!==eh){
@@ -310,9 +339,9 @@ export class Compositor {
               this.cachedFrames.set(c.id,cached);
             }
             const offCtx=cached.canvas.getContext("2d");
-            if(offCtx)offCtx.drawImage(element,0,0,ew,eh);
+            if(offCtx)offCtx.drawImage(element as HTMLVideoElement,0,0,ew,eh);
           }
-          const mediaBounds=drawVisualMedia(ctx,frame?.image||element,ew,eh,width,height,c.visualTreatment,sourceTime,treatment.rgbOffset);
+          const mediaBounds=drawVisualMedia(ctx,frame?.image||(element as any),ew,eh,width,height,c.visualTreatment,sourceTime,treatment.rgbOffset);
           bw=mediaBounds.width;bh=mediaBounds.height;
           if(c.surface&&c.surface!=="none"){ctx.save();if(c.visualTreatment?.mask)applyVisualMask(ctx,c.visualTreatment.mask,bw,bh,sourceTime);drawStyleSurface(ctx,bw,bh,local,c.surface);ctx.restore();}
         }else if(isVideo && this.cachedFrames.has(c.id)){
@@ -320,9 +349,9 @@ export class Compositor {
           const mediaBounds=drawVisualMedia(ctx,cached.canvas,cached.width,cached.height,width,height,c.visualTreatment,sourceTime,treatment.rgbOffset);
           bw=mediaBounds.width;bh=mediaBounds.height;
           if(c.surface&&c.surface!=="none"){ctx.save();if(c.visualTreatment?.mask)applyVisualMask(ctx,c.visualTreatment.mask,bw,bh,sourceTime);drawStyleSurface(ctx,bw,bh,local,c.surface);ctx.restore();}
-        }else if(frame||element instanceof HTMLImageElement||(isVideo&&ew&&eh)){
+        }else if(frame||(typeof HTMLImageElement!=="undefined"&&element instanceof HTMLImageElement)||(isVideo&&ew&&eh)||(!isVideo&&ew&&eh)){
           if(!ew||!eh){ctx.restore();continue;}
-          const mediaBounds=drawVisualMedia(ctx,frame?.image||element as HTMLVideoElement|HTMLImageElement,ew,eh,width,height,c.visualTreatment,sourceTime,treatment.rgbOffset);
+          const mediaBounds=drawVisualMedia(ctx,frame?.image||(element as any),ew,eh,width,height,c.visualTreatment,sourceTime,treatment.rgbOffset);
           bw=mediaBounds.width;bh=mediaBounds.height;
           if(c.surface&&c.surface!=="none"){ctx.save();if(c.visualTreatment?.mask)applyVisualMask(ctx,c.visualTreatment.mask,bw,bh,sourceTime);drawStyleSurface(ctx,bw,bh,local,c.surface);ctx.restore();}
         }else{ctx.restore();continue;}

@@ -13,6 +13,7 @@ import { Clip, EditorProject, TransitionKind, TextStyle, Ratio, normalizeCaption
 import * as edit from "./operations";
 import {appendSequence} from "./sequence";
 import {applyCaptionTemplate,addTemplatedCaption} from "./captionTemplates";
+import {reframeProject,type ReframeMode} from "./reframing";
 import {ALL_CAPTION_TEMPLATES as DEFAULT_CAPTION_TEMPLATES} from "../captions/referenceTemplates";
 /** Provider-neutral EDL boundary. No provider credentials, model calls, or fabricated decisions. */
 export type EditDecision =
@@ -43,7 +44,9 @@ export type EditDecision =
   | {op:"mergeCaptions";clipIds:string[]}
   | {op:"changeTrack";trackId:string;hidden?:boolean;muted?:boolean}
   | {op:"setAspectRatio";aspectRatio:Ratio}
-  | {op:"changeClipProperty";clipId:string;changes:Partial<Pick<Clip,"transform"|"volume"|"speed"|"preservePitch"|"fadeIn"|"fadeOut"|"effects"|"audioRole"|"ducking"|"surface"|"mediaAnimation"|"kenBurns">>};
+  | {op:"reframeProject";mode:ReframeMode;focusX?:number;focusY?:number;blurAmount?:number;backgroundScale?:number;topRatio?:number}
+  | {op:"applySpeedCurve";clipId:string;presetId:"hero"|"bullet"|"montage"|"jump_cut"|"flash_in"|"flash_out"|"standard";preservePitch?:boolean}
+  | {op:"changeClipProperty";clipId:string;changes:Partial<Pick<Clip,"transform"|"volume"|"speed"|"preservePitch"|"fadeIn"|"fadeOut"|"effects"|"audioRole"|"ducking"|"surface"|"mediaAnimation"|"kenBurns"|"speedCurveId">>};
 export interface EditDecisionList {version:1;projectId:string;baseRevision:number;decisions:EditDecision[];transcriptionId?:string}
 /** Validate against a revision and apply atomically in one EditorStore.execute transaction. */
 export function applyEditDecisionList(p:EditorProject,list:EditDecisionList):EditorProject {
@@ -78,6 +81,17 @@ export function applyEditDecisionList(p:EditorProject,list:EditDecisionList):Edi
       case"addCaption":{const next=addTemplatedCaption(project,d.text,d.startTime,d.duration,d.templateId,d.words);return applyTextPlacement(next,Object.keys(next.clips).filter(id=>!project.clips[id]),d.placementId||"caption-safe");}
       case"addTransition":return edit.addTransition(project,d.fromClipId,d.toClipId,d.kind,d.duration);
       case"setAspectRatio":return {...project,settings:{...project.settings,aspectRatio:d.aspectRatio}};
+      case"reframeProject":return reframeProject(project,d.mode,{focusX:d.focusX,focusY:d.focusY,blurAmount:d.blurAmount,backgroundScale:d.backgroundScale,topRatio:d.topRatio});
+      case"applySpeedCurve":{
+        const clip=project.clips[d.clipId];
+        if(!clip)throw new Error("Target clip not found.");
+        const track=project.tracks[clip.trackId];
+        if(!track||track.locked)throw new Error("Track is locked.");
+        return edit.changeClipProperty(project,d.clipId,{
+          speedCurveId:d.presetId,
+          preservePitch:d.preservePitch??true
+        });
+      }
       case"changeClipProperty":return edit.changeClipProperty(project,d.clipId,d.changes);
       default:throw new Error("Unsupported AI editing operation.");
     }

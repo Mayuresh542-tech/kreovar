@@ -17,6 +17,10 @@ import {loadEditorStudioFonts} from './editorCaptionStudio';
 import {Compositor} from './compositor';
 import {extractEditingConstraints} from './editingIntent';
 import {createAutoSfxDecisions} from './autoSfx';
+import {detectSilences} from './audioSilenceDetector';
+import {extractViralHooks} from './viralHookExtractor';
+
+const silenceScanCache = new Map<string, Array<{ start: number; end: number; duration: number; source: 'acoustic' | 'transcript' | 'hybrid' }>>();
 
 function canSkipSupportingStage(stage:EditStage,project:EditorProject,output?:StageOutput,job?:EditingJob):boolean{
  if(job?.faultTolerant!==false)return true;
@@ -50,7 +54,51 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
   if(!token)throw Error('Sign in to use AI editing.');
   if(!frames)await readFrames(project,job.selection);
   const conversationHistory=(project.editingHistory||[]).filter(h=>h.status==='completed'&&!h.summary?.includes('stopped')).map(h=>({instructions:h.instructions,summary:h.summary}));
-  const response=await fetch('/api/editor/ai-edit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,'Idempotency-Key':job.id+':'+stage},body:JSON.stringify({instruction:stageInstruction(stage,job),pipelineStage:stage,editingJobId:job.id,project:aiProjectSnapshot(project),selectedClipIds:job.selection.filter(id=>!!project.clips[id]),footageFrames:frames,fallbackFootageFrames:fallbackFrames,conversationHistory}),signal:AbortSignal.any([signal,AbortSignal.timeout(85000)])});
+  let detectedSilences: Array<{ start: number; end: number; duration: number; source: 'acoustic' | 'transcript' | 'hybrid' }> | undefined;
+  const cacheKey = `${project.id}:${project.revision}`;
+  if (silenceScanCache.has(cacheKey)) {
+    detectedSilences = silenceScanCache.get(cacheKey);
+  } else if (stage === 'analyzeFootage' || stage === 'applyRequestedEdits') {
+    try {
+      const footage = analysisFootage(project, job.selection);
+      const hasFootage = footage.length > 0 || Object.values(project.clips).some(c => {
+        const t = project.tracks[c.trackId];
+        return t && (t.kind === 'video' || t.kind === 'audio') && !t.locked;
+      });
+      if (hasFootage) {
+        const segments = speechContext(project);
+        const flattenedWords = segments.flatMap(s => s.words && s.words.length > 0 ? s.words : (s.text ? [{ word: s.text, start: s.start, end: s.end }] : []));
+        const primaryAsset = footage.map(c => c.assetId ? project.assets[c.assetId] : undefined).find(Boolean) ||
+          Object.values(project.assets).find(a => a.waveform && a.waveform.length > 0);
+        const dur = projectDuration(project);
+        if (dur > 0 && (flattenedWords.length > 0 || (primaryAsset?.waveform && primaryAsset.waveform.length > 0))) {
+          const scan = detectSilences({
+            words: flattenedWords.length > 0 ? flattenedWords : undefined,
+            waveform: primaryAsset?.waveform,
+            duration: dur
+          }, {
+            thresholdDb: -38,
+            minSilenceDuration: 0.40,
+            paddingBefore: 0.060,
+            paddingAfter: 0.080,
+            minKeptGap: 0.15
+          });
+          if (scan.silentRanges && scan.silentRanges.length > 0) {
+            detectedSilences = scan.silentRanges.slice(0, 100).map(r => ({
+              start: r.start,
+              end: r.end,
+              duration: r.duration,
+              source: (r.mode === 'acoustic' ? 'acoustic' : (r.confidence && r.confidence > 0.93 ? 'hybrid' : 'transcript')) as 'acoustic' | 'transcript' | 'hybrid'
+            }));
+            silenceScanCache.set(cacheKey, detectedSilences);
+          }
+        }
+      }
+    } catch {
+      detectedSilences = undefined;
+    }
+  }
+  const response=await fetch('/api/editor/ai-edit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,'Idempotency-Key':job.id+':'+stage},body:JSON.stringify({instruction:stageInstruction(stage,job),pipelineStage:stage,editingJobId:job.id,project:aiProjectSnapshot(project),selectedClipIds:job.selection.filter(id=>!!project.clips[id]),footageFrames:frames,fallbackFootageFrames:fallbackFrames,conversationHistory,detectedSilences:detectedSilences?.length?detectedSilences:undefined}),signal:AbortSignal.any([signal,AbortSignal.timeout(85000)])});
   const result=await response.json();if(!response.ok)throw Error(publicErrorMessage(result.error,'This AI stage could not be completed. Please retry.'));
   if(result.list?.projectId!==project.id||result.list?.baseRevision!==project.revision)throw Error('AI returned a stale stage plan.');
   const validated=validateAiPlan({summary:publicServiceText(result.summary),decisions:result.list.decisions},project),requests=validateAiTools(result.toolRequests,stage==='applyRequestedEdits'?buildStageProject(project,{summary:result.summary,decisions:validated.list.decisions}):project,result.catalog||[]);
@@ -76,9 +124,28 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
    case 'analyzeFootage':{
     const footage=analysisFootage(project,job.selection);if(!footage.length&&job.presetId)throw Error('Add original footage to the timeline first.');
     if(!frames)await readFrames(project,job.selection);
+    const segments=speechContext(project);
+    let viralHooks: Array<{ start: number; end: number; text: string; type: string; score: number; recommendation: string }> | undefined;
+    try {
+      if (segments.length > 0) {
+        const hooks = extractViralHooks(segments);
+        if (hooks.length > 0) {
+          viralHooks = hooks.slice(0, 3).map(h => ({
+            start: Math.round(h.start * 100) / 100,
+            end: Math.round(h.end * 100) / 100,
+            text: (h.sampleText || h.title || '').slice(0, 160),
+            type: h.hookType,
+            score: Math.round(h.confidence * 100) / 100,
+            recommendation: (h.reason || '').slice(0, 200)
+          }));
+        }
+      }
+    } catch {
+      viralHooks = undefined;
+    }
     const operations=PIPELINE_PRESETS.find(p=>p.id===job.presetId)?.operations||(footage.length?explicitOperations(job.instructions):undefined);
-    const result=operations?{summary:`Analyzed ${footage.length} source clip(s), ${projectDuration(project).toFixed(2)} seconds, ${frames?.length||0} sampled frames and ${speechContext(project).length} available speech segments. Planned ${operations.join(', ')}.`,operations}:await plan(stage,project,job,signal);
-    return {...result,analysis:{duration:projectDuration(project),footageIds:footage.map(c=>c.id),speechSegments:speechContext(project).length,sampledFrames:frames?.length||0,assetIds:Object.keys(project.assets)}};
+    const result=operations?{summary:`Analyzed ${footage.length} source clip(s), ${projectDuration(project).toFixed(2)} seconds, ${frames?.length||0} sampled frames and ${segments.length} available speech segments. Planned ${operations.join(', ')}.`,operations}:await plan(stage,project,job,signal);
+    return {...result,analysis:{duration:projectDuration(project),footageIds:footage.map(c=>c.id),speechSegments:segments.length,sampledFrames:frames?.length||0,assetIds:Object.keys(project.assets),...(viralHooks?.length?{viralHooks}:{})}};
    }
    case 'applyCaptions':{
     try{

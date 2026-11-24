@@ -122,12 +122,12 @@ export default function ToolSidebar({
               aria-pressed={isActive}
               className={`w-full h-11 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer ${
                 isActive
-                  ? "bg-[#00E5FF]/15 text-[#00E5FF] font-bold border border-[#00E5FF]/30 shadow-[0_0_12px_rgba(0,229,255,0.15)]"
+                  ? "bg-[#222226] text-white font-bold border border-[#2E2E33] shadow-2xs"
                   : "text-[#A0A0A8] hover:text-white hover:bg-[#222226]"
               }`}
             >
               {isActive && (
-                <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#00E5FF] rounded-r shadow-[0_0_6px_#00E5FF]" />
+                <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#00E5FF] rounded-r" />
               )}
               <Icon
                 size={18}
@@ -137,7 +137,7 @@ export default function ToolSidebar({
               />
               <span
                 className={`text-[9.5px] mt-0.5 tracking-tight truncate max-w-[54px] ${
-                  isActive ? "text-[#00E5FF] font-bold" : "text-[#A0A0A8] font-medium group-hover:text-white"
+                  isActive ? "text-white font-bold" : "text-[#A0A0A8] font-medium group-hover:text-white"
                 }`}
               >
                 {tool.label}
@@ -146,7 +146,7 @@ export default function ToolSidebar({
           );
         })}
 
-        {/* Inspector Button (Highlighted in CapCut Cyan if clip selected) */}
+        {/* Inspector Button */}
         <button
           onClick={() => onSelectTab("inspector")}
           title="Inspector — Adjust selected clip properties"
@@ -154,14 +154,14 @@ export default function ToolSidebar({
           aria-pressed={isDrawerOpen && activeTab === "inspector"}
           className={`w-full h-11 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer mt-1 ${
             isDrawerOpen && activeTab === "inspector"
-              ? "bg-[#00E5FF]/15 text-[#00E5FF] font-bold border border-[#00E5FF]/30 shadow-[0_0_12px_rgba(0,229,255,0.15)]"
+              ? "bg-[#222226] text-white font-bold border border-[#2E2E33] shadow-2xs"
               : hasSelection
-              ? "text-[#00E5FF] bg-[#222226] hover:bg-[#2A2A30] border border-[#00E5FF]/40"
+              ? "text-[#00E5FF] bg-[#222226] hover:bg-[#2A2A30] border border-[#2E2E33]"
               : "text-[#A0A0A8] hover:text-white hover:bg-[#222226]"
           }`}
         >
           {isDrawerOpen && activeTab === "inspector" && (
-            <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#00E5FF] rounded-r shadow-[0_0_6px_#00E5FF]" />
+            <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#00E5FF] rounded-r" />
           )}
           <SlidersHorizontal
             size={18}
@@ -176,7 +176,7 @@ export default function ToolSidebar({
           <span
             className={`text-[9.5px] mt-0.5 tracking-tight ${
               isDrawerOpen && activeTab === "inspector"
-                ? "text-[#00E5FF] font-bold"
+                ? "text-white font-bold"
                 : hasSelection
                 ? "text-[#00E5FF] font-semibold"
                 : "text-[#A0A0A8] font-medium group-hover:text-white"
@@ -185,7 +185,7 @@ export default function ToolSidebar({
             Inspector
           </span>
           {hasSelection && (
-            <div className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#00E5FF] ring-2 ring-[#18181C] shadow-[0_0_6px_#00E5FF] animate-pulse" />
+            <div className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#00E5FF] ring-2 ring-[#18181C]" />
           )}
         </button>
 
@@ -197,7 +197,7 @@ export default function ToolSidebar({
           aria-pressed={isDrawerOpen && activeTab === "settings"}
           className={`w-full h-10 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer ${
             isDrawerOpen && activeTab === "settings"
-              ? "bg-[#00E5FF]/15 text-[#00E5FF] font-bold border border-[#00E5FF]/30"
+              ? "bg-[#222226] text-white font-bold border border-[#2E2E33]"
               : "text-[#A0A0A8] hover:text-white hover:bg-[#222226]"
           }`}
         >
@@ -205,14 +205,14 @@ export default function ToolSidebar({
             size={17}
             className={
               isDrawerOpen && activeTab === "settings"
-                ? "text-[#00E5FF]"
+                ? "text-white"
                 : "text-[#A0A0A8] group-hover:text-white"
             }
           />
           <span
             className={`text-[9px] mt-0.5 tracking-tight ${
               isDrawerOpen && activeTab === "settings"
-                ? "text-[#00E5FF] font-bold"
+                ? "text-white font-bold"
                 : "text-[#A0A0A8] font-medium group-hover:text-white"
             }`}
           >
@@ -228,20 +228,20 @@ export default function ToolSidebar({
           onClick={onToggleDrawer}
           title={isDrawerOpen ? "Collapse Tool Drawer" : "Expand Tool Drawer"}
           aria-label={isDrawerOpen ? "Collapse Tool Drawer" : "Expand Tool Drawer"}
-          className="w-10 h-10 flex items-center justify-center rounded-xl text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
         >
-          {isDrawerOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+          {isDrawerOpen ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
         </button>
 
-        {/* Keyboard Shortcuts Dialog Trigger */}
+        {/* Keyboard Shortcuts Help */}
         {onOpenShortcuts && (
           <button
             onClick={onOpenShortcuts}
             title="Keyboard Shortcuts (?)"
             aria-label="Keyboard Shortcuts"
-            className="w-10 h-10 flex items-center justify-center rounded-xl text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
           >
-            <Keyboard size={18} />
+            <Keyboard size={17} />
           </button>
         )}
       </div>

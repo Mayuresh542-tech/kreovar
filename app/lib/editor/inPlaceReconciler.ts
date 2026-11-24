@@ -62,7 +62,8 @@ export function reconcileEditingDecisions(
   decisions: EditDecision[],
   toolRequests: AiToolRequest[] = [],
   constraints?: EditingConstraints,
-  speech?: SpeechSegmentLike[]
+  speech?: SpeechSegmentLike[],
+  detectedSilences?: Array<{ start: number; end: number; duration: number; source?: string }>
 ): ReconciliationResult {
   const summaryNotes: string[] = [];
   let reconciledDecisions: EditDecision[] = [...decisions];
@@ -77,7 +78,7 @@ export function reconcileEditingDecisions(
   const addCaptionDecisions = reconciledDecisions.filter(d => d.op === 'addCaption');
   if (existingCaptionClips.length > 0 && addCaptionDecisions.length > 0) {
     // Redundant transcription detected: restyle existing captions in-place!
-    const targetTemplateId = (addCaptionDecisions[0] as { templateId?: string }).templateId || 'study-clean-motion';
+    const targetTemplateId = (addCaptionDecisions[0] as { templateId?: string }).templateId || 'viral-hinglish-pop';
     const existingClipIds = existingCaptionClips.map(c => c.id);
 
     // Strip addCaption operations
@@ -232,14 +233,19 @@ export function reconcileEditingDecisions(
       summaryNotes.push('Removed B-roll overlays from timeline.');
     }
 
-    // Silence & Pause Trimming (>0.40s word gaps into consolidated rippleCut with cadence alternation)
+    // Silence & Pause Trimming (detectedSilences or >0.40s word gaps into consolidated rippleCut with cadence alternation)
     if (constraints.requestedSilenceCut && !constraints.disallowedCuts) {
-      if (!reconciledDecisions.some(d => d.op === 'rippleCut') && speech && speech.length > 0) {
-        const rawRanges: Array<{ start: number; end: number }> = [];
-        for (let i = 0; i < allWords.length - 1; i++) {
-          const gap = allWords[i + 1].start - allWords[i].end;
-          if (gap > 0.40) {
-            rawRanges.push({ start: allWords[i].end, end: allWords[i + 1].start });
+      if (!reconciledDecisions.some(d => d.op === 'rippleCut')) {
+        let rawRanges: Array<{ start: number; end: number }> = [];
+
+        if (detectedSilences && detectedSilences.length > 0) {
+          rawRanges = detectedSilences.map(s => ({ start: s.start, end: s.end }));
+        } else if (speech && speech.length > 0) {
+          for (let i = 0; i < allWords.length - 1; i++) {
+            const gap = allWords[i + 1].start - allWords[i].end;
+            if (gap > 0.40) {
+              rawRanges.push({ start: allWords[i].end, end: allWords[i + 1].start });
+            }
           }
         }
 
@@ -265,7 +271,8 @@ export function reconcileEditingDecisions(
           }
 
           reconciledDecisions.push({ op: 'rippleCut', ranges: consolidated });
-          summaryNotes.push(`Trimmed ${consolidated.length} awkward speech pause(s) (>0.40s) into consolidated rippleCut with cadence alternation.`);
+          const sourceLabel = (detectedSilences && detectedSilences.length > 0) ? 'measured acoustic silence interval(s)' : 'awkward speech pause(s) (>0.40s)';
+          summaryNotes.push(`Trimmed ${consolidated.length} ${sourceLabel} into consolidated rippleCut with cadence alternation.`);
         } else {
           summaryNotes.push('No silent gaps > 0.4s detected; kept original clip timing intact.');
         }
@@ -303,6 +310,13 @@ export function reconcileEditingDecisions(
       reconciledDecisions = reconciledDecisions.filter(d => d.op !== 'setAspectRatio');
       reconciledDecisions.unshift({ op: 'setAspectRatio', aspectRatio: constraints.requestedAspectRatio });
       summaryNotes.push(`Changed aspect ratio to ${constraints.requestedAspectRatio}.`);
+    }
+
+    // Smart Reframing (fit-with-blur, center-crop, split-screen)
+    if (constraints.requestedReframeMode) {
+      reconciledDecisions = reconciledDecisions.filter(d => d.op !== 'reframeProject');
+      reconciledDecisions.unshift({ op: 'reframeProject', mode: constraints.requestedReframeMode });
+      summaryNotes.push(`Applied smart reframing (${constraints.requestedReframeMode}) to adapt project layout.`);
     }
 
     // Speed adjustments (0.1x to 10x with pitch preservation)
@@ -653,7 +667,7 @@ export function reconcileEditingDecisions(
       case 'animate':
       case 'setVisualTreatment': {
         const clip = project.clips[d.clipId];
-        return Boolean(clip && !project.tracks[clip.trackId]?.locked);
+        return Boolean(!clip || !project.tracks[clip.trackId]?.locked);
       }
       case 'composeCaption': {
         const clip = project.clips[d.clipId];
@@ -668,7 +682,7 @@ export function reconcileEditingDecisions(
       }
       case 'changeText': {
         const clip = project.clips[d.clipId];
-        return Boolean(clip && !project.tracks[clip.trackId]?.locked);
+        return Boolean(!clip || !project.tracks[clip.trackId]?.locked);
       }
       case 'mergeCaptions': {
         d.clipIds = (d.clipIds || []).filter(id => {

@@ -198,11 +198,11 @@ export default function MobileEditorLayout({
   }, []);
 
   return (
-    <div className="flex md:hidden h-[100dvh] w-screen overflow-hidden flex-col bg-[#0E0E12] text-white select-none overscroll-none font-sans antialiased">
+    <div className="flex md:hidden h-[100dvh] w-screen overflow-hidden flex-col bg-slate-50 text-slate-900 select-none overscroll-none font-sans antialiased">
       <CaptionFonts />
 
       {/* 1. TOP BAR (48px + Safe Area Top) matching CapCut Mobile */}
-      <header className="pt-[env(safe-area-inset-top)] min-h-[calc(48px+env(safe-area-inset-top))] bg-[#0E0E12] border-b border-[#26262E] px-2 flex items-center justify-between flex-shrink-0 z-30">
+      <header className="pt-[env(safe-area-inset-top)] min-h-[calc(48px+env(safe-area-inset-top))] bg-white border-b border-slate-200 px-2 flex items-center justify-between flex-shrink-0 z-30">
         {/* Left: Back Arrow '<' & subtle project title / save check */}
         <div className="flex items-center gap-1 min-w-0 flex-1 mr-1">
           {onExit && (
@@ -210,9 +210,9 @@ export default function MobileEditorLayout({
               type="button"
               onClick={onExit}
               aria-label="Back to Projects"
-              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-white/90 active:bg-white/10 active:scale-95 transition-all flex-shrink-0"
+              className="min-w-[40px] min-h-[40px] rounded-full flex items-center justify-center text-slate-700 active:bg-slate-100 active:scale-95 transition-all flex-shrink-0"
             >
-              <ArrowLeft size={19} className="text-white" />
+              <ArrowLeft size={19} className="text-slate-800" />
             </button>
           )}
 
@@ -232,21 +232,21 @@ export default function MobileEditorLayout({
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
             }}
-            className="bg-transparent focus:bg-[#1E1E26] border border-transparent focus:border-[#00E5FF] rounded-lg px-2 py-0.5 text-xs font-semibold text-white/90 outline-none min-w-0 flex-1 max-w-[120px] sm:max-w-[150px] truncate transition-colors"
+            className="bg-transparent focus:bg-slate-100 border border-transparent focus:border-slate-300 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-800 outline-none min-w-0 flex-1 max-w-[120px] sm:max-w-[150px] truncate transition-colors"
           />
 
           <button
             type="button"
             onClick={retrySave}
             aria-label={`Sync status: ${persistenceState}`}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-white/40 active:bg-white/10 transition-colors flex-shrink-0"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 active:bg-slate-100 transition-colors flex-shrink-0"
           >
             {persistenceState === "saving" || persistenceState === "loading" ? (
-              <LoaderCircle size={13} className="animate-spin text-[#00E5FF]" />
+              <LoaderCircle size={13} className="animate-spin text-blue-600" />
             ) : persistenceState === "failed" ? (
               <AlertCircle size={13} className="text-rose-500" />
             ) : (
-              <Check size={13} className="text-[#00E5FF]" />
+              <Check size={13} className="text-emerald-600" />
             )}
           </button>
         </div>
@@ -257,14 +257,14 @@ export default function MobileEditorLayout({
             type="button"
             onClick={toggleQuality}
             aria-label={`Resolution: ${previewQuality}P at ${fps} FPS. Tap to change.`}
-            className="min-h-[28px] px-2.5 py-0.5 rounded-full bg-[#1C1C24] hover:bg-[#252530] border border-[#2E2E38] text-white/90 text-[11px] font-semibold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
+            className="min-h-[28px] px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-800 text-[11px] font-semibold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
             <span>{previewQuality}P · {fps}fps</span>
           </button>
         </div>
 
-        {/* Right: Undo '↺', Redo '↻', and CapCut Cyan pill Export button */}
+        {/* Right: Undo '↺', Redo '↻', and Clean Slate Export button */}
         <div className="flex items-center gap-1 flex-shrink-0 ml-1">
           <button
             type="button"
@@ -272,7 +272,7 @@ export default function MobileEditorLayout({
             onClick={() => store.undo()}
             aria-label="Undo"
             title="Undo (↺)"
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 active:bg-white/10 disabled:opacity-30 transition-all active:scale-95"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 active:bg-slate-100 disabled:opacity-30 transition-all active:scale-95"
           >
             <Undo2 size={16} />
           </button>
@@ -282,7 +282,7 @@ export default function MobileEditorLayout({
             onClick={() => store.redo()}
             aria-label="Redo"
             title="Redo (↻)"
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 active:bg-white/10 disabled:opacity-30 transition-all active:scale-95"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 active:bg-slate-100 disabled:opacity-30 transition-all active:scale-95"
           >
             <Redo2 size={16} />
           </button>
@@ -291,9 +291,9 @@ export default function MobileEditorLayout({
             disabled={!hasClips}
             onClick={() => setExportOpen(true)}
             aria-label="Export Video"
-            className="min-h-[30px] ml-1 bg-[#00E5FF] hover:bg-[#33EAFF] active:bg-[#00C4CC] disabled:opacity-30 text-black font-bold text-xs px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,229,255,0.4)] active:scale-95 transition-all"
+            className="min-h-[30px] ml-1 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 disabled:opacity-30 text-white font-semibold text-xs px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-xs active:scale-95 transition-all"
           >
-            <Download size={13} className="text-black stroke-[2.5]" />
+            <Download size={13} className="text-white stroke-[2.5]" />
             <span>Export</span>
           </button>
         </div>
@@ -358,14 +358,14 @@ export default function MobileEditorLayout({
       />
 
       {/* 3. MIDDLE TRANSPORT & KEYFRAME STRIP (between Canvas and Timeline) */}
-      <div className="h-11 bg-[#0E0E12] border-t border-[#26262E] px-3 flex items-center justify-between flex-shrink-0 z-20 select-none">
+      <div className="h-11 bg-white border-t border-slate-200 px-3 flex items-center justify-between flex-shrink-0 z-20 select-none">
         {/* Left: Timecode '00:00 / 00:15' */}
         <div className="flex items-center gap-1 font-mono text-[11px] tabular-nums tracking-tight">
-          <span className="text-white font-semibold">
+          <span className="text-slate-900 font-semibold">
             {formatTime(playbackState.time, fps)}
           </span>
-          <span className="text-[#6E6E78]">/</span>
-          <span className="text-[#8E8E98]">{formatTime(duration, fps)}</span>
+          <span className="text-slate-400">/</span>
+          <span className="text-slate-600">{formatTime(duration, fps)}</span>
         </div>
 
         {/* Center: Round Play/Pause button with frame step chevrons */}
@@ -374,7 +374,7 @@ export default function MobileEditorLayout({
             type="button"
             onClick={() => handleStepFrame(-1)}
             aria-label="Step back 1 frame"
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white active:bg-white/10 transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 active:bg-slate-100 transition-colors"
           >
             <ChevronLeft size={16} />
           </button>
@@ -383,7 +383,7 @@ export default function MobileEditorLayout({
             type="button"
             onClick={handleTogglePlay}
             aria-label={playbackState.playing ? "Pause" : "Play"}
-            className="w-10 h-10 bg-white/10 hover:bg-white/15 active:bg-white/20 text-white rounded-full flex items-center justify-center shadow-md active:scale-95 transition-all"
+            className="w-10 h-10 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-900 rounded-full flex items-center justify-center shadow-xs active:scale-95 transition-all"
           >
             {playbackState.playing ? (
               <Pause size={17} fill="currentColor" />
@@ -396,13 +396,13 @@ export default function MobileEditorLayout({
             type="button"
             onClick={() => handleStepFrame(1)}
             aria-label="Step forward 1 frame"
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white active:bg-white/10 transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-800 active:bg-slate-100 transition-colors"
           >
             <ChevronRight size={16} />
           </button>
         </div>
 
-        {/* Right: CapCut Keyframe Diamond button ('◇+' or solid cyan '◆') + Fullscreen button '⛶' */}
+        {/* Right: Keyframe Diamond button ('◇+' or solid '◆') + Fullscreen button '⛶' */}
         <div className="flex items-center gap-1.5">
           {/* Keyframe Diamond Button */}
           <button
@@ -420,18 +420,18 @@ export default function MobileEditorLayout({
             }
             className={`min-h-[30px] px-2 rounded-lg flex items-center gap-1 text-xs font-semibold transition-all active:scale-95 ${
               !selectedClip
-                ? "opacity-35 cursor-not-allowed text-white/40"
+                ? "opacity-35 cursor-not-allowed text-slate-400"
                 : hasKeyframeAtPlayhead
-                ? "bg-[#00E5FF]/20 text-[#00E5FF] border border-[#00E5FF]/60 shadow-[0_0_8px_rgba(0,229,255,0.4)]"
-                : "bg-white/10 text-white/90 hover:text-white hover:bg-white/15 border border-white/15"
+                ? "bg-blue-50 text-blue-600 border border-blue-300"
+                : "bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200 border border-slate-200"
             }`}
           >
             {hasKeyframeAtPlayhead ? (
-              <span className="text-[#00E5FF] text-base leading-none drop-shadow">
+              <span className="text-blue-600 text-base leading-none">
                 ◆
               </span>
             ) : (
-              <span className="text-white text-xs leading-none font-bold">
+              <span className="text-slate-700 text-xs leading-none font-bold">
                 ◇+
               </span>
             )}
@@ -445,8 +445,8 @@ export default function MobileEditorLayout({
             title="Fullscreen Preview"
             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 ${
               isFullscreenPreview
-                ? "bg-[#00E5FF] text-black shadow-[0_0_8px_rgba(0,229,255,0.4)]"
-                : "bg-white/10 text-white/90 hover:text-white hover:bg-white/15 border border-white/15"
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200 border border-slate-200"
             }`}
           >
             {isFullscreenPreview ? <Minimize2 size={15} /> : <Maximize2 size={15} />}

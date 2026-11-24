@@ -289,7 +289,7 @@ export default function EditorPropertiesInspector({
             {inspectorType === "text" && "Text Layer Properties"}
             {inspectorType === "caption" && "Caption Style & Timing"}
             {inspectorType === "audio" && "Audio & Ducking"}
-            {inspectorType === "project" && "Project Settings"}
+            {inspectorType === "project" && "Details"}
           </span>
         </div>
 
@@ -1855,22 +1855,77 @@ export default function EditorPropertiesInspector({
         )}
 
         {/* ========================================================= */}
-        {/* CASE E: PROJECT SETTINGS (NOTHING SELECTED)              */}
+        {/* CASE E: CAPCUT DETAILS PANEL (NOTHING SELECTED)          */}
         {/* ========================================================= */}
         {inspectorType === "project" && (
-          <>
-            {/* Aspect Ratio Picker */}
-            <div className="space-y-2">
-              <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                Video Aspect Ratio
-              </span>
-              <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-4">
+            {/* CapCut Metadata Grid */}
+            <div className="space-y-2.5 text-xs text-slate-700">
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Name:</span>
+                <span className="font-semibold text-slate-900 truncate max-w-[160px]">
+                  {timeline.title || "Draft 1123"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Path:</span>
+                <span className="font-mono text-[10px] text-slate-600 truncate max-w-[160px]" title="Local project database">
+                  Local draft storage
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Imported media:</span>
+                <span className="text-slate-800">Stay in original location</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Arrange layers:</span>
+                <span className="text-slate-800 font-medium">Turned on</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Proxy:</span>
+                <span className="text-slate-800 font-medium">Turned off</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Timeline name:</span>
+                <span className="text-slate-800 font-medium">Timeline 01</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Aspect ratio:</span>
+                <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
+                  {timeline.aspectRatio}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Resolution:</span>
+                <span className="font-mono text-[11px] text-slate-800">
+                  {timeline.resolution.width}×{timeline.resolution.height}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Frame rate:</span>
+                <span className="font-mono text-[11px] text-slate-800">
+                  {timeline.settings?.fps || 30} FPS
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Aspect Ratio Switcher (CapCut Modify) */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider">
+                  Modify Aspect Ratio
+                </span>
+                <span className="text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-medium">
+                  Modify
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
                 {[
                   { ratio: "9:16", desc: "TikTok / Reels" },
-                  { ratio: "16:9", desc: "YouTube / TV" },
-                  { ratio: "1:1", desc: "Feed Posts" },
-                  { ratio: "4:5", desc: "Instagram" },
-                  { ratio: "4:3", desc: "Retro / Standard" },
+                  { ratio: "16:9", desc: "YouTube" },
+                  { ratio: "1:1", desc: "Square" },
+                  { ratio: "4:5", desc: "Portrait" },
+                  { ratio: "4:3", desc: "Standard" },
                 ].map(({ ratio, desc }) => {
                   const isCurrent = timeline.aspectRatio === ratio;
                   return (
@@ -1878,13 +1933,13 @@ export default function EditorPropertiesInspector({
                       key={ratio}
                       type="button"
                       onClick={() => onUpdateAspectRatio(ratio as AspectRatio)}
-                      className={`p-2 rounded-xl border text-left cursor-pointer transition-all ${
+                      className={`p-2 rounded-lg border text-left cursor-pointer transition-all ${
                         isCurrent
-                          ? "bg-slate-900 border-slate-900 text-white shadow-2xs"
+                          ? "bg-slate-900 border-slate-900 text-white shadow-2xs font-bold"
                           : "bg-white border-slate-200 hover:border-slate-300 text-slate-800"
                       }`}
                     >
-                      <div className="text-[11px] font-bold">{ratio}</div>
+                      <div className="text-[11px]">{ratio}</div>
                       <div className={`text-[9px] truncate ${isCurrent ? "text-slate-300" : "text-slate-500"}`}>
                         {desc}
                       </div>
@@ -1899,8 +1954,8 @@ export default function EditorPropertiesInspector({
             {/* Audio Ducking Global Toggle */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                  Voice Ducking
+                <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider">
+                  Auto Ducking
                 </span>
                 <input
                   type="checkbox"
@@ -1910,38 +1965,14 @@ export default function EditorPropertiesInspector({
                       audioDucking: e.target.checked,
                     })
                   }
-                  className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                  className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-slate-900"
                 />
               </div>
-              <p className="text-[11px] text-slate-500">
-                Automatically dips background music volume whenever voiceover audio is active.
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Automatically attenuates background music when speech is active on voiceover/caption tracks.
               </p>
             </div>
-
-            <div className="h-px bg-slate-200" />
-
-            {/* Project Technical Telemetry */}
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 font-mono text-[10px]">
-              <div className="flex justify-between text-slate-600">
-                <span>Duration:</span>
-                <span className="font-bold text-slate-900">{timeline.duration.toFixed(1)}s</span>
-              </div>
-              <div className="flex justify-between text-slate-600">
-                <span>Frame Rate:</span>
-                <span className="font-bold text-slate-900">{timeline.settings?.fps || 30} FPS</span>
-              </div>
-              <div className="flex justify-between text-slate-600">
-                <span>Resolution:</span>
-                <span className="font-bold text-slate-900">
-                  {timeline.resolution.width}×{timeline.resolution.height}
-                </span>
-              </div>
-              <div className="flex justify-between text-slate-600">
-                <span>Total Tracks:</span>
-                <span className="font-bold text-slate-900">{timeline.tracks.length}</span>
-              </div>
-            </div>
-          </>
+          </div>
         )}
       </div>
     </div>

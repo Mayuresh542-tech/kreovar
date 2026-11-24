@@ -488,7 +488,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
           <span className="font-semibold text-sm text-white truncate">
             {titles[activeTab] || "Library"}
           </span>
-          <span className="text-[10px] bg-[#222226] text-[#00E5FF] border border-[#2E2E33] px-2 py-0.5 rounded font-mono">
+          <span className="text-[10px] bg-[#222226] text-[#A0A0A8] border border-[#2E2E33] px-2 py-0.5 rounded font-mono">
             {activeTab === "media"
               ? `${Object.keys(project.assets).length} assets`
               : activeTab === "captions"
@@ -510,18 +510,18 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
       </header>
 
       {/* Drawer Body */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-[#2E2E33] scrollbar-track-transparent bg-[#18181C]">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-[#2E2E33] scrollbar-track-transparent bg-[#18181C] text-white">
         {/* ======================= TAB: CAPTIONS ======================= */}
         {activeTab === "captions" && (
           <div className="space-y-4">
             {/* Hinglish Toggle & Info */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50 border border-amber-200">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-[#222226] border border-[#2E2E33]">
               <div className="space-y-0.5">
-                <span className="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
-                  <Sparkles size={13} className="text-amber-600" />
+                <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-[#00E5FF]" />
                   Hinglish & Hindi Pop
                 </span>
-                <p className="text-[10px] text-amber-700">
+                <p className="text-[10px] text-[#A0A0A8]">
                   Dynamic color accents on Hindi/Hinglish keywords
                 </p>
               </div>
@@ -537,10 +537,10 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                   }
                 }}
                 aria-pressed={isHinglishMode}
-                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer ${
                   isHinglishMode
-                    ? "bg-amber-500 text-white font-semibold shadow-sm"
-                    : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                    ? "bg-[#00E5FF] text-black font-semibold shadow-sm"
+                    : "bg-[#18181C] border border-[#2E2E33] text-white hover:bg-[#2A2A30]"
                 }`}
               >
                 {isHinglishMode ? "Active" : "Enable"}
@@ -551,21 +551,21 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
             <div className="relative">
               <Search
                 size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0A8]"
               />
               <input
                 type="text"
                 placeholder="Search styles (Hormozi, Ali Abdaal, Beast)..."
                 value={captionQuery}
                 onChange={(e) => setCaptionQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white"
+                className="w-full bg-[#121214] border border-[#2E2E33] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-[#6E6E78] focus:outline-none focus:border-[#00E5FF] focus:bg-[#18181C]"
               />
             </div>
 
             {/* Registered Caption Presets Cards */}
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
+                <span className="text-[11px] font-semibold tracking-wider text-[#A0A0A8] uppercase">
                   Caption Presets ({ALL_CAPTION_TEMPLATES.length})
                 </span>
               </div>
@@ -587,26 +587,26 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                       key={preset.id}
                       onMouseEnter={() => setHoveredPreset(preset.id)}
                       onMouseLeave={() => setHoveredPreset(null)}
-                      className={`p-3 rounded-xl border bg-white transition-all cursor-pointer group ${
+                      className={`p-3 rounded-xl border bg-[#222226] transition-all cursor-pointer group ${
                         isSelected
-                          ? "border-blue-600 bg-blue-50/50 shadow-sm"
-                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                          ? "border-[#00E5FF] bg-[#2A2A30] shadow-sm"
+                          : "border-[#2E2E33] hover:border-[#3E3E45] hover:bg-[#2A2A30]"
                       }`}
                       onClick={() => handleApplyCaptionPreset(preset.id)}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-xs text-slate-900">
+                        <span className="font-semibold text-xs text-white">
                           {preset.name}
                         </span>
                         {isSelected && (
-                          <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-mono font-medium">
+                          <span className="text-[10px] bg-[#00E5FF] text-black px-1.5 py-0.5 rounded font-mono font-bold">
                             Active
                           </span>
                         )}
                       </div>
 
                       {/* Live Hovering Preview Box */}
-                      <div className="mt-2 h-14 rounded-lg bg-[#0F172A] flex items-center justify-center p-2 relative overflow-hidden border border-slate-200 group-hover:border-slate-300 transition-colors">
+                      <div className="mt-2 h-14 rounded-lg bg-[#121214] flex items-center justify-center p-2 relative overflow-hidden border border-[#2E2E33] group-hover:border-[#3E3E45] transition-colors">
                         <CaptionRenderer
                           text={sampleText}
                           currentTime={1.0}
@@ -615,7 +615,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                         />
                       </div>
 
-                      <p className="mt-2 text-[11px] text-slate-600 line-clamp-1">
+                      <p className="mt-2 text-[11px] text-[#A0A0A8] line-clamp-1">
                         {tagline}
                       </p>
                     </div>
@@ -637,13 +637,13 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
         {activeTab === "audio" && (
           <div className="space-y-4">
             {/* Quick Silence Trimmer Feature Card */}
-            <details className="rounded-2xl border border-blue-200 bg-blue-50/60 p-3 group">
-              <summary className="cursor-pointer text-xs font-semibold text-blue-900 flex items-center justify-between select-none">
+            <details className="rounded-2xl border border-[#2E2E33] bg-[#222226] p-3 group">
+              <summary className="cursor-pointer text-xs font-semibold text-white flex items-center justify-between select-none">
                 <span className="flex items-center gap-2">
-                  <Scissors size={14} className="text-blue-600" />
+                  <Scissors size={14} className="text-[#00E5FF]" />
                   <span>Silence Trimmer Studio</span>
                 </span>
-                <span className="text-[10px] text-blue-600 font-normal group-open:hidden">Open Controls ↓</span>
+                <span className="text-[10px] text-[#A0A0A8] font-normal group-open:hidden">Open Controls ↓</span>
               </summary>
               <div className="pt-3">
                 <SilenceTrimmerControls compact />
@@ -655,10 +655,10 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                 <button
                   key={cat}
                   onClick={() => setSfxCategory(cat)}
-                  className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors ${
+                  className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors cursor-pointer ${
                     sfxCategory === cat
-                      ? "bg-blue-600 text-white font-bold shadow-2xs"
-                      : "bg-slate-100 border border-slate-200 text-slate-800 hover:text-black hover:bg-slate-200 font-medium"
+                      ? "bg-[#00E5FF] text-black font-bold shadow-2xs"
+                      : "bg-[#222226] border border-[#2E2E33] text-[#A0A0A8] hover:text-white hover:bg-[#2A2A30] font-medium"
                   }`}
                 >
                   {cat}
@@ -670,20 +670,20 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
             <div className="relative">
               <Search
                 size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0A8]"
               />
               <input
                 type="text"
                 placeholder="Search SFX (Whoosh, click, pop, sub-drop)..."
                 value={sfxQuery}
                 onChange={(e) => setSfxQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-600 focus:bg-white"
+                className="w-full bg-[#121214] border border-[#2E2E33] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-[#6E6E78] focus:outline-none focus:border-[#00E5FF] focus:bg-[#18181C]"
               />
             </div>
 
             {/* Categorized SFX List */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
+              <div className="flex items-center justify-between text-[11px] text-[#A0A0A8]">
                 <span>Sound Effects ({BUILTIN_SFX.length})</span>
                 <span className="font-mono text-[10px]">WAV 48kHz</span>
               </div>
@@ -698,7 +698,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                   return (
                     <div
                       key={sfx.id}
-                      className="p-2.5 rounded-lg bg-slate-50/80 border border-slate-200 flex items-center justify-between hover:border-slate-300 hover:bg-white transition-colors group"
+                      className="p-2.5 rounded-lg bg-[#222226] border border-[#2E2E33] flex items-center justify-between hover:border-[#3E3E45] hover:bg-[#2A2A30] transition-colors group"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         {/* Instant Preview Play Button */}
@@ -706,20 +706,20 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                           onClick={() => togglePlaySfx(sfx.id, sfx.url)}
                           title={isPlaying ? "Stop Preview" : "Play Preview"}
                           aria-label={`Preview ${sfx.name}`}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                          className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
                             isPlaying
-                              ? "bg-violet-600 text-white"
-                              : "bg-white border border-slate-200 text-slate-600 hover:bg-violet-600 hover:text-white hover:border-violet-600"
+                              ? "bg-[#00E5FF] text-black"
+                              : "bg-[#18181C] border border-[#2E2E33] text-[#A0A0A8] hover:bg-[#00E5FF] hover:text-black hover:border-[#00E5FF]"
                           }`}
                         >
                           {isPlaying ? <Pause size={12} /> : <Play size={12} className="ml-0.5" />}
                         </button>
 
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-slate-900 truncate">
+                          <p className="text-xs font-medium text-white truncate">
                             {sfx.name}
                           </p>
-                          <span className="text-[10px] text-slate-500 font-mono">
+                          <span className="text-[10px] text-[#A0A0A8] font-mono">
                             {sfx.category} · {sfx.duration}s
                           </span>
                         </div>
@@ -729,7 +729,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                       <button
                         onClick={() => handleAddSfxToTimeline(sfx)}
                         title="Add to Audio Track at Playhead"
-                        className="opacity-90 group-hover:opacity-100 flex items-center gap-1 px-2 py-1 rounded bg-violet-50 hover:bg-violet-600 text-violet-700 hover:text-white text-[10px] font-semibold border border-violet-200 hover:border-violet-600 transition-colors"
+                        className="opacity-90 group-hover:opacity-100 flex items-center gap-1 px-2 py-1 rounded bg-[#18181C] hover:bg-[#00E5FF] text-[#A0A0A8] hover:text-black text-[10px] font-semibold border border-[#2E2E33] hover:border-[#00E5FF] transition-colors cursor-pointer"
                       >
                         <Plus size={11} />
                         <span>Add</span>
@@ -742,14 +742,13 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
           </div>
         )}
 
-        {/* ======================= TAB: MEDIA ======================= */}
         {/* ======================= TAB: MEDIA (CapCut Dark Media Grid) ======================= */}
         {activeTab === "media" && (
           <div className="space-y-4">
             {/* Upload Zone */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="p-4 border-2 border-dashed border-[#2E2E33] hover:border-[#00E5FF] rounded-xl bg-[#121214] hover:bg-[#16161C] text-center cursor-pointer transition-colors group"
+              className="p-4 border-2 border-dashed border-[#2E2E33] hover:border-[#00E5FF] rounded-xl bg-[#121214] hover:bg-[#222226] text-center cursor-pointer transition-colors group"
             >
               <input
                 ref={fileInputRef}
@@ -783,13 +782,13 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                   placeholder="Filter media..."
                   value={mediaQuery}
                   onChange={(e) => setMediaQuery(e.target.value)}
-                  className="w-full bg-[#121214] border border-[#2E2E33] rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-[#6E6E78] focus:outline-none focus:border-[#00E5FF]"
+                  className="w-full bg-[#121214] border border-[#2E2E33] rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-[#6E6E78] focus:outline-none focus:border-[#00E5FF] focus:bg-[#18181C]"
                 />
               </div>
               <select
                 value={mediaFilter}
                 onChange={(e) => setMediaFilter(e.target.value as any)}
-                className="bg-[#121214] border border-[#2E2E33] rounded-lg px-2 py-1.5 text-xs text-[#A0A0A8] focus:outline-none focus:border-[#00E5FF] cursor-pointer"
+                className="bg-[#121214] border border-[#2E2E33] rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-[#3E3E45] cursor-pointer"
               >
                 <option value="all" className="bg-[#18181C] text-white">All</option>
                 <option value="video" className="bg-[#18181C] text-white">Video</option>
@@ -798,7 +797,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
               </select>
             </div>
 
-            {/* Dark Media Grid with Clean Thumbnails & '+' Button */}
+            {/* Clean Media Grid with Thumbnails & '+' Button */}
             <div className="grid grid-cols-2 gap-2.5">
               {Object.values(project.assets)
                 .filter(
@@ -822,9 +821,9 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                       );
                       e.dataTransfer.effectAllowed = "copy";
                     }}
-                    className="p-1.5 rounded-xl bg-[#222226] border border-[#2E2E33] hover:border-[#00E5FF]/60 flex flex-col group transition-all relative overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-lg hover:shadow-black/50"
+                    className="p-1.5 rounded-xl bg-[#222226] border border-[#2E2E33] hover:border-[#3E3E45] flex flex-col group transition-all relative overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-xs"
                   >
-                    <div className="w-full h-20 rounded-lg bg-[#121214] border border-[#2E2E33] flex items-center justify-center overflow-hidden relative">
+                    <div className="w-full h-20 rounded-lg bg-[#18181C] border border-[#2E2E33] flex items-center justify-center overflow-hidden relative">
                       {asset.thumbnail ? (
                         <img
                           src={asset.thumbnail}
@@ -832,11 +831,11 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : asset.kind === "audio" ? (
-                        <Music size={22} className="text-[#00E5FF]" />
+                        <Music size={22} className="text-emerald-400" />
                       ) : asset.kind === "image" ? (
                         <ImageIcon size={22} className="text-pink-400" />
                       ) : (
-                        <Film size={22} className="text-[#00E5FF]" />
+                        <Film size={22} className="text-blue-400" />
                       )}
 
                       {/* Duration Badge */}
@@ -847,7 +846,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                       )}
 
                       {/* Kind Badge */}
-                      <span className="absolute top-1 left-1 bg-black/70 text-[#00E5FF] font-mono text-[8px] font-bold px-1 py-0.2 rounded uppercase tracking-wider">
+                      <span className="absolute top-1 left-1 bg-black/80 text-[#A0A0A8] font-mono text-[8px] font-bold px-1 py-0.2 rounded uppercase tracking-wider">
                         {asset.kind}
                       </span>
 
@@ -859,9 +858,9 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                         }}
                         title="Insert clip at playhead (+)"
                         aria-label={`Insert ${asset.name} at playhead`}
-                        className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+                        className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
                       >
-                        <div className="w-8 h-8 rounded-full bg-[#00E5FF] hover:bg-[#33EAFF] text-black flex items-center justify-center font-bold shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                        <div className="w-8 h-8 rounded-full bg-[#00E5FF] hover:bg-[#33EAFF] text-black flex items-center justify-center font-bold shadow-md transform scale-90 group-hover:scale-100 transition-transform">
                           <Plus size={18} className="stroke-[3]" />
                         </div>
                       </button>
@@ -880,8 +879,8 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
             </div>
 
             {Object.keys(project.assets).length === 0 && (
-              <div className="text-center py-6 px-4 bg-[#222226] rounded-xl border border-[#2E2E33] space-y-2.5">
-                <p className="text-xs text-[#A0A0A8]">
+              <div className="text-center py-6 px-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+                <p className="text-xs text-slate-500">
                   No assets uploaded yet.
                 </p>
                 <button
@@ -890,7 +889,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                     loadDemoProjectIntoStore(store);
                     notify("Loaded 15-second creator demo project.");
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#18181C] hover:bg-[#2A2A30] text-[#00E5FF] font-semibold text-xs border border-[#2E2E33] hover:border-[#00E5FF]/40 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer"
                 >
                   <Sparkles size={13} />
                   <span>Try Demo Project</span>
@@ -1077,13 +1076,13 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
               ].map((preset, idx) => (
                 <div
                   key={idx}
-                  className="p-3 rounded-xl border border-[#2E2E33] bg-[#222226] hover:border-[#00E5FF]/60 hover:bg-[#2A2A30] flex flex-col justify-between group transition-all relative overflow-hidden"
+                  className="p-3 rounded-xl border border-slate-200 bg-slate-50 hover:border-slate-300 flex flex-col justify-between group transition-all relative overflow-hidden"
                 >
                   <div>
-                    <p className="text-xs font-bold text-white truncate">{preset.name}</p>
-                    <p className="text-[10px] text-[#A0A0A8] truncate mt-0.5">{preset.desc}</p>
+                    <p className="text-xs font-bold text-slate-900 truncate">{preset.name}</p>
+                    <p className="text-[10px] text-slate-500 truncate mt-0.5">{preset.desc}</p>
                     <div
-                      className="mt-2 py-2 px-1 rounded bg-[#121214] border border-[#2E2E33] text-center font-bold text-xs truncate"
+                      className="mt-2 py-2 px-1 rounded bg-white border border-slate-200 text-center font-bold text-xs truncate shadow-2xs"
                       style={{ color: preset.color }}
                     >
                       {preset.text}
@@ -1110,7 +1109,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                       notify(`Added "${preset.name}" at ${curTime.toFixed(1)}s.`);
                     }}
                     title="Insert text at playhead"
-                    className="mt-2.5 w-full py-1.5 rounded-lg bg-[#18181C] hover:bg-[#00E5FF] hover:text-black text-[#00E5FF] border border-[#00E5FF]/40 hover:border-[#00E5FF] text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
+                    className="mt-2.5 w-full py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer shadow-2xs"
                   >
                     <Plus size={13} className="stroke-[2.5]" />
                     <span>Insert</span>
@@ -1124,7 +1123,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
         {/* ======================= TAB: TRANSITIONS ======================= */}
         {activeTab === "transitions" && (
           <div className="space-y-4">
-            <span className="text-[11px] font-semibold text-[#A0A0A8] uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
               CapCut Video Transitions
             </span>
             <div className="grid grid-cols-2 gap-2">
@@ -1138,13 +1137,13 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                   key={tr.kind}
                   type="button"
                   onClick={() => handleAddTransition(tr.kind)}
-                  className="p-3 rounded-xl border border-[#2E2E33] bg-[#222226] hover:border-[#00E5FF]/60 hover:bg-[#2A2A30] text-left transition-all cursor-pointer group"
+                  className="p-3 rounded-xl border border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100 text-left transition-all cursor-pointer group"
                 >
-                  <p className="text-xs font-semibold text-white group-hover:text-[#00E5FF] transition-colors">{tr.name}</p>
-                  <span className="text-[10px] text-[#A0A0A8] mt-1 block">
+                  <p className="text-xs font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{tr.name}</p>
+                  <span className="text-[10px] text-slate-500 mt-1 block">
                     {tr.desc}
                   </span>
-                  <div className="mt-2 text-[9px] font-mono text-[#00E5FF] bg-[#121214] border border-[#2E2E33] px-1.5 py-0.5 rounded w-fit">
+                  <div className="mt-2 text-[9px] font-mono text-slate-700 bg-white border border-slate-200 px-1.5 py-0.5 rounded w-fit shadow-2xs">
                     1-Click Apply
                   </div>
                 </button>
@@ -1183,10 +1182,10 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                       notify("Select a clip on the timeline first.");
                     }
                   }}
-                  className="p-2.5 rounded-xl border border-[#2E2E33] bg-[#222226] hover:border-[#00E5FF]/60 hover:bg-[#2A2A30] text-left transition-all cursor-pointer group"
+                  className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100 text-left transition-all cursor-pointer group"
                 >
-                  <p className="text-xs font-semibold text-white group-hover:text-[#00E5FF] transition-colors">{zoom.name}</p>
-                  <span className="text-[10px] text-[#A0A0A8] font-mono">
+                  <p className="text-xs font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{zoom.name}</p>
+                  <span className="text-[10px] text-slate-500 font-mono">
                     {zoom.scale}× · {zoom.desc}
                   </span>
                 </button>

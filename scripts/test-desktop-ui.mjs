@@ -50,10 +50,9 @@ test("Task 2: EditorLayout.tsx Top Bar matches CapCut Studio specs", () => {
   assert.ok(layoutTsx.includes("4:5"), "Aspect ratio must include 4:5");
   assert.ok(layoutTsx.includes("4:3"), "Aspect ratio must include 4:3");
 
-  // Check AI Copilot quick button with sparkles
-  assert.ok(layoutTsx.includes("AI Copilot"), "Top bar must have AI Copilot quick button");
-  assert.ok(layoutTsx.includes("Sparkles"), "AI Copilot button must include Sparkles icon");
-  assert.ok(layoutTsx.includes("text-[#00E5FF]"), "AI Copilot button must use CapCut cyan text");
+  // Check AI Editor quick button with sparkles
+  assert.ok(layoutTsx.includes("AI Editor"), "Top bar must have AI Editor quick button");
+  assert.ok(layoutTsx.includes("Sparkles"), "AI Editor button must include Sparkles icon");
 
   // Check Undo/Redo
   assert.ok(layoutTsx.includes("Undo2"), "Top bar must have Undo button");
