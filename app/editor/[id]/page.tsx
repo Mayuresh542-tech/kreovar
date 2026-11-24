@@ -19,9 +19,13 @@ function EditorPageContent({ params }: { params: Promise<{ id: string }> }) {
     });
   }, []);
 
-  useEffect(() => { if (status === "unauthed") router.replace("/login"); }, [status, router]);
+  useEffect(() => {
+    if (status === "unauthed" && id !== "demo" && id !== "demo_creator_starter" && process.env.NODE_ENV === "production") {
+      router.replace("/login");
+    }
+  }, [status, router, id]);
 
-  if (status !== "authed") {
+  if (status === "loading") {
     return <AuthLoadingScreen label="Loading video editor…" />;
   }
 

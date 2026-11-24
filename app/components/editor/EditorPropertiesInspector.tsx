@@ -848,6 +848,26 @@ export default function EditorPropertiesInspector({
 
   const isMultiSelection = selectedClipIds.length > 1;
 
+  // Fallback to first clip in timeline if no clip is explicitly selected
+  const firstTimelineClip =
+    (timeline.tracks as any[]).flatMap((t: any) => t.clips || [])[0] ||
+    null;
+  const targetClip: TimelineItem = selectedClip || firstTimelineClip || {
+    id: "default_clip",
+    name: "Video 1",
+    duration: timeline.duration || 15,
+    startTime: 0,
+    trackId: "track-video",
+    speed: 1.0,
+    volume: 1.0,
+    fadeIn: 0,
+    fadeOut: 0,
+    scale: 1.0,
+    rotation: 0,
+    opacity: 1.0,
+    transform: { x: 0, y: 0, scale: 1.0, rotation: 0, opacity: 1.0 },
+  };
+
   // Determine contextual mode based on selected clip's track and type
   const inspectorType = isMultiSelection
     ? "multi"
@@ -884,11 +904,10 @@ export default function EditorPropertiesInspector({
 
             <span className="text-xs font-bold text-slate-900 tracking-tight truncate">
               {inspectorType === "multi" && `Multi-Selection (${selectedClipIds.length})`}
-              {inspectorType === "video" && "Video Clip Properties"}
               {inspectorType === "text" && "Text Layer Properties"}
               {inspectorType === "caption" && "Caption Style & Timing"}
-              {inspectorType === "audio" && "Audio & Ducking"}
-              {inspectorType === "project" && "Details"}
+              {(inspectorType === "video" || inspectorType === "audio" || inspectorType === "project") &&
+                (selectedClip ? `${(selectedClip as any).name || (selectedClip as any).label || "Clip"} Properties` : "Clip Properties & Audio/Speed")}
             </span>
           </div>
 
@@ -904,72 +923,64 @@ export default function EditorPropertiesInspector({
           )}
         </div>
 
-        {/* CapCut Inspector Top Tabs (Image 5 Parity: Video | Audio | Speed | Animation | Adjust) */}
-        {(inspectorType === "video" || inspectorType === "audio") && (
-          <div className="flex items-center px-2 gap-1 border-t border-slate-100 bg-slate-50/60 text-xs">
-            {inspectorType === "video" && (
-              <button
-                type="button"
-                onClick={() => setActiveInspectorTab("video")}
-                className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
-                  activeInspectorTab === "video"
-                    ? "border-sky-500 text-sky-600 font-bold bg-white"
-                    : "border-transparent text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                Video
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setActiveInspectorTab("audio")}
-              className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
-                activeInspectorTab === "audio" || (inspectorType === "audio" && activeInspectorTab !== "speed")
-                  ? "border-sky-500 text-sky-600 font-bold bg-white"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              Audio
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveInspectorTab("speed")}
-              className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
-                activeInspectorTab === "speed"
-                  ? "border-sky-500 text-sky-600 font-bold bg-white"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              Speed
-            </button>
-            {inspectorType === "video" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setActiveInspectorTab("animation")}
-                  className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
-                    activeInspectorTab === "animation"
-                      ? "border-sky-500 text-sky-600 font-bold bg-white"
-                      : "border-transparent text-slate-500 hover:text-slate-900"
-                  }`}
-                >
-                  Animation
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveInspectorTab("adjust")}
-                  className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
-                    activeInspectorTab === "adjust"
-                      ? "border-sky-500 text-sky-600 font-bold bg-white"
-                      : "border-transparent text-slate-500 hover:text-slate-900"
-                  }`}
-                >
-                  Adjust
-                </button>
-              </>
-            )}
-          </div>
-        )}
+        {/* CapCut Inspector Top Tabs (Image 5 Parity: Video | Audio | Speed | Animation | Adjust) - Always Visible */}
+        <div className="flex items-center px-2 gap-1 border-t border-slate-100 bg-slate-50/60 text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveInspectorTab("video")}
+            className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+              activeInspectorTab === "video"
+                ? "border-sky-500 text-sky-600 font-bold bg-white"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Video
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveInspectorTab("audio")}
+            className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+              activeInspectorTab === "audio"
+                ? "border-sky-500 text-sky-600 font-bold bg-white"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Audio
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveInspectorTab("speed")}
+            className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+              activeInspectorTab === "speed"
+                ? "border-sky-500 text-sky-600 font-bold bg-white"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Speed
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveInspectorTab("animation")}
+            className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+              activeInspectorTab === "animation"
+                ? "border-sky-500 text-sky-600 font-bold bg-white"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Animation
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveInspectorTab("adjust")}
+            className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+              activeInspectorTab === "adjust"
+                ? "border-sky-500 text-sky-600 font-bold bg-white"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Adjust
+          </button>
+        </div>
       </div>
 
       {/* 2. Scrollable Body Content */}
@@ -1067,15 +1078,16 @@ export default function EditorPropertiesInspector({
         )}
 
         {/* ========================================================= */}
-        {/* CASE A: VIDEO CLIP INSPECTOR                             */}
+        {/* CASE A: VIDEO / AUDIO / SPEED / ANIMATION / ADJUST TABS   */}
         {/* ========================================================= */}
-        {inspectorType === "video" && selectedClip && (
+        {(inspectorType === "video" || inspectorType === "audio" || inspectorType === "project") && (
           <>
-            {/* SUB-TAB 1: VIDEO (Transform & Keyframes) */}
+            {/* SUB-TAB 1: VIDEO (Transform & Keyframes or Project Details) */}
             {activeInspectorTab === "video" && (
-              <>
-                {/* Spatial Transform Precision */}
-                <div className="space-y-3">
+              selectedClip ? (
+                <>
+                  {/* Spatial Transform Precision */}
+                  <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
                   Spatial Transform
@@ -1409,121 +1421,269 @@ export default function EditorPropertiesInspector({
               )}
             </div>
           </>
-        )}
-
-            {/* SUB-TAB 2: AUDIO (Image 3 CapCut Basic Audio Controls) */}
-            {activeInspectorTab === "audio" && renderBasicAudioControls(selectedClip)}
-
-            {/* SUB-TAB 3: SPEED (Image 4 & 5 CapCut Speed Controls) */}
-            {activeInspectorTab === "speed" && renderSpeedControls(selectedClip)}
-
-            {/* SUB-TAB 4: ANIMATION (Transitions) */}
-            {activeInspectorTab === "animation" && (
-              <div className="space-y-2">
-                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                  Clip Transition
+        ) : (
+          <div className="space-y-4">
+            {/* CapCut Metadata Grid (Image 2 & 5 Parity) */}
+            <div className="space-y-2.5 text-xs text-slate-700">
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Name:</span>
+                <span className="font-semibold text-slate-900 truncate max-w-[160px]">
+                  {timeline.title || "Draft 1123"}
                 </span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {TRANSITION_PRESETS.map((t) => {
-                    const isCurrent = (selectedClip.transition || "cut") === t.id;
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => onUpdateClip({ ...selectedClip, transition: t.id })}
-                        className={`py-1.5 px-2 rounded-lg text-left text-[11px] font-medium transition-colors cursor-pointer border ${
-                          isCurrent
-                            ? "bg-slate-900 text-white border-slate-900"
-                            : "bg-white border-slate-200 hover:border-slate-300 text-slate-800"
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
-            )}
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Path:</span>
+                <span className="font-mono text-[10px] text-slate-600 truncate max-w-[160px]" title="Local project database">
+                  Local draft storage
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Imported media:</span>
+                <span className="text-slate-800">Stay in original location</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Arrange layers:</span>
+                <span className="text-slate-800 font-medium">Turned on</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Proxy:</span>
+                <span className="text-slate-800 font-medium">Turned off</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Timeline name:</span>
+                <span className="text-slate-800 font-medium">Timeline 01</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Aspect ratio:</span>
+                <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
+                  {timeline.aspectRatio}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Resolution:</span>
+                <span className="font-mono text-[11px] text-slate-800">
+                  {timeline.resolution.width}×{timeline.resolution.height}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Frame rate:</span>
+                <span className="font-mono text-[11px] text-slate-800">
+                  {timeline.settings?.fps || 30} FPS
+                </span>
+              </div>
+            </div>
 
-            {/* SUB-TAB 5: ADJUST (Color & Grading) */}
-            {activeInspectorTab === "adjust" && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                    Color & Grading
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onUpdateClip({
-                        ...selectedClip,
-                        colorAdjustments: {
-                          brightness: 0,
-                          contrast: 0,
-                          saturation: 0,
-                          exposure: 0,
-                          temperature: 0,
-                          tint: 0,
-                          highlights: 0,
-                          shadows: 0,
-                          vignette: 0,
-                        },
-                        filterPreset: "none",
-                      })
-                    }
-                    className="text-[10px] font-medium text-sky-600 hover:underline cursor-pointer"
-                  >
-                    Reset Color
-                  </button>
-                </div>
-
+            {/* Quick Aspect Ratio Switcher (CapCut Modify) */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider">
+                  Modify Aspect Ratio
+                </span>
+                <span className="text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-medium">
+                  Modify
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
                 {[
-                  { key: "brightness", label: "Brightness", min: -100, max: 100 },
-                  { key: "contrast", label: "Contrast", min: -100, max: 100 },
-                  { key: "saturation", label: "Saturation", min: -100, max: 100 },
-                  { key: "exposure", label: "Exposure", min: -100, max: 100 },
-                  { key: "temperature", label: "Temperature", min: -100, max: 100 },
-                  { key: "vignette", label: "Vignette", min: 0, max: 100 },
-                ].map(({ key, label, min, max }) => {
-                  const currentVal =
-                    (selectedClip.colorAdjustments as any)?.[key] ?? 0;
+                  { ratio: "9:16", desc: "TikTok / Reels" },
+                  { ratio: "16:9", desc: "YouTube" },
+                  { ratio: "1:1", desc: "Square" },
+                  { ratio: "4:5", desc: "Portrait" },
+                  { ratio: "4:3", desc: "Standard" },
+                ].map(({ ratio, desc }) => {
+                  const isCurrent = timeline.aspectRatio === ratio;
                   return (
-                    <div key={key} className="space-y-1">
-                      <div className="flex justify-between text-[11px] font-mono">
-                        <span>{label}</span>
-                        <span className="font-bold text-slate-900">{currentVal}</span>
+                    <button
+                      key={ratio}
+                      type="button"
+                      onClick={() => onUpdateAspectRatio(ratio as AspectRatio)}
+                      className={`p-2 rounded-lg border text-left cursor-pointer transition-all ${
+                        isCurrent
+                          ? "bg-slate-900 border-slate-900 text-white shadow-2xs font-bold"
+                          : "bg-white border-slate-200 hover:border-slate-300 text-slate-800"
+                      }`}
+                    >
+                      <div className="text-[11px]">{ratio}</div>
+                      <div className={`text-[9px] truncate ${isCurrent ? "text-slate-300" : "text-slate-500"}`}>
+                        {desc}
                       </div>
-                      <input
-                        type="range"
-                        min={min}
-                        max={max}
-                        value={currentVal}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value);
-                          onUpdateClip({
-                            ...selectedClip,
-                            colorAdjustments: {
-                              brightness: 0,
-                              contrast: 0,
-                              saturation: 0,
-                              exposure: 0,
-                              temperature: 0,
-                              tint: 0,
-                              highlights: 0,
-                              shadows: 0,
-                              vignette: 0,
-                              ...selectedClip.colorAdjustments,
-                              [key]: val,
-                            },
-                          });
-                        }}
-                        className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
-                      />
-                    </div>
+                    </button>
                   );
                 })}
               </div>
-            )}
+            </div>
+
+            <div className="h-px bg-slate-200" />
+
+            {/* Audio Ducking Global Toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider">
+                  Auto Ducking
+                </span>
+                <input
+                  type="checkbox"
+                  checked={timeline.settings?.audioDucking ?? true}
+                  onChange={(e) =>
+                    onUpdateSettings({
+                      audioDucking: e.target.checked,
+                    })
+                  }
+                  className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-slate-900"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Automatically attenuates background music when speech is active on voiceover/caption tracks.
+              </p>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* SUB-TAB 2: AUDIO (Image 3 CapCut Basic Audio Controls) */}
+      {activeInspectorTab === "audio" && (
+        <>
+          {renderBasicAudioControls(targetClip)}
+          {/* Stereo Pan */}
+          <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div className="flex justify-between text-xs font-mono text-slate-700">
+              <span className="font-semibold">Stereo Pan</span>
+              <span className="font-bold text-slate-900">
+                {(targetClip.pan ?? 0) === 0
+                  ? "Center"
+                  : (targetClip.pan ?? 0) < 0
+                  ? `L ${Math.abs(Math.round((targetClip.pan ?? 0) * 100))}%`
+                  : `R ${Math.round((targetClip.pan ?? 0) * 100)}%`}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="-1"
+              max="1"
+              step="0.1"
+              value={targetClip.pan ?? 0}
+              onChange={(e) =>
+                onUpdateClip({
+                  ...targetClip,
+                  pan: parseFloat(e.target.value),
+                })
+              }
+              className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-800"
+            />
+          </div>
+        </>
+      )}
+
+      {/* SUB-TAB 3: SPEED (Image 4 & 5 CapCut Speed Controls) */}
+      {activeInspectorTab === "speed" && renderSpeedControls(targetClip)}
+
+      {/* SUB-TAB 4: ANIMATION (Transitions) */}
+      {activeInspectorTab === "animation" && (
+        <div className="space-y-2">
+          <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
+            Clip Transition
+          </span>
+          <div className="grid grid-cols-2 gap-1.5">
+            {TRANSITION_PRESETS.map((t) => {
+              const isCurrent = (targetClip.transition || "cut") === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => onUpdateClip({ ...targetClip, transition: t.id })}
+                  className={`py-1.5 px-2 rounded-lg text-left text-[11px] font-medium transition-colors cursor-pointer border ${
+                    isCurrent
+                      ? "bg-slate-900 text-white border-slate-900"
+                      : "bg-white border-slate-200 hover:border-slate-300 text-slate-800"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* SUB-TAB 5: ADJUST (Color & Grading) */}
+      {activeInspectorTab === "adjust" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
+              Color & Grading
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                onUpdateClip({
+                  ...targetClip,
+                  colorAdjustments: {
+                    brightness: 0,
+                    contrast: 0,
+                    saturation: 0,
+                    exposure: 0,
+                    temperature: 0,
+                    tint: 0,
+                    highlights: 0,
+                    shadows: 0,
+                    vignette: 0,
+                  },
+                  filterPreset: "none",
+                })
+              }
+              className="text-[10px] font-medium text-sky-600 hover:underline cursor-pointer"
+            >
+              Reset Color
+            </button>
+          </div>
+
+          {[
+            { key: "brightness", label: "Brightness", min: -100, max: 100 },
+            { key: "contrast", label: "Contrast", min: -100, max: 100 },
+            { key: "saturation", label: "Saturation", min: -100, max: 100 },
+            { key: "exposure", label: "Exposure", min: -100, max: 100 },
+            { key: "temperature", label: "Temperature", min: -100, max: 100 },
+            { key: "vignette", label: "Vignette", min: 0, max: 100 },
+          ].map(({ key, label, min, max }) => {
+            const currentVal =
+              (targetClip.colorAdjustments as any)?.[key] ?? 0;
+            return (
+              <div key={key} className="space-y-1">
+                <div className="flex justify-between text-[11px] font-mono">
+                  <span>{label}</span>
+                  <span className="font-bold text-slate-900">{currentVal}</span>
+                </div>
+                <input
+                  type="range"
+                  min={min}
+                  max={max}
+                  value={currentVal}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    onUpdateClip({
+                      ...targetClip,
+                      colorAdjustments: {
+                        brightness: 0,
+                        contrast: 0,
+                        saturation: 0,
+                        exposure: 0,
+                        temperature: 0,
+                        tint: 0,
+                        highlights: 0,
+                        shadows: 0,
+                        vignette: 0,
+                        ...targetClip.colorAdjustments,
+                        [key]: val,
+                      },
+                    });
+                  }}
+                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
           </>
         )}
 
@@ -1866,213 +2026,6 @@ export default function EditorPropertiesInspector({
               </div>
             </div>
           </>
-        )}
-
-        {/* ========================================================= */}
-        {/* CASE D: AUDIO CLIP INSPECTOR                              */}
-        {/* ========================================================= */}
-        {inspectorType === "audio" && selectedClip && (
-          <>
-            {activeInspectorTab === "speed" ? (
-              renderSpeedControls(selectedClip)
-            ) : (
-              <>
-                {renderBasicAudioControls(selectedClip)}
-
-                {/* Stereo Pan */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <div className="flex justify-between text-xs font-mono text-slate-700">
-                    <span className="font-semibold">Stereo Pan</span>
-                    <span className="font-bold text-slate-900">
-                      {(selectedClip.pan ?? 0) === 0
-                        ? "Center"
-                        : (selectedClip.pan ?? 0) < 0
-                        ? `L ${Math.abs(Math.round((selectedClip.pan ?? 0) * 100))}%`
-                        : `R ${Math.round((selectedClip.pan ?? 0) * 100)}%`}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="-1"
-                    max="1"
-                    step="0.1"
-                    value={selectedClip.pan ?? 0}
-                    onChange={(e) =>
-                      onUpdateClip({
-                        ...selectedClip,
-                        pan: parseFloat(e.target.value),
-                      })
-                    }
-                    className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-800"
-                  />
-                </div>
-
-                {/* Automatic Voiceover Ducking */}
-                <div className="space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-800">
-                      Automatic Voiceover Ducking
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={selectedClip.ducking ?? selectedClip.track === "music"}
-                      onChange={(e) =>
-                        onUpdateClip({
-                          ...selectedClip,
-                          ducking: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 rounded text-sky-600 cursor-pointer accent-sky-600"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-500 leading-relaxed">
-                    When speech occurs on the timeline, background music automatically ducks by 14 dB using a smooth sin² envelope.
-                  </p>
-                  <div className="flex justify-between text-[10px] font-mono pt-1 text-slate-700 font-semibold">
-                    <span>Ducking Attenuation:</span>
-                    <span>
-                      {Math.round((timeline.settings?.duckingFactor ?? 0.2) * 100)}% (
-                      {formatGainAsDecibels(timeline.settings?.duckingFactor ?? 0.2)})
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.05"
-                    max="0.6"
-                    step="0.05"
-                    value={timeline.settings?.duckingFactor ?? 0.2}
-                    onChange={(e) =>
-                      onUpdateSettings({
-                        duckingFactor: parseFloat(e.target.value),
-                      })
-                    }
-                    className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-800"
-                  />
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        {/* ========================================================= */}
-        {/* CASE E: CAPCUT DETAILS PANEL (NOTHING SELECTED)          */}
-        {/* ========================================================= */}
-        {inspectorType === "project" && (
-          <div className="space-y-4">
-            {/* CapCut Metadata Grid */}
-            <div className="space-y-2.5 text-xs text-slate-700">
-              <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Name:</span>
-                <span className="font-semibold text-slate-900 truncate max-w-[160px]">
-                  {timeline.title || "Draft 1123"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Path:</span>
-                <span className="font-mono text-[10px] text-slate-600 truncate max-w-[160px]" title="Local project database">
-                  Local draft storage
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Imported media:</span>
-                <span className="text-slate-800">Stay in original location</span>
-              </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Arrange layers:</span>
-                <span className="text-slate-800 font-medium">Turned on</span>
-              </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Proxy:</span>
-                <span className="text-slate-800 font-medium">Turned off</span>
-              </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Timeline name:</span>
-                <span className="text-slate-800 font-medium">Timeline 01</span>
-              </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Aspect ratio:</span>
-                <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
-                  {timeline.aspectRatio}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Resolution:</span>
-                <span className="font-mono text-[11px] text-slate-800">
-                  {timeline.resolution.width}×{timeline.resolution.height}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Frame rate:</span>
-                <span className="font-mono text-[11px] text-slate-800">
-                  {timeline.settings?.fps || 30} FPS
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Aspect Ratio Switcher (CapCut Modify) */}
-            <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider">
-                  Modify Aspect Ratio
-                </span>
-                <span className="text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-medium">
-                  Modify
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {[
-                  { ratio: "9:16", desc: "TikTok / Reels" },
-                  { ratio: "16:9", desc: "YouTube" },
-                  { ratio: "1:1", desc: "Square" },
-                  { ratio: "4:5", desc: "Portrait" },
-                  { ratio: "4:3", desc: "Standard" },
-                ].map(({ ratio, desc }) => {
-                  const isCurrent = timeline.aspectRatio === ratio;
-                  return (
-                    <button
-                      key={ratio}
-                      type="button"
-                      onClick={() => onUpdateAspectRatio(ratio as AspectRatio)}
-                      className={`p-2 rounded-lg border text-left cursor-pointer transition-all ${
-                        isCurrent
-                          ? "bg-slate-900 border-slate-900 text-white shadow-2xs font-bold"
-                          : "bg-white border-slate-200 hover:border-slate-300 text-slate-800"
-                      }`}
-                    >
-                      <div className="text-[11px]">{ratio}</div>
-                      <div className={`text-[9px] truncate ${isCurrent ? "text-slate-300" : "text-slate-500"}`}>
-                        {desc}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="h-px bg-slate-200" />
-
-            {/* Audio Ducking Global Toggle */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider">
-                  Auto Ducking
-                </span>
-                <input
-                  type="checkbox"
-                  checked={timeline.settings?.audioDucking ?? true}
-                  onChange={(e) =>
-                    onUpdateSettings({
-                      audioDucking: e.target.checked,
-                    })
-                  }
-                  className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-slate-900"
-                />
-              </div>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                Automatically attenuates background music when speech is active on voiceover/caption tracks.
-              </p>
-            </div>
-          </div>
         )}
       </div>
     </div>

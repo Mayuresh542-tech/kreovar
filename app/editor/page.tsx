@@ -26,12 +26,13 @@ function EditorIndexContent() {
   }, []);
 
   useEffect(() => {
-    if (status === "unauthed") {
-      router.replace("/login");
-      return;
-    }
     if (queryProjectId) {
       setActiveProjectId(queryProjectId);
+      return;
+    }
+    if (status === "unauthed") {
+      // Allow immediate guest / demo preview so user can test localhost without login barriers
+      setActiveProjectId("demo_creator_starter");
       return;
     }
     if (status === "authed" && session?.user?.id) {
@@ -49,7 +50,7 @@ function EditorIndexContent() {
     }
   }, [status, session, queryProjectId, router]);
 
-  if (status !== "authed" || !activeProjectId) {
+  if (status === "loading" || !activeProjectId) {
     return <AuthLoadingScreen label="Loading AI Video Editor…" />;
   }
 

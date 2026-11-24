@@ -48,18 +48,18 @@ export default function AiResponseBubble({
     <div className="space-y-3">
       {/* User Prompt Bubble */}
       <div className="flex justify-end">
-        <div className="max-w-[86%] rounded-2xl rounded-br-sm bg-[#222226] border border-[#2E2E33] px-3.5 py-2.5 text-[13px] leading-relaxed text-white shadow-sm">
+        <div className="max-w-[86%] rounded-2xl rounded-br-sm bg-sky-50 border border-sky-200 px-3.5 py-2.5 text-[13px] leading-relaxed text-sky-950 shadow-2xs">
           {turn.prompt}
         </div>
       </div>
 
       {/* Assistant Response Bubble */}
       <div className="flex items-start gap-2.5">
-        <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg border border-[#2E2E33] bg-[#222226]">
+        <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
           <BrandMark size={15} />
         </div>
 
-        <div className="min-w-0 flex-1 space-y-2.5 rounded-2xl rounded-tl-sm border border-[#2E2E33] bg-[#222226] px-3.5 py-3 text-white shadow-sm transition-all">
+        <div className="min-w-0 flex-1 space-y-2.5 rounded-2xl rounded-tl-sm border border-slate-200 bg-white px-3.5 py-3 text-slate-800 shadow-2xs transition-all">
           {/* Progressive Timeline Steps */}
           {steps.length > 0 && (
             <ul className="space-y-1.5" aria-label="Edit progress steps">
@@ -72,32 +72,32 @@ export default function AiResponseBubble({
                     <Check
                       size={13}
                       strokeWidth={2.5}
-                      className="flex-shrink-0 text-emerald-400"
+                      className="flex-shrink-0 text-emerald-600"
                     />
                   ) : step.status === "active" ? (
                     <LoaderCircle
                       size={13}
-                      className="flex-shrink-0 animate-spin text-[#00E5FF]"
+                      className="flex-shrink-0 animate-spin text-sky-600"
                     />
                   ) : step.status === "failed" ? (
-                    <XCircle size={13} className="flex-shrink-0 text-rose-400" />
+                    <XCircle size={13} className="flex-shrink-0 text-rose-500" />
                   ) : step.status === "skipped" ? (
                     <span className="h-2 w-2 flex-shrink-0 rounded-full bg-amber-500 mx-0.5" />
                   ) : (
-                    <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full border border-[#3E3E45] mx-0.5" />
+                    <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full border border-slate-300 mx-0.5" />
                   )}
 
                   <span
                     className={
                       step.status === "completed"
-                        ? "text-white"
+                        ? "text-slate-900 font-medium"
                         : step.status === "active"
-                        ? "font-medium text-[#00E5FF]"
+                        ? "font-medium text-sky-600"
                         : step.status === "failed"
-                        ? "text-rose-400"
+                        ? "text-rose-500"
                         : step.status === "skipped"
-                        ? "text-amber-400"
-                        : "text-[#6E6E78]"
+                        ? "text-amber-600"
+                        : "text-slate-400"
                     }
                   >
                     {step.label}
@@ -110,12 +110,12 @@ export default function AiResponseBubble({
           {/* Execution Summary / Clarification / Error */}
           {turn.responseText && turn.status !== "running" && (
             <p
-              className={`border-t border-[#2E2E33] pt-2 text-[12.5px] leading-relaxed ${
+              className={`border-t border-slate-200 pt-2 text-[12.5px] leading-relaxed ${
                 turn.status === "failed"
-                  ? "text-rose-400"
+                  ? "text-rose-500"
                   : turn.status === "cancelled"
-                  ? "text-[#6E6E78]"
-                  : "text-[#A0A0A8]"
+                  ? "text-slate-400"
+                  : "text-slate-600"
               }`}
             >
               {turn.responseText}
@@ -124,14 +124,14 @@ export default function AiResponseBubble({
 
           {/* Subtle Collapsible Degradation Notes */}
           {turn.degradationNotes.length > 0 && turn.status !== "running" && (
-            <div className="rounded-xl border border-amber-900/40 bg-amber-950/20 px-2.5 py-1.5">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5">
               <button
                 type="button"
                 onClick={() => setShowNotes((v) => !v)}
-                className="flex w-full items-center justify-between text-[11px] font-medium text-amber-300"
+                className="flex w-full items-center justify-between text-[11px] font-medium text-amber-800"
               >
                 <span className="flex items-center gap-1.5">
-                  <AlertTriangle size={12} className="text-amber-400" />
+                  <AlertTriangle size={12} className="text-amber-600" />
                   <span>
                     {turn.degradationNotes.length} skipped or adjusted{" "}
                     {turn.degradationNotes.length === 1 ? "item" : "items"}
@@ -141,7 +141,7 @@ export default function AiResponseBubble({
               </button>
 
               {showNotes && (
-                <div className="mt-1.5 space-y-1 border-t border-amber-900/40 pt-1.5 text-[11px] leading-relaxed text-amber-300">
+                <div className="mt-1.5 space-y-1 border-t border-amber-200 pt-1.5 text-[11px] leading-relaxed text-amber-800">
                   {turn.degradationNotes.map((note, idx) => (
                     <p key={idx}>• {note}</p>
                   ))}
@@ -158,10 +158,10 @@ export default function AiResponseBubble({
                   type="button"
                   disabled={!canUndo}
                   onClick={() => onUndo(turn.id)}
-                  className={`${actionBtnClass} inline-flex items-center gap-1.5 font-medium transition-colors ${
+                  className={`${actionBtnClass} inline-flex items-center gap-1.5 font-medium transition-colors cursor-pointer ${
                     turn.undone
-                      ? "border border-[#2E2E33] bg-[#18181C] text-[#6E6E78]"
-                      : "border border-[#2E2E33] bg-[#18181C] text-[#A0A0A8] hover:border-[#3E3E45] hover:bg-[#222226] hover:text-white active:scale-95"
+                      ? "border border-slate-200 bg-slate-50 text-slate-400"
+                      : "border border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 active:scale-95"
                   }`}
                 >
                   {turn.undone ? (
@@ -183,7 +183,7 @@ export default function AiResponseBubble({
                   type="button"
                   onClick={() => setShowChanges((v) => !v)}
                   aria-expanded={showChanges}
-                  className={`${actionBtnClass} inline-flex items-center gap-1.5 border border-[#2E2E33] bg-[#18181C] font-medium text-[#A0A0A8] transition-colors hover:border-[#3E3E45] hover:bg-[#222226] hover:text-white active:scale-95`}
+                  className={`${actionBtnClass} inline-flex items-center gap-1.5 border border-slate-200 bg-slate-50 font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 active:scale-95 cursor-pointer`}
                 >
                   <Eye size={12} />
                   <span>{showChanges ? "Hide Changes" : "View Changes"}</span>
@@ -195,7 +195,7 @@ export default function AiResponseBubble({
 
           {/* Inline Timeline Diff Drawer */}
           {showChanges && turn.changes.length > 0 && (
-            <div className="space-y-1.5 rounded-xl border border-[#2E2E33] bg-[#18181C] p-2.5">
+            <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
               {turn.changes.map((item) => {
                 const interactive = item.time !== undefined || item.clipId !== undefined;
                 return (
@@ -206,16 +206,16 @@ export default function AiResponseBubble({
                     onClick={() => interactive && onFocusChange(item)}
                     className={`flex w-full items-start justify-between gap-2 rounded-lg px-2 py-1 text-left transition-colors ${
                       interactive
-                        ? "hover:bg-[#222226] active:bg-[#2A2A30]"
+                        ? "hover:bg-white hover:shadow-2xs active:bg-slate-100 cursor-pointer"
                         : "cursor-default"
                     }`}
                   >
                     <div className="min-w-0">
-                      <p className="text-[11.5px] font-medium text-white truncate">
+                      <p className="text-[11.5px] font-medium text-slate-900 truncate">
                         {item.label}
                       </p>
                       {item.detail && (
-                        <p className="text-[10.5px] text-[#A0A0A8] truncate">
+                        <p className="text-[10.5px] text-slate-500 truncate">
                           {item.detail}
                         </p>
                       )}
@@ -223,7 +223,7 @@ export default function AiResponseBubble({
                     {interactive && (
                       <ArrowUpRight
                         size={12}
-                        className="mt-0.5 flex-shrink-0 text-[#00E5FF]"
+                        className="mt-0.5 flex-shrink-0 text-sky-600"
                       />
                     )}
                   </button>

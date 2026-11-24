@@ -543,11 +543,11 @@ export default function CanvasStage({
       {/* Main Preview Container */}
       <div
         ref={stageRef}
-        className={`flex-1 w-full flex items-center justify-center relative min-h-0 ${zoom !== "fit" && zoom > 1 ? "overflow-auto p-4" : "overflow-hidden"}`}
+        className={`flex-1 w-full flex items-center justify-center relative min-h-0 bg-slate-100 ${zoom !== "fit" && zoom > 1 ? "overflow-auto p-4" : "overflow-hidden"}`}
       >
         <div
           ref={frameRef}
-          className="relative bg-black rounded-lg shadow-[0_8px_28px_rgba(15,23,42,0.18)] overflow-hidden border border-slate-200/80 will-change-transform"
+          className="relative bg-slate-950 rounded-lg shadow-[0_8px_28px_rgba(15,23,42,0.12)] overflow-hidden border border-slate-300 will-change-transform"
         >
           {/* Video Canvas */}
           <canvas

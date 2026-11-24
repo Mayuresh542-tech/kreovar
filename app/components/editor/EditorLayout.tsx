@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import {
   ArrowLeft,
@@ -24,12 +24,14 @@ import ToolSidebar, { EditorToolTab } from "./ToolSidebar";
 import AssetDrawer from "./AssetDrawer";
 import CanvasStage from "./CanvasStage";
 import EditorAIChat from "./EditorAIChat";
+import EditorPropertiesInspector from "./EditorPropertiesInspector";
 import TimelinePanel from "./TimelinePanel";
 import { useEditor } from "./workspace/EditorContext";
-import { useProject } from "@/app/lib/editor/store";
+import { usePlayback, useProject } from "@/app/lib/editor/store";
 import {
   Ratio,
   aspectRatios,
+  dimensions,
   projectDuration,
 } from "@/app/lib/editor/model";
 import { duplicateClip, removeClip, splitClip, pasteClips, reframeProject, trimToPlayhead, type ReframeMode } from "@/app/lib/editor/operations";
@@ -96,6 +98,83 @@ export default function EditorLayout({
   });
 
   const clipboard = useRef<{ project: typeof project; ids: string[] } | undefined>(undefined);
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const { time: currentTime } = usePlayback(playback);
+
+  useEffect(() => {
+    const handleToggleAi = () => setIsAiChatOpen((prev) => !prev);
+    window.addEventListener("veelox:toggle-ai-chat", handleToggleAi);
+    return () => window.removeEventListener("veelox:toggle-ai-chat", handleToggleAi);
+  }, []);
+
+  const selectedClip = selection[0] ? project.clips[selection[0]] : null;
+
+  const timelineForInspector = useMemo(() => ({
+    id: project.id,
+    title: project.title,
+    version: 1,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    duration: projectDuration(project),
+    aspectRatio: project.settings.aspectRatio,
+    resolution: {
+      width: dimensions[project.settings.aspectRatio]?.[0] ?? 1080,
+      height: dimensions[project.settings.aspectRatio]?.[1] ?? 1920,
+    },
+    settings: {
+      fps: project.settings.fps,
+      audioDucking: project.settings.audioDucking ?? true,
+      duckingFactor: 0.35,
+      musicVolume: 0.8,
+      voiceVolume: 1.0,
+      captionPreset: "viral-hinglish-pop",
+      captionTemplateId: (project.settings as any)?.captionTemplateId,
+      captionPosition: (project.settings as any)?.captionPosition,
+    },
+    tracks: Object.values(project.tracks) as any,
+  } as any), [project]);
+
+  const handleUpdateClip = useCallback((updated: any) => {
+    run((p) => {
+      const existing = p.clips[updated.id];
+      if (!existing) return p;
+      return {
+        ...p,
+        clips: {
+          ...p.clips,
+          [updated.id]: {
+            ...existing,
+            ...updated,
+            transform: {
+              ...existing.transform,
+              ...(updated.scale !== undefined ? { scale: updated.scale } : {}),
+              ...(updated.rotation !== undefined ? { rotation: updated.rotation } : {}),
+              ...(updated.position ? { x: updated.position.x, y: updated.position.y } : {}),
+            },
+            volume: updated.volume !== undefined ? updated.volume : existing.volume,
+            fadeIn: updated.fadeIn !== undefined ? updated.fadeIn : existing.fadeIn,
+            fadeOut: updated.fadeOut !== undefined ? updated.fadeOut : existing.fadeOut,
+            speed: updated.speed !== undefined ? updated.speed : existing.speed,
+            speedCurveId: updated.speedCurveId !== undefined ? updated.speedCurveId : (existing as any).speedCurveId,
+          },
+        },
+      };
+    });
+  }, [run]);
+
+  const handleUpdateSettings = useCallback((settings: any) => {
+    run((p) => ({
+      ...p,
+      settings: { ...p.settings, ...settings },
+    }));
+  }, [run]);
+
+  const handleUpdateAspectRatio = useCallback((ratio: any) => {
+    run((p) => ({
+      ...p,
+      settings: { ...p.settings, aspectRatio: ratio },
+    }));
+  }, [run]);
 
   // Automatically switch tab to inspector if a clip is selected and drawer is open
   useEffect(() => {
@@ -600,9 +679,9 @@ export default function EditorLayout({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. MIDDLE REGION: TOOLBAR + ASSET DRAWER + CANVAS + AI EDITOR            */}
+      {/* 2. MIDDLE REGION: MEDIA HUB + INSPECTOR + PREVIEW + AI EDITOR             */}
       {/* ========================================================================= */}
-      <div className="flex-1 flex flex-row min-h-0 overflow-hidden relative bg-[#121214]">
+      <div className="flex-1 flex flex-row min-h-0 overflow-hidden relative bg-slate-100">
         {/* Left: Mini-Bar Tool Navigation (Width: 64px) */}
         <ToolSidebar
           activeTab={activeTab}
@@ -621,11 +700,27 @@ export default function EditorLayout({
           />
         )}
 
-        {/* Center: Video Preview Canvas Stage */}
+        {/* Center-Left: CapCut Properties Inspector (Video | Audio | Speed | Animation | Adjust) */}
+        <div className="w-[340px] flex-shrink-0 h-full bg-white border-r border-slate-200 overflow-hidden z-10 flex flex-col">
+          <EditorPropertiesInspector
+            timeline={timelineForInspector}
+            selectedClip={selectedClip as any}
+            selectedClipIds={selection}
+            currentTime={currentTime}
+            width={340}
+            onUpdateClip={handleUpdateClip}
+            onUpdateSettings={handleUpdateSettings}
+            onUpdateAspectRatio={handleUpdateAspectRatio}
+          />
+        </div>
+
+        {/* Center-Right: Video Preview Canvas Stage */}
         <CanvasStage quality={previewQuality} />
 
-        {/* Right: Persistent Conversational AI Editor (Width: 360px) */}
-        <EditorAIChat />
+        {/* Right Slide-Over: Conversational AI Editor (Toggled via AI Editor button) */}
+        {isAiChatOpen && (
+          <EditorAIChat onClose={() => setIsAiChatOpen(false)} />
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -638,9 +733,9 @@ export default function EditorLayout({
         tabIndex={0}
         onPointerDown={handleTimelineResize}
         onDoubleClick={() => setTimelineHeight(300)}
-        className="h-2 w-full bg-[#18181C] hover:bg-[#222226] border-t border-b border-[#2E2E33] cursor-row-resize flex items-center justify-center transition-colors group z-20"
+        className="h-2 w-full bg-slate-200 hover:bg-slate-300 border-t border-b border-slate-300 cursor-row-resize flex items-center justify-center transition-colors group z-20"
       >
-        <div className="w-10 h-1 bg-[#2E2E33] group-hover:bg-[#A0A0A8] rounded-full transition-colors" />
+        <div className="w-10 h-1 bg-slate-400 group-hover:bg-slate-600 rounded-full transition-colors" />
       </div>
 
       {/* ========================================================================= */}
@@ -656,31 +751,31 @@ export default function EditorLayout({
       {/* Keyboard Shortcuts Dialog */}
       {shortcutsOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={() => setShortcutsOpen(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="shortcuts-title"
-            className="w-full max-w-2xl bg-[#18181C] border border-[#2E2E33] rounded-2xl p-6 shadow-2xl text-white space-y-4 max-h-[88vh] flex flex-col"
+            className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl text-slate-800 space-y-4 max-h-[88vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-[#2E2E33] pb-3 flex-shrink-0">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 flex-shrink-0">
               <div className="flex items-center gap-2">
-                <Keyboard size={20} className="text-[#A0A0A8]" />
+                <Keyboard size={20} className="text-slate-500" />
                 <div>
-                  <h2 id="shortcuts-title" className="font-semibold text-sm text-white">
+                  <h2 id="shortcuts-title" className="font-semibold text-sm text-slate-900">
                     NLE Keyboard Shortcuts &amp; Navigation
                   </h2>
-                  <p className="text-[11px] text-[#A0A0A8]">
+                  <p className="text-[11px] text-slate-500">
                     Pro CapCut Studio editing workflows (Split, Trim, Magnetic Ripple, Snapping).
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShortcutsOpen(false)}
-                className="text-[#A0A0A8] hover:text-white p-1 rounded-lg hover:bg-[#222226] transition-colors cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -700,24 +795,24 @@ export default function EditorLayout({
                 if (!items.length) return null;
                 return (
                   <div key={category} className="space-y-1.5">
-                    <h3 className="text-[11px] font-bold text-[#A0A0A8] uppercase tracking-wider">
+                    <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                       {category}
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                       {items.map((def) => (
                         <div
                           key={def.id}
-                          className="p-2 rounded-lg bg-[#222226] border border-[#2E2E33] flex items-center justify-between gap-2"
+                          className="p-2 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between gap-2"
                         >
                           <div className="min-w-0">
-                            <div className="text-white text-[11px] font-medium font-sans truncate">
+                            <div className="text-slate-800 text-[11px] font-medium font-sans truncate">
                               {def.label}
                             </div>
-                            <div className="text-[#A0A0A8] text-[10px] truncate">
+                            <div className="text-slate-400 text-[10px] truncate">
                               {def.description}
                             </div>
                           </div>
-                          <span className="text-white font-mono font-bold text-[10px] bg-[#18181C] border border-[#2E2E33] px-2 py-0.5 rounded shadow-2xs whitespace-nowrap shrink-0">
+                          <span className="text-slate-700 font-mono font-bold text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded shadow-2xs whitespace-nowrap shrink-0">
                             {def.keys}
                           </span>
                         </div>
@@ -728,7 +823,7 @@ export default function EditorLayout({
               })}
             </div>
 
-            <div className="border-t border-[#2E2E33] pt-3 flex items-center justify-between flex-shrink-0 text-[11px] text-[#A0A0A8]">
+            <div className="border-t border-slate-200 pt-3 flex items-center justify-between flex-shrink-0 text-[11px] text-slate-500">
               <span>On macOS, use ⌘ Command instead of Ctrl.</span>
               <button
                 type="button"
@@ -737,7 +832,7 @@ export default function EditorLayout({
                   setShortcutsOpen(false);
                   notify("Loaded 15-second creator demo project.");
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#222226] hover:bg-[#2A2A30] text-white font-semibold border border-[#2E2E33] transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold border border-slate-200 transition-colors cursor-pointer"
               >
                 <Sparkles size={13} />
                 <span>Try Demo Project</span>

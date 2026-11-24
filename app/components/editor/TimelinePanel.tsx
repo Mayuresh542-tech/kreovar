@@ -873,10 +873,10 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
                     onDrop={(e) => handleDropAsset(e, track)}
                     className={`h-[56px] relative transition-colors ${
                       track.locked
-                        ? "bg-[#141416]/80 opacity-60"
+                        ? "bg-slate-100/80 opacity-60"
                         : trackIdx % 2 === 0
-                        ? "bg-[#141416] hover:bg-[#18181c]"
-                        : "bg-[#18181C] hover:bg-[#1c1c20]"
+                        ? "bg-white hover:bg-slate-50"
+                        : "bg-slate-50/70 hover:bg-slate-100"
                     }`}
                   >
                     {/* Render clips inside this track */}
