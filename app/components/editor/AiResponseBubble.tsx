@@ -36,6 +36,13 @@ export default function AiResponseBubble({
   const [showChanges, setShowChanges] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
 
+  const isActualError =
+    turn.status === "failed" &&
+    !turn.isClarification &&
+    /^(?:Could not|Failed|Error|Timed out|AI could not|This AI stage|Sign in)/i.test(
+      turn.responseText?.trim() || ""
+    );
+
   const showActions =
     !turn.isClarification &&
     (turn.didModifyTimeline || turn.changes.length > 0 || turn.undone);
@@ -111,7 +118,7 @@ export default function AiResponseBubble({
           {turn.responseText && turn.status !== "running" && (
             <p
               className={`border-t border-slate-200 pt-2 text-[12.5px] leading-relaxed ${
-                turn.status === "failed"
+                isActualError
                   ? "text-rose-500"
                   : turn.status === "cancelled"
                   ? "text-slate-400"

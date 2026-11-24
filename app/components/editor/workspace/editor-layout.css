@@ -34,7 +34,7 @@
 .vx-editor .vx-media-card > strong { font-size:11px; padding:7px 7px 3px; color:#0F172A; }
 .vx-editor .vx-media-thumb { height:80px; background:#F8FAFC; }
 .vx-editor .vx-preview { flex:1 1 0; min-width:180px; min-height:0; overflow:hidden; background:#F1F5F9; }
-.vx-editor .vx-stage { min-height:0; padding:16px; background:#F1F5F9; overflow:auto; }
+.vx-editor .vx-stage { min-height:0; background:#F1F5F9; overflow:hidden; }
 .vx-editor .vx-canvas-frame { box-shadow:0 6px 30px rgba(15,23,42,0.18); border:1px solid #E2E8F0; }
 .vx-editor .vx-preview-scrub { min-height:14px; margin:4px 12px 0; flex-shrink:0; accent-color:#0284C7; }
 .vx-editor .vx-transport { min-height:43px; padding:5px 10px; gap:6px; flex-wrap:nowrap; overflow-x:auto; background:#FFFFFF; border-top:1px solid #E2E8F0; color:#0F172A; }

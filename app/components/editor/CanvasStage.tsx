@@ -489,7 +489,7 @@ export default function CanvasStage({
 
   return (
     <section
-      className="vx-stage flex-1 bg-slate-100 flex flex-col items-center justify-between relative min-w-0 h-full overflow-hidden select-none"
+      className="vx-stage flex-1 bg-slate-100 flex flex-col items-center justify-between relative min-w-0 h-full !overflow-hidden overflow-x-hidden select-none"
       aria-label="Central Video Preview Stage"
     >
       {/* Top Preview Header (CapCut Desktop Parity: "Previewing — video") */}
@@ -694,7 +694,7 @@ export default function CanvasStage({
       </div>
 
       {/* Transport Control Bar (CapCut Desktop Parity: Integrated Light Player Bar) */}
-      <div className="w-full bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-between z-20 text-slate-700">
+      <div className="w-full max-w-full bg-white border-t border-slate-200 px-3 py-1.5 flex items-center justify-between z-20 text-slate-700 overflow-x-hidden min-w-0 flex-wrap sm:flex-nowrap gap-1">
         {/* Left: Step Frame & Go to Start */}
         <div className="flex items-center gap-1.5 text-slate-500">
           <button

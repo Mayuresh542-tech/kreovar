@@ -779,21 +779,36 @@ export function reconcileEditingDecisions(
   reconciledDecisions = [...nonZooms, ...validZooms];
 
   // Guarantee Reconciler Invariant:
-  // rippleCut decisions are sorted and appended at the very end of the reconciled decisions array
-  // (after phraseQuotes/addZoom, captions, and B-roll decisions).
+  // EXACTLY ONE single consolidated rippleCut decision placed at the very end of decisions array
+  // (after phraseQuotes/addZoom, captions, and B-roll decisions), as required by aiValidation.
   const nonRippleCuts = reconciledDecisions.filter(d => d.op !== 'rippleCut');
   const rippleCuts = reconciledDecisions.filter(d => d.op === 'rippleCut') as Array<Extract<EditDecision, { op: 'rippleCut' }>>;
-  rippleCuts.forEach(rc => {
-    if (Array.isArray(rc.ranges)) {
-      rc.ranges.sort((a, b) => a.start - b.start);
+  if (rippleCuts.length > 0) {
+    const rawRanges = rippleCuts.flatMap(rc => Array.isArray(rc.ranges) ? rc.ranges : []);
+    const validRanges = rawRanges
+      .filter(r => typeof r.start === 'number' && typeof r.end === 'number' && r.end > r.start)
+      .sort((a, b) => a.start - b.start);
+    const consolidated: Array<{ start: number; end: number }> = [];
+    for (const r of validRanges) {
+      if (!consolidated.length) {
+        consolidated.push({ start: r.start, end: r.end });
+      } else {
+        const last = consolidated[consolidated.length - 1];
+        if (r.start <= last.end + 0.02) {
+          last.end = Math.max(last.end, r.end);
+        } else {
+          consolidated.push({ start: r.start, end: r.end });
+        }
+      }
     }
-  });
-  rippleCuts.sort((a, b) => {
-    const aStart = a.ranges?.[0]?.start ?? 0;
-    const bStart = b.ranges?.[0]?.start ?? 0;
-    return aStart - bStart;
-  });
-  reconciledDecisions = [...nonRippleCuts, ...rippleCuts];
+    if (consolidated.length > 0) {
+      reconciledDecisions = [...nonRippleCuts, { op: 'rippleCut', ranges: consolidated }];
+    } else {
+      reconciledDecisions = nonRippleCuts;
+    }
+  } else {
+    reconciledDecisions = nonRippleCuts;
+  }
 
   return {
     decisions: reconciledDecisions,

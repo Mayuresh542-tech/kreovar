@@ -142,3 +142,31 @@ test("Task 7: Project Hub (app/projects/[id]/page.tsx) banner 'CapCut-Grade Vide
   assert.ok(!projectPage.includes("CapCut-Grade Video Editor 3.0"), "Banner 'CapCut-Grade Video Editor 3.0' must be removed from Project Hub");
 });
 
+test("Task 8: Video preview section eliminates horizontal scrollbars across styles and markup", () => {
+  const editorCss = fs.readFileSync(path.join(ROOT, "app/components/editor/workspace/editor.css"), "utf-8");
+  const layoutCss = fs.readFileSync(path.join(ROOT, "app/components/editor/workspace/editor-layout.css"), "utf-8");
+  const canvasStage = fs.readFileSync(path.join(ROOT, "app/components/editor/CanvasStage.tsx"), "utf-8");
+
+  assert.ok(editorCss.includes(".vx-stage { flex:1;min-height:0;min-width:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#F1F5F9; }"), "editor.css .vx-stage must have overflow:hidden");
+  assert.ok(layoutCss.includes(".vx-editor .vx-stage { min-height:0; background:#F1F5F9; overflow:hidden; }"), "editor-layout.css .vx-stage must have overflow:hidden");
+  assert.ok(canvasStage.includes("!overflow-hidden overflow-x-hidden"), "CanvasStage section must enforce overflow-x-hidden");
+});
+
+test("Task 9: AI Editor prompts (both Groq Qwen and Gemini) enforce instant execution and forbid chat plans", () => {
+  const geminiAi = fs.readFileSync(path.join(ROOT, "app/lib/server/editorAi.ts"), "utf-8");
+  const fallbackPrompt = fs.readFileSync(path.join(ROOT, "app/lib/server/editorFallbackPrompt.ts"), "utf-8");
+
+  assert.ok(geminiAi.includes("IMMEDIATE TIMELINE EDITING REQUIRED (NO CONVERSATIONAL DELAYS OR PLANS IN CHAT)"), "Gemini prompt must enforce immediate timeline editing");
+  assert.ok(geminiAi.includes("NO CHAT DELAYS OR CONFIRMATION QUESTIONS"), "Gemini prompt must forbid asking questions or confirmation in chat");
+  assert.ok(fallbackPrompt.includes("IMMEDIATE TIMELINE EDITING REQUIRED"), "Groq Qwen fallback prompt must enforce immediate timeline editing");
+});
+
+test("Task 10: Editorial plans are never colored in error red and client fail-open guarantees completed edits", () => {
+  const bubble = fs.readFileSync(path.join(ROOT, "app/components/editor/AiResponseBubble.tsx"), "utf-8");
+  const client = fs.readFileSync(path.join(ROOT, "app/lib/editor/sequentialEditClient.ts"), "utf-8");
+
+  assert.ok(bubble.includes("isActualError"), "AiResponseBubble must distinguish genuine errors from editorial plans");
+  assert.ok(client.includes("reconcileEditingDecisions"), "sequentialEditClient must synthesize edits through inPlaceReconciler if server stage fails");
+});
+
+

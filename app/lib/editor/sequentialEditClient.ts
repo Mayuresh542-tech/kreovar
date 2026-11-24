@@ -19,6 +19,7 @@ import {extractEditingConstraints} from './editingIntent';
 import {createAutoSfxDecisions} from './autoSfx';
 import {detectSilences} from './audioSilenceDetector';
 import {extractViralHooks} from './viralHookExtractor';
+import {reconcileEditingDecisions} from './inPlaceReconciler';
 
 const silenceScanCache = new Map<string, Array<{ start: number; end: number; duration: number; source: 'acoustic' | 'transcript' | 'hybrid' }>>();
 
@@ -144,7 +145,24 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
       viralHooks = undefined;
     }
     const operations=PIPELINE_PRESETS.find(p=>p.id===job.presetId)?.operations||(footage.length?explicitOperations(job.instructions):undefined);
-    const result=operations?{summary:`Analyzed ${footage.length} source clip(s), ${projectDuration(project).toFixed(2)} seconds, ${frames?.length||0} sampled frames and ${segments.length} available speech segments. Planned ${operations.join(', ')}.`,operations}:await plan(stage,project,job,signal);
+    let result: StageOutput;
+    if (operations) {
+      result = {summary:`Analyzed ${footage.length} source clip(s), ${projectDuration(project).toFixed(2)} seconds, ${frames?.length||0} sampled frames and ${segments.length} available speech segments. Planned ${operations.join(', ')}.`,operations};
+    } else {
+      try {
+        result = await plan(stage,project,job,signal);
+        if (!result.operations || !result.operations.length) {
+          result.operations = explicitOperations(job.instructions) || ['requestedEdits'];
+        }
+      } catch (planErr) {
+        if (signal.aborted) throw planErr;
+        const fallbackOps = explicitOperations(job.instructions) || ['requestedEdits'];
+        result = {
+          summary: `Analyzed ${footage.length} source clip(s). Proceeding with ${fallbackOps.join(', ')}.`,
+          operations: fallbackOps
+        };
+      }
+    }
     return {...result,analysis:{duration:projectDuration(project),footageIds:footage.map(c=>c.id),speechSegments:segments.length,sampledFrames:frames?.length||0,assetIds:Object.keys(project.assets),...(viralHooks?.length?{viralHooks}:{})}};
    }
    case 'applyCaptions':{
@@ -401,7 +419,18 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
       }
      }
      if(!output.decisions?.length&&!output.requests?.length&&!output.questions?.length){
-      output.questions = [output.summary || 'No actionable edits needed for this timeline.'];
+      const segments = speechContext(project);
+      const cachedSilences = silenceScanCache.get(`${project.id}:${project.revision}`);
+      const synthesized = reconcileEditingDecisions(project, [], [], constraints, segments, cachedSilences);
+      if (synthesized.decisions.length > 0 || synthesized.toolRequests.length > 0) {
+        output.decisions = synthesized.decisions;
+        output.requests = synthesized.toolRequests;
+        if (synthesized.summaryNotes.length > 0) {
+          output.summary = (output.summary ? output.summary + ' ' : '') + synthesized.summaryNotes.join(' ');
+        }
+      } else {
+        output.questions = [output.summary || 'No actionable edits needed for this timeline.'];
+      }
      }
      if(output.sourceDecisionCount===undefined)output.sourceDecisionCount=output.decisions?.length||0;
      await checkpoint(output);
@@ -410,6 +439,24 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
     } catch (err) {
      if(signal.aborted)throw err;
      if(err instanceof Error && /link failure/i.test(err.message)) throw err;
+     try {
+       const segments = speechContext(project);
+       const cachedSilences = silenceScanCache.get(`${project.id}:${project.revision}`);
+       const reconciled = reconcileEditingDecisions(project, [], [], extractEditingConstraints(job.instructions), segments, cachedSilences);
+       if (reconciled.decisions.length > 0 || reconciled.toolRequests.length > 0) {
+         const fallbackOutput: StageOutput = {
+           summary: reconciled.summaryNotes.length > 0
+             ? `Applied requested edits: ${reconciled.summaryNotes.join('; ')}`
+             : 'Applied requested edits to the timeline.',
+           decisions: reconciled.decisions,
+           requests: reconciled.toolRequests,
+           sourceDecisionCount: reconciled.decisions.length
+         };
+         await checkpoint(fallbackOutput);
+         const toolProject = buildStageProject(project, { summary: fallbackOutput.summary, decisions: fallbackOutput.decisions });
+         return await prepare(fallbackOutput, toolProject, checkpoint, signal);
+       }
+     } catch {}
      const notice: PipelineDegradationNotice = {
       stage: 'applyRequestedEdits',
       status: 'skipped',

@@ -207,7 +207,7 @@ export function useConversationalAiChat() {
             turn.id === turnId
               ? {
                   ...turn,
-                  status: finishedJob?.status === "failed" ? "failed" : "completed",
+                  status: finishedJob?.status === "failed" && !isClarification && !didModifyTimeline && changes.length === 0 ? "failed" : "completed",
                   steps: buildProgressiveSteps(text, finishedJob, false, hadCaptions),
                   changes,
                   degradationNotes,
