@@ -489,47 +489,19 @@ export default function CanvasStage({
 
   return (
     <section
-      className="vx-stage flex-1 bg-[#121214] flex flex-col items-center justify-between relative min-w-0 h-full overflow-hidden select-none"
+      className="vx-stage flex-1 bg-slate-100 flex flex-col items-center justify-between relative min-w-0 h-full overflow-hidden select-none"
       aria-label="Central Video Preview Stage"
     >
       {/* Top Preview Header (CapCut Desktop Parity: "Previewing — video") */}
-      <div className="w-full flex items-center justify-between z-20 px-4 py-2 text-xs bg-[#18181C] border-b border-[#2E2E33] text-white">
+      <div className="w-full flex items-center justify-between z-20 px-4 py-2 text-xs bg-white border-b border-slate-200 text-slate-800">
         <div className="flex items-center gap-2 font-medium">
-          <span className="text-[13px] font-semibold text-white tracking-tight">Previewing — video</span>
+          <span className="text-[13px] font-semibold text-slate-900 tracking-tight">Previewing — video</span>
         </div>
 
-        {/* Right HUD: Aspect Ratio & Safe Area Overlays */}
+        {/* Right HUD: Safe Area Overlays & Alignment Guides (Single Ratio selector kept in Top Bar) */}
         <div className="flex items-center gap-2">
-          {/* Aspect Ratio Quick Toggle Pill */}
-          <div className="flex items-center gap-1.5 bg-[#222226] border border-[#2E2E33] px-2.5 py-1 rounded-lg text-white">
-            <button
-              onClick={() =>
-                run((p) => ({
-                  ...p,
-                  settings: {
-                    ...p.settings,
-                    aspectRatio: aspectRatio === "9:16" ? "16:9" : "9:16",
-                  },
-                }))
-              }
-              title="Toggle between 9:16 Portrait and 16:9 Widescreen"
-              className="flex items-center gap-1.5 text-white font-semibold hover:text-[#00E5FF] transition-colors"
-            >
-              {aspectRatio === "9:16" ? (
-                <Smartphone size={13} className="text-white" />
-              ) : (
-                <Monitor size={13} className="text-white" />
-              )}
-              <span>{aspectRatio}</span>
-            </button>
-
-            <span className="text-[11px] text-[#A0A0A8] px-0.5">
-              {aspectRatio === "9:16" ? "Portrait (9:16)" : "Landscape (16:9)"}
-            </span>
-          </div>
-
           {/* Framing & Safe Area Overlays */}
-          <div className="flex items-center gap-1 bg-[#222226] border border-[#2E2E33] px-2 py-1 rounded-lg text-[#A0A0A8]">
+          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg text-slate-600">
             {/* Safe Areas Guide */}
             <button
               onClick={() => setShowSafeAreas(!showSafeAreas)}
@@ -537,8 +509,8 @@ export default function CanvasStage({
               aria-pressed={showSafeAreas}
               className={`p-1 rounded transition-colors ${
                 showSafeAreas
-                  ? "bg-[#2E2E33] text-white"
-                  : "hover:text-white hover:bg-[#2A2A30]"
+                  ? "bg-slate-200 text-slate-900"
+                  : "hover:bg-slate-100 text-slate-600"
               }`}
             >
               <Shield size={13} />
@@ -551,17 +523,17 @@ export default function CanvasStage({
               aria-pressed={showCrosshair}
               className={`p-1 rounded transition-colors ${
                 showCrosshair
-                  ? "bg-[#2E2E33] text-white"
-                  : "hover:text-white hover:bg-[#2A2A30]"
+                  ? "bg-slate-200 text-slate-900"
+                  : "hover:bg-slate-100 text-slate-600"
               }`}
             >
               <Crosshair size={13} />
             </button>
 
-            <div className="h-3 w-[1px] bg-[#2E2E33] mx-0.5" />
+            <div className="h-3 w-[1px] bg-slate-200 mx-0.5" />
 
-            {/* Buffering or Quality Badge */}
-            <span className="text-[10px] font-mono text-[#A0A0A8]">
+            {/* Quality Badge */}
+            <span className="text-[10px] font-mono text-slate-500">
               {buffering ? "Buffering…" : `${quality}p`}
             </span>
           </div>
@@ -721,15 +693,15 @@ export default function CanvasStage({
         </div>
       </div>
 
-      {/* Transport Control Bar (CapCut Desktop Parity: Integrated Dark Player Bar) */}
-      <div className="w-full bg-[#18181C] border-t border-[#2E2E33] px-4 py-2 flex items-center justify-between z-20 text-white">
+      {/* Transport Control Bar (CapCut Desktop Parity: Integrated Light Player Bar) */}
+      <div className="w-full bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-between z-20 text-slate-700">
         {/* Left: Step Frame & Go to Start */}
-        <div className="flex items-center gap-1.5 text-[#A0A0A8]">
+        <div className="flex items-center gap-1.5 text-slate-500">
           <button
             onClick={() => playback.set(0, false)}
             title="Go to Start (Home)"
             aria-label="Go to Start"
-            className="p-1.5 rounded-lg hover:text-white hover:bg-[#222226] transition-colors"
+            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <RotateCcw size={14} />
           </button>
@@ -737,7 +709,7 @@ export default function CanvasStage({
             onClick={() => stepFrame(-1)}
             title="Step 1 Frame Back (←)"
             aria-label="Previous Frame"
-            className="p-1.5 rounded-lg hover:text-white hover:bg-[#222226] transition-colors"
+            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <SkipBack size={15} />
           </button>
@@ -745,7 +717,7 @@ export default function CanvasStage({
             onClick={() => stepFrame(1)}
             title="Step 1 Frame Forward (→)"
             aria-label="Next Frame"
-            className="p-1.5 rounded-lg hover:text-white hover:bg-[#222226] transition-colors"
+            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <SkipForward size={15} />
           </button>
@@ -758,30 +730,30 @@ export default function CanvasStage({
             disabled={!duration}
             title="Play / Pause (Space)"
             aria-label={playing ? "Pause" : "Play"}
-            className="w-8 h-8 rounded-full bg-[#2A2A30] hover:bg-[#383842] text-white flex items-center justify-center transition-all hover:scale-105 disabled:opacity-40"
+            className="w-8 h-8 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition-all hover:scale-105 disabled:opacity-40 cursor-pointer shadow-xs"
           >
             {playing ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
           </button>
 
           {/* Timecode Display (CapCut Format: 00:00:00 / 00:00:00) */}
-          <div className="flex items-center font-mono text-xs bg-[#222226] border border-[#2E2E33] px-2.5 py-1 rounded-md">
-            <span className="text-white font-semibold">{formatTime(time, fps)}</span>
-            <span className="text-[#6E6E78] mx-1">/</span>
-            <span className="text-[#A0A0A8]">{formatTime(duration, fps)}</span>
+          <div className="flex items-center font-mono text-xs bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-md text-slate-800">
+            <span className="text-slate-900 font-semibold">{formatTime(time, fps)}</span>
+            <span className="text-slate-400 mx-1">/</span>
+            <span className="text-slate-500">{formatTime(duration, fps)}</span>
           </div>
         </div>
 
         {/* Right: Loop, Zoom, Fullscreen, Quick AI Editor Launcher */}
-        <div className="flex items-center gap-1.5 text-[#A0A0A8]">
+        <div className="flex items-center gap-1.5 text-slate-500">
           {/* Loop Toggle */}
           <button
             onClick={() => setIsLooping(!isLooping)}
             title={isLooping ? "Loop Playback (Active)" : "Loop Playback (Off)"}
             aria-pressed={isLooping}
-            className={`p-1.5 rounded-lg transition-colors ${
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
               isLooping
-                ? "text-white bg-[#2E2E33]"
-                : "hover:text-white hover:bg-[#222226]"
+                ? "text-sky-600 bg-sky-50 border border-sky-200"
+                : "hover:text-slate-900 hover:bg-slate-100"
             }`}
           >
             <Repeat size={14} />
@@ -794,7 +766,7 @@ export default function CanvasStage({
               setZoom(e.target.value === "fit" ? "fit" : Number(e.target.value))
             }
             aria-label="Stage Scale"
-            className="bg-[#222226] border border-[#2E2E33] text-[11px] text-white rounded-md px-2 py-1 focus:outline-none focus:border-white ml-1"
+            className="bg-slate-50 border border-slate-200 text-[11px] text-slate-800 rounded-md px-2 py-1 focus:outline-none focus:border-sky-500 ml-1 cursor-pointer"
           >
             <option value="fit">Fit</option>
             <option value={0.5}>50%</option>
@@ -814,7 +786,7 @@ export default function CanvasStage({
             }}
             title="Fullscreen Canvas"
             aria-label="Fullscreen"
-            className="p-1.5 rounded-lg hover:text-white hover:bg-[#222226] transition-colors"
+            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
           </button>
@@ -824,9 +796,9 @@ export default function CanvasStage({
             onClick={() => window.dispatchEvent(new CustomEvent("veelox:toggle-ai-chat"))}
             title="Open AI Editor"
             aria-label="Open AI Editor"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#222226] hover:bg-[#2A2A30] border border-[#2E2E33] hover:border-[#3E3E45] text-white text-xs font-semibold transition-colors ml-1 cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-semibold transition-colors ml-1 cursor-pointer shadow-2xs"
           >
-            <Sparkles size={12} className="text-white" />
+            <Sparkles size={12} className="text-sky-600" />
             <span className="hidden sm:inline">AI Editor</span>
           </button>
         </div>

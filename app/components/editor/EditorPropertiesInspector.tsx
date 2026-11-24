@@ -24,6 +24,7 @@ import {
   Activity,
   Zap,
   Check,
+  ChevronDown,
 } from "lucide-react";
 import {
   VeeloxTimelineProject,
@@ -40,6 +41,7 @@ import {
   getSpeedCurvePreset,
   generateSpeedCurveSvgPoints,
   calculateAverageSpeed,
+  calculateTimelineDurationFromSource,
   formatGainAsDecibels,
   linearGainToDecibels,
   decibelsToLinearGain,
@@ -91,6 +93,73 @@ const TRANSITION_PRESETS: Array<{ id: TransitionType; label: string }> = [
   { id: "blur", label: "Blur" },
 ];
 
+/**
+ * CapCut Keyframe Diamond Icon Component (<> style)
+ */
+function KeyframeDiamond({
+  active = false,
+  onClick,
+  title,
+}: {
+  active?: boolean;
+  onClick?: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title || "Keyframe"}
+      className="p-1 cursor-pointer transition-colors group flex items-center justify-center shrink-0"
+    >
+      <span
+        className={`block w-2.5 h-2.5 rotate-45 transition-colors ${
+          active
+            ? "bg-amber-500 border border-amber-600 shadow-2xs"
+            : "border border-slate-400 group-hover:border-slate-700 bg-transparent"
+        }`}
+      />
+    </button>
+  );
+}
+
+/**
+ * CapCut Stepper Input Component with Display Value & Up/Down Steppers
+ */
+function StepperBox({
+  displayValue,
+  onStepUp,
+  onStepDown,
+}: {
+  displayValue: string;
+  onStepUp: () => void;
+  onStepDown: () => void;
+}) {
+  return (
+    <div className="flex items-center bg-slate-100 hover:bg-slate-200/70 border border-slate-200 rounded-md px-1.5 py-0.5 gap-1.5 text-[11px] font-mono text-slate-800 transition-colors select-none shrink-0">
+      <span className="min-w-[42px] text-right font-semibold">{displayValue}</span>
+      <div className="flex flex-col -space-y-0.5 text-slate-400 leading-none">
+        <button
+          type="button"
+          onClick={onStepUp}
+          className="hover:text-slate-900 cursor-pointer p-0.5 leading-none"
+          title="Step Up"
+        >
+          ▲
+        </button>
+        <button
+          type="button"
+          onClick={onStepDown}
+          className="hover:text-slate-900 cursor-pointer p-0.5 leading-none"
+          title="Step Down"
+        >
+          ▼
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function EditorPropertiesInspector({
   timeline,
   selectedClip,
@@ -107,6 +176,13 @@ export default function EditorPropertiesInspector({
   isOpen = true,
   onToggleOpen,
 }: EditorPropertiesInspectorProps) {
+  // CapCut Inspector Tab States
+  const [activeInspectorTab, setActiveInspectorTab] = useState<
+    "video" | "audio" | "speed" | "animation" | "adjust"
+  >("video");
+  const [speedSubTab, setSpeedSubTab] = useState<"standard" | "curve">("standard");
+  const [audioBasicOpen, setAudioBasicOpen] = useState(true);
+
   // Keyframe creator state
   const [kfProperty, setKfProperty] = useState<
     "scale" | "rotation" | "opacity" | "position" | "position_x" | "position_y" | "volume"
@@ -248,6 +324,528 @@ export default function EditorPropertiesInspector({
     );
   }
 
+  // Render CapCut Basic Audio Controls (Image 3 Parity)
+  function renderBasicAudioControls(clip: TimelineItem) {
+    const volLinear = clip.volume ?? 1.0;
+    const volDb = linearGainToDecibels(volLinear);
+    const fadeInSec = clip.fadeIn ?? 0;
+    const fadeOutSec = clip.fadeOut ?? 0;
+
+    return (
+      <div className="space-y-4">
+        {/* Basic Section Accordion (Image 3 Parity) */}
+        <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-3 shadow-2xs">
+          <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-sky-500 text-white flex items-center justify-center shadow-2xs">
+                <Check size={11} strokeWidth={3} />
+              </div>
+              <button
+                type="button"
+                onClick={() => setAudioBasicOpen((prev) => !prev)}
+                className="font-semibold text-slate-900 text-xs flex items-center gap-1 cursor-pointer hover:text-slate-700"
+              >
+                <span>Basic</span>
+                <ChevronDown
+                  size={13}
+                  className={`text-slate-400 transition-transform ${audioBasicOpen ? "" : "-rotate-90"}`}
+                />
+              </button>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateClip({
+                    ...clip,
+                    volume: 1.0,
+                    fadeIn: 0,
+                    fadeOut: 0,
+                  });
+                }}
+                className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer transition-colors"
+                title="Reset Audio Settings"
+              >
+                <RotateCcw size={13} />
+              </button>
+              <KeyframeDiamond
+                active={hasKeyframeAtPlayhead("volume")}
+                onClick={() => handleToggleKeyframeAtPlayhead("volume", volLinear)}
+                title="Volume Keyframe"
+              />
+            </div>
+          </div>
+
+          {audioBasicOpen && (
+            <div className="space-y-3 pt-1">
+              {/* 1. Volume Row */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs text-slate-700">
+                  <span className="font-medium">Volume</span>
+                  <div className="flex items-center gap-1.5">
+                    <StepperBox
+                      displayValue={formatGainAsDecibels(volLinear).replace(" ", "")}
+                      onStepUp={() => {
+                        const nextDb = Math.min(12, Math.round((volDb + 0.5) * 10) / 10);
+                        onUpdateClip({
+                          ...clip,
+                          volume: decibelsToLinearGain(nextDb),
+                        });
+                      }}
+                      onStepDown={() => {
+                        const nextDb = Math.max(-40, Math.round((volDb - 0.5) * 10) / 10);
+                        onUpdateClip({
+                          ...clip,
+                          volume: decibelsToLinearGain(nextDb),
+                        });
+                      }}
+                    />
+                    <KeyframeDiamond
+                      active={hasKeyframeAtPlayhead("volume")}
+                      onClick={() => handleToggleKeyframeAtPlayhead("volume", volLinear)}
+                      title="Toggle Volume Keyframe at Playhead"
+                    />
+                  </div>
+                </div>
+                <div className="relative flex items-center w-full h-5">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1.5"
+                    step="0.01"
+                    value={volLinear}
+                    onChange={(e) =>
+                      onUpdateClip({
+                        ...clip,
+                        volume: parseFloat(e.target.value),
+                      })
+                    }
+                    className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-800"
+                  />
+                </div>
+              </div>
+
+              {/* 2. Fade in Row */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs text-slate-700">
+                  <span className="font-medium">Fade in</span>
+                  <div className="flex items-center gap-1.5">
+                    <StepperBox
+                      displayValue={`${fadeInSec.toFixed(1)}s`}
+                      onStepUp={() => {
+                        const nextFade = Math.min(5.0, Math.round((fadeInSec + 0.1) * 10) / 10);
+                        onUpdateClip({ ...clip, fadeIn: nextFade });
+                      }}
+                      onStepDown={() => {
+                        const nextFade = Math.max(0, Math.round((fadeInSec - 0.1) * 10) / 10);
+                        onUpdateClip({ ...clip, fadeIn: nextFade });
+                      }}
+                    />
+                    <KeyframeDiamond
+                      title="Fade in Keyframe"
+                      onClick={() => {}}
+                    />
+                  </div>
+                </div>
+                <div className="relative flex items-center w-full h-5">
+                  <input
+                    type="range"
+                    min="0"
+                    max="5.0"
+                    step="0.1"
+                    value={fadeInSec}
+                    onChange={(e) =>
+                      onUpdateClip({
+                        ...clip,
+                        fadeIn: parseFloat(e.target.value),
+                      })
+                    }
+                    className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-800"
+                  />
+                </div>
+              </div>
+
+              {/* 3. Fade out Row */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs text-slate-700">
+                  <span className="font-medium">Fade out</span>
+                  <div className="flex items-center gap-1.5">
+                    <StepperBox
+                      displayValue={`${fadeOutSec.toFixed(1)}s`}
+                      onStepUp={() => {
+                        const nextFade = Math.min(5.0, Math.round((fadeOutSec + 0.1) * 10) / 10);
+                        onUpdateClip({ ...clip, fadeOut: nextFade });
+                      }}
+                      onStepDown={() => {
+                        const nextFade = Math.max(0, Math.round((fadeOutSec - 0.1) * 10) / 10);
+                        onUpdateClip({ ...clip, fadeOut: nextFade });
+                      }}
+                    />
+                    <KeyframeDiamond
+                      title="Fade out Keyframe"
+                      onClick={() => {}}
+                    />
+                  </div>
+                </div>
+                <div className="relative flex items-center w-full h-5">
+                  <input
+                    type="range"
+                    min="0"
+                    max="5.0"
+                    step="0.1"
+                    value={fadeOutSec}
+                    onChange={(e) =>
+                      onUpdateClip({
+                        ...clip,
+                        fadeOut: parseFloat(e.target.value),
+                      })
+                    }
+                    className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-800"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Equal-Power Crossfade & Transition Controls */}
+        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-800">
+              Equal-Power Crossfade
+            </span>
+            <input
+              type="checkbox"
+              checked={clip.equalPowerCrossfade ?? true}
+              onChange={(e) =>
+                onUpdateClip({
+                  ...clip,
+                  equalPowerCrossfade: e.target.checked,
+                })
+              }
+              className="w-4 h-4 rounded text-sky-600 cursor-pointer accent-sky-600"
+            />
+          </div>
+          <p className="text-[10px] text-slate-500 leading-relaxed">
+            {(clip.equalPowerCrossfade ?? true)
+              ? "Constant power cosine-sine curve eliminates 3 dB volume dip between adjoining clips."
+              : "Linear crossfade (causes subtle volume dip at center point)."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render CapCut Speed Controls (Image 4 & 5 Parity)
+  function renderSpeedControls(clip: TimelineItem) {
+    const curSpeed = clip.speed ?? 1.0;
+    const srcDur = clip.metadata?.sourceDuration ?? (clip.duration * (clip.speed ?? 1.0));
+    const speedCurveId = (clip as any).speedCurveId;
+    const effectiveDur = speedCurveId
+      ? calculateTimelineDurationFromSource(srcDur, getSpeedCurvePreset(speedCurveId))
+      : clip.duration;
+
+    return (
+      <div className="space-y-4">
+        {/* Mode Switcher: Standard | Curve (Image 4 & 5 Parity) */}
+        <div className="grid grid-cols-2 p-0.5 bg-slate-100 rounded-lg text-xs font-semibold text-slate-600">
+          <button
+            type="button"
+            onClick={() => setSpeedSubTab("standard")}
+            className={`py-1.5 rounded-md transition-all cursor-pointer text-center ${
+              speedSubTab === "standard"
+                ? "bg-white text-slate-900 shadow-2xs font-bold"
+                : "hover:text-slate-900"
+            }`}
+          >
+            Standard
+          </button>
+          <button
+            type="button"
+            onClick={() => setSpeedSubTab("curve")}
+            className={`py-1.5 rounded-md transition-all cursor-pointer text-center ${
+              speedSubTab === "curve"
+                ? "bg-white text-slate-900 shadow-2xs font-bold"
+                : "hover:text-slate-900"
+            }`}
+          >
+            Curve
+          </button>
+        </div>
+
+        {speedSubTab === "standard" && (
+          <div className="space-y-4">
+            {/* Speed Row */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-slate-700">
+                <span className="font-medium">Speed</span>
+                <StepperBox
+                  displayValue={`${curSpeed.toFixed(2)}x`}
+                  onStepUp={() => {
+                    const nextSpeed = Math.min(10.0, Math.round((curSpeed + 0.05) * 100) / 100);
+                    onUpdateClip({
+                      ...clip,
+                      speed: nextSpeed,
+                      duration: srcDur / nextSpeed,
+                      speedCurvePreset: undefined,
+                    });
+                  }}
+                  onStepDown={() => {
+                    const nextSpeed = Math.max(0.1, Math.round((curSpeed - 0.05) * 100) / 100);
+                    onUpdateClip({
+                      ...clip,
+                      speed: nextSpeed,
+                      duration: srcDur / nextSpeed,
+                      speedCurvePreset: undefined,
+                    });
+                  }}
+                />
+              </div>
+
+              {/* Slider with Visible Tick Marks at 1x, 2x, 5x, 10x */}
+              <div className="relative pt-1 pb-3">
+                <input
+                  type="range"
+                  min="0.1"
+                  max="10.0"
+                  step="0.05"
+                  value={curSpeed}
+                  onChange={(e) => {
+                    const spd = parseFloat(e.target.value);
+                    onUpdateClip({
+                      ...clip,
+                      speed: spd,
+                      duration: srcDur / spd,
+                      speedCurvePreset: undefined,
+                    });
+                  }}
+                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-800"
+                />
+                {/* Tick Marks: 1x, 2x, 5x, 10x */}
+                <div className="relative w-full h-4 mt-1 select-none pointer-events-none">
+                  {[
+                    { label: "1x", val: 1.0 },
+                    { label: "2x", val: 2.0 },
+                    { label: "5x", val: 5.0 },
+                    { label: "10x", val: 10.0 },
+                  ].map((tick) => {
+                    const pct = ((tick.val - 0.1) / 9.9) * 100;
+                    return (
+                      <div
+                        key={tick.label}
+                        style={{ position: "absolute", left: `${pct}%`, transform: "translateX(-50%)" }}
+                        className="text-[9px] font-mono text-slate-400 flex flex-col items-center"
+                      >
+                        <span className="w-0.5 h-1.5 bg-slate-300 mb-0.5" />
+                        <span>{tick.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Duration Row with Dashed Arrow Line */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-xs text-slate-700">
+                <span className="font-medium">Duration</span>
+                <StepperBox
+                  displayValue={`${clip.duration.toFixed(1)}s`}
+                  onStepUp={() => {
+                    const nextDur = Math.max(0.2, Math.round((clip.duration + 0.5) * 10) / 10);
+                    const nextSpeed = Math.max(0.1, Math.min(10.0, srcDur / nextDur));
+                    onUpdateClip({
+                      ...clip,
+                      duration: nextDur,
+                      speed: nextSpeed,
+                      speedCurvePreset: undefined,
+                    });
+                  }}
+                  onStepDown={() => {
+                    const nextDur = Math.max(0.2, Math.round((clip.duration - 0.5) * 10) / 10);
+                    const nextSpeed = Math.max(0.1, Math.min(10.0, srcDur / nextDur));
+                    onUpdateClip({
+                      ...clip,
+                      duration: nextDur,
+                      speed: nextSpeed,
+                      speedCurvePreset: undefined,
+                    });
+                  }}
+                />
+              </div>
+
+              {/* Dashed Timeline Arrow */}
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[11px] font-mono text-slate-500 shrink-0">
+                  {srcDur.toFixed(1)}s
+                </span>
+                <div className="flex-1 flex items-center relative py-1">
+                  <div className="w-full border-b border-dashed border-slate-400 relative">
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-0 h-0 border-y-[3px] border-y-transparent border-l-[6px] border-l-slate-500" />
+                  </div>
+                </div>
+                <span className="text-[11px] font-mono text-slate-800 font-semibold shrink-0">
+                  {clip.duration.toFixed(1)}s
+                </span>
+              </div>
+            </div>
+
+            {/* Change Audio Pitch Toggle Switch */}
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-slate-700 font-medium">Change audio pitch</span>
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateClip({
+                    ...clip,
+                    preservePitch: !(clip.preservePitch ?? true),
+                  })
+                }
+                className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors cursor-pointer ${
+                  (clip.preservePitch ?? true) ? "bg-sky-500 justify-end" : "bg-slate-200 justify-start"
+                }`}
+              >
+                <div className="w-4 h-4 rounded-full bg-white shadow-2xs" />
+              </button>
+            </div>
+
+            {/* Subtext: Smooth slow-mo note */}
+            <p className="text-[10px] text-slate-400">
+              Smooth slow-mo Only slow-speed videos are supported.
+            </p>
+
+            {/* Reset Button */}
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateClip({
+                    ...clip,
+                    speed: 1.0,
+                    duration: srcDur,
+                    speedCurvePreset: undefined,
+                  });
+                }}
+                className="px-4 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        )}
+
+        {speedSubTab === "curve" && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                SPEED_CURVE_PRESETS.hero,
+                SPEED_CURVE_PRESETS.bullet,
+                SPEED_CURVE_PRESETS.montage,
+                SPEED_CURVE_PRESETS.jump_cut,
+                SPEED_CURVE_PRESETS.flash_in,
+                SPEED_CURVE_PRESETS.flash_out,
+              ].map((preset) => {
+                const isSelected =
+                  clip.speedCurvePreset?.toLowerCase() === preset.id ||
+                  clip.speedCurvePreset?.toLowerCase() === preset.name.toLowerCase();
+                const avgSpeed = calculateAverageSpeed(preset);
+                const svgPoints = generateSpeedCurveSvgPoints(preset, 110, 32);
+
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => {
+                      onUpdateClip({
+                        ...clip,
+                        speedCurvePreset: preset.name as any,
+                        speed: Math.round(avgSpeed * 100) / 100,
+                      });
+                    }}
+                    className={`p-2 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1.5 ${
+                      isSelected
+                        ? "bg-sky-50 border-sky-500 ring-2 ring-sky-200 shadow-2xs"
+                        : "bg-white border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-900 flex items-center gap-1">
+                        {preset.name}
+                        {isSelected && <Check className="w-3 h-3 text-sky-600" />}
+                      </span>
+                      <span className="text-[9px] font-mono text-slate-500">
+                        ~{avgSpeed.toFixed(1)}x
+                      </span>
+                    </div>
+
+                    <div className="w-full h-8 bg-slate-900 rounded-md overflow-hidden flex items-center justify-center px-1">
+                      <svg viewBox="0 0 110 32" className="w-full h-full overflow-visible">
+                        <polyline
+                          fill="none"
+                          stroke={isSelected ? "#38BDF8" : "#94A3B8"}
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          points={svgPoints}
+                        />
+                      </svg>
+                    </div>
+
+                    <p className="text-[9px] text-slate-500 leading-tight truncate">
+                      {preset.description}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Pitch Lock Toggle */}
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-800">
+                  Pitch Lock (WSOLA)
+                </span>
+                <input
+                  type="checkbox"
+                  checked={clip.preservePitch ?? true}
+                  onChange={(e) =>
+                    onUpdateClip({
+                      ...clip,
+                      preservePitch: e.target.checked,
+                    })
+                  }
+                  className="w-4 h-4 rounded text-sky-600 cursor-pointer accent-sky-600"
+                />
+              </div>
+              <p className="text-[10px] text-slate-500 leading-relaxed">
+                {(clip.preservePitch ?? true)
+                  ? "Preserves original vocal pitch across speed ramping using Waveform Similarity Overlap-Add."
+                  : "Pitch shifts proportionally with velocity."}
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateClip({
+                    ...clip,
+                    speed: 1.0,
+                    duration: srcDur,
+                    speedCurvePreset: undefined,
+                  });
+                }}
+                className="px-4 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const isMultiSelection = selectedClipIds.length > 1;
 
   // Determine contextual mode based on selected clip's track and type
@@ -273,35 +871,104 @@ export default function EditorPropertiesInspector({
       style={{ width: `${width}px` }}
       className="h-full bg-white border-l border-slate-200 flex flex-col shrink-0 overflow-hidden select-none"
     >
-      {/* 1. Header with Context Badge */}
-      <div className="h-11 px-3 border-b border-slate-200 flex items-center justify-between bg-white shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          {inspectorType === "multi" && <Layers className="w-4 h-4 text-purple-600 shrink-0" />}
-          {inspectorType === "video" && <Video className="w-4 h-4 text-blue-600 shrink-0" />}
-          {inspectorType === "text" && <Type className="w-4 h-4 text-amber-500 shrink-0" />}
-          {inspectorType === "caption" && <MessageSquare className="w-4 h-4 text-sky-600 shrink-0" />}
-          {inspectorType === "audio" && <Music className="w-4 h-4 text-emerald-600 shrink-0" />}
-          {inspectorType === "project" && <Sliders className="w-4 h-4 text-slate-700 shrink-0" />}
+      {/* 1. Header with Context Badge and CapCut Tabs */}
+      <div className="border-b border-slate-200 bg-white shrink-0">
+        <div className="h-10 px-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            {inspectorType === "multi" && <Layers className="w-4 h-4 text-purple-600 shrink-0" />}
+            {inspectorType === "video" && <Video className="w-4 h-4 text-sky-600 shrink-0" />}
+            {inspectorType === "text" && <Type className="w-4 h-4 text-amber-500 shrink-0" />}
+            {inspectorType === "caption" && <MessageSquare className="w-4 h-4 text-sky-600 shrink-0" />}
+            {inspectorType === "audio" && <Music className="w-4 h-4 text-emerald-600 shrink-0" />}
+            {inspectorType === "project" && <Sliders className="w-4 h-4 text-slate-700 shrink-0" />}
 
-          <span className="text-xs font-bold text-slate-900 tracking-tight truncate">
-            {inspectorType === "multi" && `Multi-Selection (${selectedClipIds.length})`}
-            {inspectorType === "video" && "Video Clip Properties"}
-            {inspectorType === "text" && "Text Layer Properties"}
-            {inspectorType === "caption" && "Caption Style & Timing"}
-            {inspectorType === "audio" && "Audio & Ducking"}
-            {inspectorType === "project" && "Details"}
-          </span>
+            <span className="text-xs font-bold text-slate-900 tracking-tight truncate">
+              {inspectorType === "multi" && `Multi-Selection (${selectedClipIds.length})`}
+              {inspectorType === "video" && "Video Clip Properties"}
+              {inspectorType === "text" && "Text Layer Properties"}
+              {inspectorType === "caption" && "Caption Style & Timing"}
+              {inspectorType === "audio" && "Audio & Ducking"}
+              {inspectorType === "project" && "Details"}
+            </span>
+          </div>
+
+          {onToggleOpen && (
+            <button
+              type="button"
+              onClick={onToggleOpen}
+              className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 cursor-pointer transition-colors"
+              title="Collapse Inspector"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
-        {onToggleOpen && (
-          <button
-            type="button"
-            onClick={onToggleOpen}
-            className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 cursor-pointer transition-colors"
-            title="Collapse Inspector"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+        {/* CapCut Inspector Top Tabs (Image 5 Parity: Video | Audio | Speed | Animation | Adjust) */}
+        {(inspectorType === "video" || inspectorType === "audio") && (
+          <div className="flex items-center px-2 gap-1 border-t border-slate-100 bg-slate-50/60 text-xs">
+            {inspectorType === "video" && (
+              <button
+                type="button"
+                onClick={() => setActiveInspectorTab("video")}
+                className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+                  activeInspectorTab === "video"
+                    ? "border-sky-500 text-sky-600 font-bold bg-white"
+                    : "border-transparent text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                Video
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setActiveInspectorTab("audio")}
+              className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+                activeInspectorTab === "audio" || (inspectorType === "audio" && activeInspectorTab !== "speed")
+                  ? "border-sky-500 text-sky-600 font-bold bg-white"
+                  : "border-transparent text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Audio
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveInspectorTab("speed")}
+              className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+                activeInspectorTab === "speed"
+                  ? "border-sky-500 text-sky-600 font-bold bg-white"
+                  : "border-transparent text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Speed
+            </button>
+            {inspectorType === "video" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveInspectorTab("animation")}
+                  className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+                    activeInspectorTab === "animation"
+                      ? "border-sky-500 text-sky-600 font-bold bg-white"
+                      : "border-transparent text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  Animation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveInspectorTab("adjust")}
+                  className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+                    activeInspectorTab === "adjust"
+                      ? "border-sky-500 text-sky-600 font-bold bg-white"
+                      : "border-transparent text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  Adjust
+                </button>
+              </>
+            )}
+          </div>
         )}
       </div>
 
@@ -404,8 +1071,11 @@ export default function EditorPropertiesInspector({
         {/* ========================================================= */}
         {inspectorType === "video" && selectedClip && (
           <>
-            {/* Spatial Transform Precision */}
-            <div className="space-y-3">
+            {/* SUB-TAB 1: VIDEO (Transform & Keyframes) */}
+            {activeInspectorTab === "video" && (
+              <>
+                {/* Spatial Transform Precision */}
+                <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
                   Spatial Transform
@@ -738,493 +1408,122 @@ export default function EditorPropertiesInspector({
                 </div>
               )}
             </div>
+          </>
+        )}
 
-            <div className="h-px bg-slate-200" />
+            {/* SUB-TAB 2: AUDIO (Image 3 CapCut Basic Audio Controls) */}
+            {activeInspectorTab === "audio" && renderBasicAudioControls(selectedClip)}
 
-            {/* Speed & Retiming Controls */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider flex items-center gap-1">
-                  <Gauge className="w-3 h-3 text-blue-600" />
-                  Playback Speed & Curves
+            {/* SUB-TAB 3: SPEED (Image 4 & 5 CapCut Speed Controls) */}
+            {activeInspectorTab === "speed" && renderSpeedControls(selectedClip)}
+
+            {/* SUB-TAB 4: ANIMATION (Transitions) */}
+            {activeInspectorTab === "animation" && (
+              <div className="space-y-2">
+                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
+                  Clip Transition
                 </span>
-                <span className="text-[10px] font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">
-                  {selectedClip.speedCurvePreset &&
-                  selectedClip.speedCurvePreset !== "normal" &&
-                  selectedClip.speedCurvePreset !== "standard"
-                    ? `${getSpeedCurvePreset(selectedClip.speedCurvePreset).name} Curve`
-                    : `${(selectedClip.speed ?? 1.0).toFixed(2)}x`}
-                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {TRANSITION_PRESETS.map((t) => {
+                    const isCurrent = (selectedClip.transition || "cut") === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => onUpdateClip({ ...selectedClip, transition: t.id })}
+                        className={`py-1.5 px-2 rounded-lg text-left text-[11px] font-medium transition-colors cursor-pointer border ${
+                          isCurrent
+                            ? "bg-slate-900 text-white border-slate-900"
+                            : "bg-white border-slate-200 hover:border-slate-300 text-slate-800"
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+            )}
 
-              {/* Mode Tabs: Constant vs Curve Ramping */}
-              <div className="grid grid-cols-2 p-0.5 bg-slate-100 rounded-lg text-[10px] font-semibold text-slate-600">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSpeedMode("constant");
-                    if (selectedClip.speedCurvePreset) {
-                      onUpdateClip({ ...selectedClip, speedCurvePreset: undefined });
-                    }
-                  }}
-                  className={`py-1 rounded-md transition-colors cursor-pointer text-center ${
-                    speedMode === "constant" &&
-                    (!selectedClip.speedCurvePreset ||
-                      selectedClip.speedCurvePreset === "normal" ||
-                      selectedClip.speedCurvePreset === "standard")
-                      ? "bg-white text-slate-900 shadow-2xs font-bold"
-                      : "hover:text-slate-900"
-                  }`}
-                >
-                  Constant Speed
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSpeedMode("curve");
-                    if (
-                      !selectedClip.speedCurvePreset ||
-                      selectedClip.speedCurvePreset === "normal" ||
-                      selectedClip.speedCurvePreset === "standard"
-                    ) {
+            {/* SUB-TAB 5: ADJUST (Color & Grading) */}
+            {activeInspectorTab === "adjust" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
+                    Color & Grading
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
                       onUpdateClip({
                         ...selectedClip,
-                        speedCurvePreset: "Hero",
-                        speed: calculateAverageSpeed(SPEED_CURVE_PRESETS.hero),
-                      });
+                        colorAdjustments: {
+                          brightness: 0,
+                          contrast: 0,
+                          saturation: 0,
+                          exposure: 0,
+                          temperature: 0,
+                          tint: 0,
+                          highlights: 0,
+                          shadows: 0,
+                          vignette: 0,
+                        },
+                        filterPreset: "none",
+                      })
                     }
-                  }}
-                  className={`py-1 rounded-md transition-colors cursor-pointer text-center ${
-                    speedMode === "curve" ||
-                    (selectedClip.speedCurvePreset &&
-                      selectedClip.speedCurvePreset !== "normal" &&
-                      selectedClip.speedCurvePreset !== "standard")
-                      ? "bg-white text-slate-900 shadow-2xs font-bold"
-                      : "hover:text-slate-900"
-                  }`}
-                >
-                  Curve Ramping
-                </button>
-              </div>
+                    className="text-[10px] font-medium text-sky-600 hover:underline cursor-pointer"
+                  >
+                    Reset Color
+                  </button>
+                </div>
 
-              {/* CONSTANT SPEED SLIDER & PRESETS */}
-              {speedMode === "constant" &&
-                (!selectedClip.speedCurvePreset ||
-                  selectedClip.speedCurvePreset === "normal" ||
-                  selectedClip.speedCurvePreset === "standard") && (
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-4 gap-1.5 font-mono text-[10px]">
-                      {SPEED_PRESETS.map((spd) => {
-                        const isCurrent = Math.abs((selectedClip.speed ?? 1.0) - spd) < 0.01;
-                        return (
-                          <button
-                            key={spd}
-                            type="button"
-                            onClick={() =>
-                              onUpdateClip({
-                                ...selectedClip,
-                                speed: spd,
-                                speedCurvePreset: undefined,
-                              })
-                            }
-                            className={`py-1 rounded-md font-bold transition-colors cursor-pointer ${
-                              isCurrent
-                                ? "bg-slate-900 text-white shadow-2xs"
-                                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                            }`}
-                          >
-                            {spd}x
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Continuous Slider with input */}
-                    <div className="space-y-1 pt-1">
-                      <div className="flex justify-between items-center text-[11px] font-mono">
-                        <span className="text-slate-500">Speed Multiplier</span>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            step="0.05"
-                            min="0.1"
-                            max="8.0"
-                            value={Math.round((selectedClip.speed ?? 1.0) * 100) / 100}
-                            onChange={(e) =>
-                              onUpdateClip({
-                                ...selectedClip,
-                                speed: Math.max(0.1, Math.min(8.0, parseFloat(e.target.value) || 1.0)),
-                                speedCurvePreset: undefined,
-                              })
-                            }
-                            className="w-14 p-0.5 text-right rounded border border-slate-200 text-[10px] font-mono font-bold"
-                          />
-                          <span className="text-slate-500">x</span>
-                        </div>
+                {[
+                  { key: "brightness", label: "Brightness", min: -100, max: 100 },
+                  { key: "contrast", label: "Contrast", min: -100, max: 100 },
+                  { key: "saturation", label: "Saturation", min: -100, max: 100 },
+                  { key: "exposure", label: "Exposure", min: -100, max: 100 },
+                  { key: "temperature", label: "Temperature", min: -100, max: 100 },
+                  { key: "vignette", label: "Vignette", min: 0, max: 100 },
+                ].map(({ key, label, min, max }) => {
+                  const currentVal =
+                    (selectedClip.colorAdjustments as any)?.[key] ?? 0;
+                  return (
+                    <div key={key} className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span>{label}</span>
+                        <span className="font-bold text-slate-900">{currentVal}</span>
                       </div>
                       <input
                         type="range"
-                        min="0.1"
-                        max="4.0"
-                        step="0.05"
-                        value={selectedClip.speed ?? 1.0}
-                        onChange={(e) =>
+                        min={min}
+                        max={max}
+                        value={currentVal}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
                           onUpdateClip({
                             ...selectedClip,
-                            speed: parseFloat(e.target.value),
-                            speedCurvePreset: undefined,
-                          })
-                        }
+                            colorAdjustments: {
+                              brightness: 0,
+                              contrast: 0,
+                              saturation: 0,
+                              exposure: 0,
+                              temperature: 0,
+                              tint: 0,
+                              highlights: 0,
+                              shadows: 0,
+                              vignette: 0,
+                              ...selectedClip.colorAdjustments,
+                              [key]: val,
+                            },
+                          });
+                        }}
                         className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
                       />
                     </div>
-                  </div>
-                )}
-
-              {/* CURVE RAMPING PRESETS (HERO, BULLET, MONTAGE, JUMP CUT, FLASH IN, FLASH OUT) */}
-              {(speedMode === "curve" ||
-                (selectedClip.speedCurvePreset &&
-                  selectedClip.speedCurvePreset !== "normal" &&
-                  selectedClip.speedCurvePreset !== "standard")) && (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      SPEED_CURVE_PRESETS.hero,
-                      SPEED_CURVE_PRESETS.bullet,
-                      SPEED_CURVE_PRESETS.montage,
-                      SPEED_CURVE_PRESETS.jump_cut,
-                      SPEED_CURVE_PRESETS.flash_in,
-                      SPEED_CURVE_PRESETS.flash_out,
-                    ].map((preset) => {
-                      const isSelected =
-                        selectedClip.speedCurvePreset?.toLowerCase() === preset.id ||
-                        selectedClip.speedCurvePreset?.toLowerCase() === preset.name.toLowerCase();
-                      const avgSpeed = calculateAverageSpeed(preset);
-                      const svgPoints = generateSpeedCurveSvgPoints(preset, 110, 32);
-
-                      return (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          onClick={() => {
-                            setSpeedMode("curve");
-                            onUpdateClip({
-                              ...selectedClip,
-                              speedCurvePreset: preset.name as any,
-                              speed: Math.round(avgSpeed * 100) / 100,
-                            });
-                          }}
-                          className={`p-2 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1.5 ${
-                            isSelected
-                              ? "bg-blue-50 border-blue-500 ring-2 ring-blue-200 shadow-2xs"
-                              : "bg-white border-slate-200 hover:border-slate-300"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-slate-900 flex items-center gap-1">
-                              {preset.name}
-                              {isSelected && <Check className="w-3 h-3 text-blue-600" />}
-                            </span>
-                            <span className="text-[9px] font-mono text-slate-500">
-                              ~{avgSpeed.toFixed(1)}x
-                            </span>
-                          </div>
-
-                          {/* Mini SVG Curve Preview */}
-                          <div className="w-full h-8 bg-slate-900 rounded-md overflow-hidden flex items-center justify-center px-1">
-                            <svg viewBox="0 0 110 32" className="w-full h-full overflow-visible">
-                              <polyline
-                                fill="none"
-                                stroke={isSelected ? "#00F0FF" : "#94A3B8"}
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                points={svgPoints}
-                              />
-                            </svg>
-                          </div>
-
-                          <p className="text-[9px] text-slate-500 leading-tight truncate">
-                            {preset.description}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* PITCH LOCK TOGGLE (WSOLA) */}
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Music className="w-3.5 h-3.5 text-blue-600" />
-                    <span className="text-[11px] font-bold text-slate-800">
-                      Pitch Lock (WSOLA)
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={selectedClip.preservePitch ?? true}
-                    onChange={(e) =>
-                      onUpdateClip({
-                        ...selectedClip,
-                        preservePitch: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-blue-600"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-500 leading-relaxed">
-                  {(selectedClip.preservePitch ?? true)
-                    ? "Preserves original vocal pitch across speed ramping using Waveform Similarity Overlap-Add (WSOLA)."
-                    : "Varispeed tape-stop active: pitch shifts proportionally with velocity."}
-                </p>
-              </div>
-            </div>
-
-            <div className="h-px bg-slate-200" />
-
-            {/* Transitions */}
-            <div className="space-y-2">
-              <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                Clip Transition
-              </span>
-              <div className="grid grid-cols-2 gap-1.5">
-                {TRANSITION_PRESETS.map((t) => {
-                  const isCurrent = (selectedClip.transition || "cut") === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => onUpdateClip({ ...selectedClip, transition: t.id })}
-                      className={`py-1.5 px-2 rounded-lg text-left text-[11px] font-medium transition-colors cursor-pointer border ${
-                        isCurrent
-                          ? "bg-slate-900 text-white border-slate-900"
-                          : "bg-white border-slate-200 hover:border-slate-300 text-slate-800"
-                      }`}
-                    >
-                      {t.label}
-                    </button>
                   );
                 })}
               </div>
-            </div>
-
-            <div className="h-px bg-slate-200" />
-
-            {/* Color Adjustments */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                  Color & Grading
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onUpdateClip({
-                      ...selectedClip,
-                      colorAdjustments: {
-                        brightness: 0,
-                        contrast: 0,
-                        saturation: 0,
-                        exposure: 0,
-                        temperature: 0,
-                        tint: 0,
-                        highlights: 0,
-                        shadows: 0,
-                        vignette: 0,
-                      },
-                      filterPreset: "none",
-                    })
-                  }
-                  className="text-[10px] font-medium text-blue-600 hover:underline cursor-pointer"
-                >
-                  Reset Color
-                </button>
-              </div>
-
-              {[
-                { key: "brightness", label: "Brightness", min: -100, max: 100 },
-                { key: "contrast", label: "Contrast", min: -100, max: 100 },
-                { key: "saturation", label: "Saturation", min: -100, max: 100 },
-                { key: "exposure", label: "Exposure", min: -100, max: 100 },
-                { key: "temperature", label: "Temperature", min: -100, max: 100 },
-                { key: "vignette", label: "Vignette", min: 0, max: 100 },
-              ].map(({ key, label, min, max }) => {
-                const currentVal =
-                  (selectedClip.colorAdjustments as any)?.[key] ?? 0;
-                return (
-                  <div key={key} className="space-y-1">
-                    <div className="flex justify-between text-[11px] font-mono">
-                      <span>{label}</span>
-                      <span className="font-bold text-slate-900">{currentVal}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={min}
-                      max={max}
-                      value={currentVal}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value);
-                        onUpdateClip({
-                          ...selectedClip,
-                          colorAdjustments: {
-                            brightness: 0,
-                            contrast: 0,
-                            saturation: 0,
-                            exposure: 0,
-                            temperature: 0,
-                            tint: 0,
-                            highlights: 0,
-                            shadows: 0,
-                            vignette: 0,
-                            ...selectedClip.colorAdjustments,
-                            [key]: val,
-                          },
-                        });
-                      }}
-                      className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="h-px bg-slate-200" />
-
-            {/* Video Clip Audio & Decibel Controls */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider flex items-center gap-1">
-                  <Volume2 className="w-3 h-3 text-emerald-600" />
-                  Embedded Audio
-                </span>
-                <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[10px] font-mono">
-                  {Math.round((selectedClip.volume ?? 1.0) * 100)}% ({formatGainAsDecibels(selectedClip.volume ?? 1.0)})
-                </span>
-              </div>
-
-              {/* Volume Slider with Keyframe */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-[11px] font-mono">
-                  <span>Clip Volume</span>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleKeyframeAtPlayhead("volume", selectedClip.volume ?? 1.0)}
-                    className={`p-0.5 rounded cursor-pointer transition-colors ${
-                      hasKeyframeAtPlayhead("volume")
-                        ? "text-amber-500 fill-amber-500 hover:text-amber-600"
-                        : "text-slate-400 hover:text-amber-500"
-                    }`}
-                    title={
-                      hasKeyframeAtPlayhead("volume")
-                        ? "Remove volume keyframe at playhead"
-                        : "Add volume keyframe at playhead"
-                    }
-                  >
-                    <Key className="w-3 h-3" />
-                  </button>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1.5"
-                  step="0.01"
-                  value={selectedClip.volume ?? 1.0}
-                  onChange={(e) =>
-                    onUpdateClip({
-                      ...selectedClip,
-                      volume: parseFloat(e.target.value),
-                    })
-                  }
-                  className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
-                />
-              </div>
-
-              {/* Quick Decibel Presets */}
-              <div className="grid grid-cols-5 gap-1 font-mono text-[9px]">
-                {[
-                  { label: "Mute", gain: 0 },
-                  { label: "-12 dB", gain: 0.25 },
-                  { label: "-6 dB", gain: 0.5 },
-                  { label: "0 dB", gain: 1.0 },
-                  { label: "+3.5 dB", gain: 1.5 },
-                ].map(({ label, gain }) => {
-                  const isCurrent = Math.abs((selectedClip.volume ?? 1.0) - gain) < 0.05;
-                  return (
-                    <button
-                      key={label}
-                      type="button"
-                      onClick={() => onUpdateClip({ ...selectedClip, volume: gain })}
-                      className={`py-1 rounded font-semibold transition-colors cursor-pointer text-center ${
-                        isCurrent
-                          ? "bg-slate-900 text-white"
-                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Equal-Power Crossfade & Fades */}
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-800">
-                    Equal-Power Crossfade
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={selectedClip.equalPowerCrossfade ?? true}
-                    onChange={(e) =>
-                      onUpdateClip({
-                        ...selectedClip,
-                        equalPowerCrossfade: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-blue-600"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
-                  <div className="space-y-1">
-                    <label className="text-slate-600">Fade In (s)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="5.0"
-                      value={selectedClip.fadeIn ?? 0}
-                      onChange={(e) =>
-                        onUpdateClip({
-                          ...selectedClip,
-                          fadeIn: Math.max(0, parseFloat(e.target.value) || 0),
-                        })
-                      }
-                      className="w-full p-1 rounded border border-slate-200 font-bold"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-slate-600">Fade Out (s)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="5.0"
-                      value={selectedClip.fadeOut ?? 0}
-                      onChange={(e) =>
-                        onUpdateClip({
-                          ...selectedClip,
-                          fadeOut: Math.max(0, parseFloat(e.target.value) || 0),
-                        })
-                      }
-                      className="w-full p-1 rounded border border-slate-200 font-bold"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </>
         )}
 
@@ -1574,283 +1873,84 @@ export default function EditorPropertiesInspector({
         {/* ========================================================= */}
         {inspectorType === "audio" && selectedClip && (
           <>
-            {/* Audio Volume & Decibel Readout */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-[11px] font-mono">
-                <span className="flex items-center gap-1 font-semibold text-slate-700">
-                  <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
-                  Volume & Gain
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleKeyframeAtPlayhead("volume", selectedClip.volume ?? 1.0)}
-                    className={`p-0.5 rounded cursor-pointer transition-colors ${
-                      hasKeyframeAtPlayhead("volume")
-                        ? "text-amber-500 fill-amber-500 hover:text-amber-600"
-                        : "text-slate-400 hover:text-amber-500"
-                    }`}
-                    title={
-                      hasKeyframeAtPlayhead("volume")
-                        ? "Remove volume keyframe at playhead"
-                        : "Add volume keyframe at playhead"
-                    }
-                  >
-                    <Key className="w-3 h-3" />
-                  </button>
-                  <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
-                    {Math.round((selectedClip.volume ?? 1.0) * 100)}% ({formatGainAsDecibels(selectedClip.volume ?? 1.0)})
-                  </span>
-                </div>
-              </div>
+            {activeInspectorTab === "speed" ? (
+              renderSpeedControls(selectedClip)
+            ) : (
+              <>
+                {renderBasicAudioControls(selectedClip)}
 
-              <input
-                type="range"
-                min="0"
-                max="1.5"
-                step="0.01"
-                value={selectedClip.volume ?? 1.0}
-                onChange={(e) =>
-                  onUpdateClip({
-                    ...selectedClip,
-                    volume: parseFloat(e.target.value),
-                  })
-                }
-                className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
-              />
-
-              {/* Quick Decibel Presets */}
-              <div className="grid grid-cols-5 gap-1 font-mono text-[9px]">
-                {[
-                  { label: "Mute", gain: 0 },
-                  { label: "-12 dB", gain: 0.25 },
-                  { label: "-6 dB", gain: 0.5 },
-                  { label: "0 dB", gain: 1.0 },
-                  { label: "+3.5 dB", gain: 1.5 },
-                ].map(({ label, gain }) => {
-                  const isCurrent = Math.abs((selectedClip.volume ?? 1.0) - gain) < 0.05;
-                  return (
-                    <button
-                      key={label}
-                      type="button"
-                      onClick={() => onUpdateClip({ ...selectedClip, volume: gain })}
-                      className={`py-1 rounded font-semibold transition-colors cursor-pointer text-center ${
-                        isCurrent
-                          ? "bg-slate-900 text-white"
-                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Stereo Pan (-1 to +1) */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-[11px] font-mono">
-                <span>Stereo Pan</span>
-                <span className="font-bold text-slate-900">
-                  {(selectedClip.pan ?? 0) === 0
-                    ? "Center"
-                    : (selectedClip.pan ?? 0) < 0
-                    ? `L ${Math.abs(Math.round((selectedClip.pan ?? 0) * 100))}%`
-                    : `R ${Math.round((selectedClip.pan ?? 0) * 100)}%`}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="-1"
-                max="1"
-                step="0.1"
-                value={selectedClip.pan ?? 0}
-                onChange={(e) =>
-                  onUpdateClip({
-                    ...selectedClip,
-                    pan: parseFloat(e.target.value),
-                  })
-                }
-                className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
-              />
-            </div>
-
-            <div className="h-px bg-slate-200" />
-
-            {/* Equal-Power Crossfade & Transition Controls */}
-            <div className="space-y-3">
-              <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-                Crossfade & Transitions
-              </span>
-
-              {/* Equal-Power Law Toggle */}
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-800">
-                    Equal-Power Crossfade
-                  </span>
+                {/* Stereo Pan */}
+                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="flex justify-between text-xs font-mono text-slate-700">
+                    <span className="font-semibold">Stereo Pan</span>
+                    <span className="font-bold text-slate-900">
+                      {(selectedClip.pan ?? 0) === 0
+                        ? "Center"
+                        : (selectedClip.pan ?? 0) < 0
+                        ? `L ${Math.abs(Math.round((selectedClip.pan ?? 0) * 100))}%`
+                        : `R ${Math.round((selectedClip.pan ?? 0) * 100)}%`}
+                    </span>
+                  </div>
                   <input
-                    type="checkbox"
-                    checked={selectedClip.equalPowerCrossfade ?? true}
-                    onChange={(e) =>
-                      onUpdateClip({
-                        ...selectedClip,
-                        equalPowerCrossfade: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-blue-600"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-500 leading-relaxed">
-                  {(selectedClip.equalPowerCrossfade ?? true)
-                    ? "Constant power cosine-sine curve eliminates 3 dB volume dip between adjoining audio clips."
-                    : "Linear crossfade (causes subtle volume dip at center point)."}
-                </p>
-              </div>
-
-              {/* Fade In & Fade Out Durations */}
-              <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
-                <div className="space-y-1">
-                  <label className="text-slate-600">Fade In (s)</label>
-                  <input
-                    type="number"
+                    type="range"
+                    min="-1"
+                    max="1"
                     step="0.1"
-                    min="0"
-                    max="5.0"
-                    value={selectedClip.fadeIn ?? 0}
+                    value={selectedClip.pan ?? 0}
                     onChange={(e) =>
                       onUpdateClip({
                         ...selectedClip,
-                        fadeIn: Math.max(0, parseFloat(e.target.value) || 0),
+                        pan: parseFloat(e.target.value),
                       })
                     }
-                    className="w-full p-1.5 rounded-lg border border-slate-200 font-bold"
+                    className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-800"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-slate-600">Fade Out (s)</label>
+
+                {/* Automatic Voiceover Ducking */}
+                <div className="space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-800">
+                      Automatic Voiceover Ducking
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={selectedClip.ducking ?? selectedClip.track === "music"}
+                      onChange={(e) =>
+                        onUpdateClip({
+                          ...selectedClip,
+                          ducking: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 rounded text-sky-600 cursor-pointer accent-sky-600"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    When speech occurs on the timeline, background music automatically ducks by 14 dB using a smooth sin² envelope.
+                  </p>
+                  <div className="flex justify-between text-[10px] font-mono pt-1 text-slate-700 font-semibold">
+                    <span>Ducking Attenuation:</span>
+                    <span>
+                      {Math.round((timeline.settings?.duckingFactor ?? 0.2) * 100)}% (
+                      {formatGainAsDecibels(timeline.settings?.duckingFactor ?? 0.2)})
+                    </span>
+                  </div>
                   <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="5.0"
-                    value={selectedClip.fadeOut ?? 0}
+                    type="range"
+                    min="0.05"
+                    max="0.6"
+                    step="0.05"
+                    value={timeline.settings?.duckingFactor ?? 0.2}
                     onChange={(e) =>
-                      onUpdateClip({
-                        ...selectedClip,
-                        fadeOut: Math.max(0, parseFloat(e.target.value) || 0),
+                      onUpdateSettings({
+                        duckingFactor: parseFloat(e.target.value),
                       })
                     }
-                    className="w-full p-1.5 rounded-lg border border-slate-200 font-bold"
+                    className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-800"
                   />
                 </div>
-              </div>
-            </div>
-
-            <div className="h-px bg-slate-200" />
-
-            {/* Audio Ducking Controls */}
-            <div className="space-y-2 p-3 rounded-xl bg-purple-50 border border-purple-200">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono font-bold text-purple-900 uppercase">
-                  Automatic Voiceover Ducking
-                </span>
-                <input
-                  type="checkbox"
-                  checked={selectedClip.ducking ?? selectedClip.track === "music"}
-                  onChange={(e) =>
-                    onUpdateClip({
-                      ...selectedClip,
-                      ducking: e.target.checked,
-                    })
-                  }
-                  className="w-4 h-4 rounded text-purple-600 cursor-pointer accent-purple-600"
-                />
-              </div>
-              <p className="text-[10px] text-purple-800 leading-relaxed">
-                When speech occurs on the timeline, background music automatically ducks by 14 dB using a smooth sin² envelope (120ms attack, 350ms release).
-              </p>
-              <div className="flex justify-between text-[10px] font-mono pt-1 text-purple-950 font-semibold">
-                <span>Ducking Attenuation:</span>
-                <span>
-                  {Math.round((timeline.settings?.duckingFactor ?? 0.2) * 100)}% (
-                  {formatGainAsDecibels(timeline.settings?.duckingFactor ?? 0.2)})
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0.05"
-                max="0.6"
-                step="0.05"
-                value={timeline.settings?.duckingFactor ?? 0.2}
-                onChange={(e) =>
-                  onUpdateSettings({
-                    duckingFactor: parseFloat(e.target.value),
-                  })
-                }
-                className="w-full h-1 bg-purple-200 rounded-lg appearance-none cursor-pointer accent-purple-800"
-              />
-            </div>
-
-            <div className="h-px bg-slate-200" />
-
-            {/* Audio Speed & Pitch Lock */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider flex items-center gap-1">
-                  <Gauge className="w-3 h-3 text-emerald-600" />
-                  Audio Retiming & Pitch
-                </span>
-                <span className="text-[10px] font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">
-                  {(selectedClip.speed ?? 1.0).toFixed(2)}x
-                </span>
-              </div>
-
-              <div className="grid grid-cols-4 gap-1.5 font-mono text-[10px]">
-                {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((spd) => {
-                  const isCurrent = Math.abs((selectedClip.speed ?? 1.0) - spd) < 0.01;
-                  return (
-                    <button
-                      key={spd}
-                      type="button"
-                      onClick={() => onUpdateClip({ ...selectedClip, speed: spd })}
-                      className={`py-1 rounded-md font-bold transition-colors cursor-pointer ${
-                        isCurrent
-                          ? "bg-slate-900 text-white shadow-2xs"
-                          : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                      }`}
-                    >
-                      {spd}x
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Pitch Lock Toggle */}
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-800">
-                    Pitch Lock (WSOLA)
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={selectedClip.preservePitch ?? true}
-                    onChange={(e) =>
-                      onUpdateClip({
-                        ...selectedClip,
-                        preservePitch: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-blue-600"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-500 leading-relaxed">
-                  {(selectedClip.preservePitch ?? true)
-                    ? "Audio retimed without pitch distortion via WSOLA overlap-add."
-                    : "Pitch shifts with speed (varispeed)."}
-                </p>
-              </div>
-            </div>
+              </>
+            )}
           </>
         )}
 

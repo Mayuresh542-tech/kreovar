@@ -99,7 +99,7 @@ export function createEditingJob(project:EditorProject,instructions:string,selec
  const id=crypto.randomUUID();
  const matchedPreset=matchCaptionPreset(instructions);
  const isCaptionRequest=/\b(?:ad|add|insert|generate|create|put|use)?\s*(?:animated\s+|timed\s+|speech\s+)?(?:captions?|subtitles?|caption\s+studio)\b/i.test(instructions);
- const defaultCaptionTemplate=preset?.captionTemplate||matchedPreset||(isCaptionRequest?'study-hormozi-style':'signature-poppins');
+ const defaultCaptionTemplate=preset?.captionTemplate||matchedPreset||(isCaptionRequest?'viral-hinglish-pop':'study-hormozi-style');
  return {version:1,id,projectId:project.id,instructions:instructions.trim(),presetId:preset?.id,captionTemplate:defaultCaptionTemplate,selection:[...selection],status:'ready',completedStages:[],failedStages:[],timelineRevision:project.revision,initialRevision:project.revision,appliedOperations:[],generatedAssets:[],errors:[],createdAt:new Date().toISOString(),faultTolerant:options?.faultTolerant??true,stages:stagesFor(preset?.operations||['requestedEdits']).map(stage=>({id:stage,key:id+':'+stage,status:'pending',attempts:0}))};
 }
 export function readRequestedOperations(value:unknown):EditOperation[]{

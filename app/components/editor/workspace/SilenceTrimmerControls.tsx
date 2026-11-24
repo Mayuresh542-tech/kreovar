@@ -174,151 +174,177 @@ export default function SilenceTrimmerControls({ compact = false }: SilenceTrimm
 
   return (
     <div className={`space-y-4 text-slate-800 ${compact ? "text-xs" : "text-sm"}`}>
-      {/* Header Banner */}
-      <div className="flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50/80 border border-blue-200/80">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-blue-600 text-white shadow-xs">
-            <Scissors size={compact ? 16 : 18} />
+      {/* CapCut-Style Basic Section Header (Matching Image 3) */}
+      <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-sky-500 flex items-center justify-center text-white text-[10px] font-bold">
+            ✓
           </div>
-          <div>
-            <div className="font-semibold text-slate-900 flex items-center gap-1.5">
-              <span>Silence Trimmer Studio</span>
-              <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded-full font-medium">
-                Dual-Mode
-              </span>
-            </div>
-            <div className="text-[11px] text-slate-500">
-              Acoustic RMS waveform & speech gap detection
-            </div>
-          </div>
+          <span className="font-semibold text-xs text-slate-900 tracking-tight">Basic</span>
+          <span className="text-[10px] text-slate-400">▴</span>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            setThresholdDb(-38);
+            setMinPauseDuration(0.40);
+            setBreathPaddingMs(70);
+            setRemoveFillerWords(false);
+            setAlternateCadence(true);
+          }}
+          title="Reset to default settings"
+          className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+        >
+          <RotateCcw size={13} />
+        </button>
       </div>
 
-      {/* Control Sliders Card */}
-      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3.5">
+      {/* Control Sliders with StepperBox (Matching Image 3 & 4) */}
+      <div className="space-y-3">
         {/* 1. Sensitivity / Threshold Slider */}
-        <div className="space-y-1">
-          <div className="flex justify-between items-center text-xs">
-            <span className="font-medium text-slate-700 flex items-center gap-1">
-              <VolumeX size={13} className="text-slate-500" />
-              <span>Sensitivity (dBFS)</span>
-            </span>
-            <span className="font-mono text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[11px]">
-              {thresholdDb} dB
-            </span>
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className="w-24 shrink-0 text-slate-700 font-medium">Sensitivity</span>
+          <div className="flex-1 relative flex items-center">
+            <input
+              type="range"
+              min={-50}
+              max={-20}
+              step={1}
+              value={thresholdDb}
+              onChange={e => setThresholdDb(Number(e.target.value))}
+              aria-label="Silence threshold in dBFS"
+              className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+            />
           </div>
-          <input
-            type="range"
-            min={-50}
-            max={-20}
-            step={1}
-            value={thresholdDb}
-            onChange={e => setThresholdDb(Number(e.target.value))}
-            aria-label="Silence threshold in dBFS"
-            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-          />
-          <div className="flex justify-between text-[10px] text-slate-500 px-0.5">
-            <span>-50 dB (Whisper/Quiet)</span>
-            <span>-38 dB (Default)</span>
-            <span>-20 dB (Aggressive)</span>
+          <div className="w-18 shrink-0 flex items-center justify-between bg-slate-50 border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono">
+            <span>{thresholdDb}dB</span>
+            <div className="flex flex-col text-[8px] leading-[8px] text-slate-400 ml-1">
+              <button
+                type="button"
+                onClick={() => setThresholdDb(Math.min(-20, thresholdDb + 1))}
+                className="hover:text-slate-800"
+              >
+                ▲
+              </button>
+              <button
+                type="button"
+                onClick={() => setThresholdDb(Math.max(-50, thresholdDb - 1))}
+                className="hover:text-slate-800"
+              >
+                ▼
+              </button>
+            </div>
           </div>
         </div>
 
         {/* 2. Min Pause Duration Slider */}
-        <div className="space-y-1">
-          <div className="flex justify-between items-center text-xs">
-            <span className="font-medium text-slate-700">Min Pause Duration</span>
-            <span className="font-mono text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[11px]">
-              {minPauseDuration.toFixed(2)}s
-            </span>
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className="w-24 shrink-0 text-slate-700 font-medium">Min Pause</span>
+          <div className="flex-1 relative flex items-center">
+            <input
+              type="range"
+              min={0.20}
+              max={2.0}
+              step={0.05}
+              value={minPauseDuration}
+              onChange={e => setMinPauseDuration(Number(e.target.value))}
+              aria-label="Minimum silence pause duration"
+              className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+            />
           </div>
-          <input
-            type="range"
-            min={0.20}
-            max={2.0}
-            step={0.05}
-            value={minPauseDuration}
-            onChange={e => setMinPauseDuration(Number(e.target.value))}
-            aria-label="Minimum silence pause duration"
-            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-          />
-          <div className="flex justify-between text-[10px] text-slate-500 px-0.5">
-            <span>0.2s (Fast cuts)</span>
-            <span>0.4s (Natural)</span>
-            <span>2.0s (Long pauses only)</span>
+          <div className="w-18 shrink-0 flex items-center justify-between bg-slate-50 border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono">
+            <span>{minPauseDuration.toFixed(2)}s</span>
+            <div className="flex flex-col text-[8px] leading-[8px] text-slate-400 ml-1">
+              <button
+                type="button"
+                onClick={() => setMinPauseDuration(Math.min(2.0, +(minPauseDuration + 0.05).toFixed(2)))}
+                className="hover:text-slate-800"
+              >
+                ▲
+              </button>
+              <button
+                type="button"
+                onClick={() => setMinPauseDuration(Math.max(0.20, +(minPauseDuration - 0.05).toFixed(2)))}
+                className="hover:text-slate-800"
+              >
+                ▼
+              </button>
+            </div>
           </div>
         </div>
 
         {/* 3. Breath Padding Slider */}
-        <div className="space-y-1">
-          <div className="flex justify-between items-center text-xs">
-            <span className="font-medium text-slate-700">Breath Padding</span>
-            <span className="font-mono text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[11px]">
-              {breathPaddingMs}ms
-            </span>
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className="w-24 shrink-0 text-slate-700 font-medium">Padding</span>
+          <div className="flex-1 relative flex items-center">
+            <input
+              type="range"
+              min={0}
+              max={200}
+              step={10}
+              value={breathPaddingMs}
+              onChange={e => setBreathPaddingMs(Number(e.target.value))}
+              aria-label="Breath padding around words"
+              className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+            />
           </div>
+          <div className="w-18 shrink-0 flex items-center justify-between bg-slate-50 border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono">
+            <span>{breathPaddingMs}ms</span>
+            <div className="flex flex-col text-[8px] leading-[8px] text-slate-400 ml-1">
+              <button
+                type="button"
+                onClick={() => setBreathPaddingMs(Math.min(200, breathPaddingMs + 10))}
+                className="hover:text-slate-800"
+              >
+                ▲
+              </button>
+              <button
+                type="button"
+                onClick={() => setBreathPaddingMs(Math.max(0, breathPaddingMs - 10))}
+                className="hover:text-slate-800"
+              >
+                ▼
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Options: Clean Toggles */}
+      <div className="pt-2 border-t border-slate-200 space-y-2">
+        <label className="flex items-center justify-between cursor-pointer select-none text-xs">
+          <span className="text-slate-700">Remove filler words (“umm”, “uh”)</span>
           <input
-            type="range"
-            min={0}
-            max={200}
-            step={10}
-            value={breathPaddingMs}
-            onChange={e => setBreathPaddingMs(Number(e.target.value))}
-            aria-label="Breath padding around words"
-            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            type="checkbox"
+            checked={removeFillerWords}
+            onChange={e => setRemoveFillerWords(e.target.checked)}
+            className="rounded border-slate-300 text-sky-500 focus:ring-sky-400 w-3.5 h-3.5 cursor-pointer"
           />
-          <div className="flex justify-between text-[10px] text-slate-500 px-0.5">
-            <span>0ms (Tight jump cut)</span>
-            <span>70ms (Clean attack)</span>
-            <span>200ms (Relaxed)</span>
-          </div>
-        </div>
+        </label>
 
-        {/* 4. Filler Words & Pacing Cadence Toggles */}
-        <div className="pt-2 border-t border-slate-200/80 space-y-2">
-          <label className="flex items-center justify-between cursor-pointer select-none">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={removeFillerWords}
-                onChange={e => setRemoveFillerWords(e.target.checked)}
-                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-              />
-              <span className="text-xs font-medium text-slate-800">
-                Flag filler tokens (“umm”, “uh”, “aa”, “hmm”, “matlab”)
-              </span>
-            </div>
-          </label>
-
-          <label className="flex items-center justify-between cursor-pointer select-none">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={alternateCadence}
-                onChange={e => setAlternateCadence(e.target.checked)}
-                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-              />
-              <span className="text-xs font-medium text-slate-800">
-                Punch-in jump cut cadence (1.16x zoom on cuts)
-              </span>
-            </div>
-            <Zap size={13} className="text-amber-500" />
-          </label>
-        </div>
+        <label className="flex items-center justify-between cursor-pointer select-none text-xs">
+          <span className="text-slate-700">Punch-in cadence on cuts</span>
+          <input
+            type="checkbox"
+            checked={alternateCadence}
+            onChange={e => setAlternateCadence(e.target.checked)}
+            className="rounded border-slate-300 text-sky-500 focus:ring-sky-400 w-3.5 h-3.5 cursor-pointer"
+          />
+        </label>
       </div>
 
       {/* Detection Results Badge & Feedback */}
       {hasSilences && (
-        <div className="p-3 rounded-2xl bg-amber-50/90 border border-amber-300 flex items-start justify-between gap-2 shadow-xs">
+        <div className="p-2.5 rounded-lg bg-sky-50 border border-sky-200 flex items-start justify-between gap-2">
           <div className="flex items-start gap-2">
-            <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+            <AlertCircle size={14} className="text-sky-600 mt-0.5 flex-shrink-0" />
             <div>
-              <div className="text-xs font-semibold text-amber-950">
+              <div className="text-xs font-semibold text-sky-950">
                 Found {detectedSilences.length} pause{detectedSilences.length > 1 ? "s" : ""} (
-                {totalSilenceSeconds.toFixed(2)}s silence)
+                {totalSilenceSeconds.toFixed(2)}s)
               </div>
-              <div className="text-[11px] text-amber-800">
-                Highlighted with visual shading on timeline. Ready for multi-track ripple cut.
+              <div className="text-[11px] text-sky-700">
+                Ready for multi-track ripple cut.
               </div>
             </div>
           </div>
@@ -326,22 +352,22 @@ export default function SilenceTrimmerControls({ compact = false }: SilenceTrimm
             type="button"
             onClick={handleClearHighlights}
             title="Clear timeline highlights"
-            className="text-[11px] text-amber-700 hover:text-amber-900 underline font-medium px-1 py-0.5"
+            className="text-[11px] text-sky-600 hover:text-sky-900 underline font-medium"
           >
             Clear
           </button>
         </div>
       )}
 
-      {/* Scan & Trim Buttons */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Scan & Trim Buttons (Clean light blue non-neon buttons) */}
+      <div className="grid grid-cols-2 gap-2 pt-1">
         <button
           type="button"
           onClick={handleScanSilences}
           disabled={isScanning}
-          className="min-h-[44px] px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 active:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-200 transition-all active:scale-[0.99] disabled:opacity-50"
+          className="min-h-[36px] px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-300 transition-colors cursor-pointer disabled:opacity-50"
         >
-          <Sparkles size={14} className="text-blue-600" />
+          <Sparkles size={13} className="text-sky-600" />
           <span>{isScanning ? "Scanning…" : "Scan Silences"}</span>
         </button>
 
@@ -349,20 +375,20 @@ export default function SilenceTrimmerControls({ compact = false }: SilenceTrimm
           type="button"
           onClick={handleTrimSilences}
           disabled={!hasSilences}
-          className={`min-h-[44px] px-3 py-2 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] ${
+          className={`min-h-[36px] px-3 py-1.5 rounded-lg font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors ${
             hasSilences
-              ? "bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xs cursor-pointer"
+              ? "bg-sky-500 hover:bg-sky-600 text-white shadow-xs cursor-pointer"
               : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
           }`}
         >
-          <Scissors size={14} />
-          <span>Trim All Silences</span>
+          <Scissors size={13} />
+          <span>Trim All</span>
         </button>
       </div>
 
-      <div className="text-[11px] text-slate-500 text-center flex items-center justify-center gap-1">
-        <Volume2 size={12} className="text-slate-400" />
-        <span>Synchronized across video, audio, B-roll & captions · 20ms micro-fades</span>
+      <div className="text-[10.5px] text-slate-400 text-center flex items-center justify-center gap-1 pt-1">
+        <Volume2 size={11} className="text-slate-400" />
+        <span>Synchronized across tracks with 20ms micro-fades</span>
       </div>
     </div>
   );

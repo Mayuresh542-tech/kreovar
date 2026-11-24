@@ -23,10 +23,10 @@ export const Scrubber = memo(function Scrubber({
   height,
   fps = 30,
   showHandle = true,
-  color = "#00E5FF",
+  color = "#0284c7",
 }: ScrubberProps) {
   const left = Math.max(0, time * pps);
-  const isCyan = color === "#00E5FF";
+  const isCyan = color === "#0284c7" || color === "#00E5FF";
 
   return (
     <div
@@ -42,11 +42,11 @@ export const Scrubber = memo(function Scrubber({
         <div className="relative -left-[7px] -top-0 flex flex-col items-center pointer-events-auto cursor-ew-resize group">
           <div
             className={`w-[14px] h-[14px] rounded-sm shadow-md flex items-center justify-center ${
-              isCyan ? "bg-[#00E5FF] shadow-[#00E5FF]/50" : "bg-red-500 shadow-red-500/40"
+              isCyan ? "bg-sky-500 shadow-sky-500/50" : "bg-red-500 shadow-red-500/40"
             }`}
             style={{ backgroundColor: color }}
           >
-            <div className="w-[2px] h-[6px] bg-black rounded-full opacity-80" />
+            <div className="w-[2px] h-[6px] bg-white rounded-full opacity-90" />
           </div>
           {/* Triangular pointer tip */}
           <div
@@ -55,7 +55,7 @@ export const Scrubber = memo(function Scrubber({
           />
           
           {/* Floating Timecode Pill on Hover */}
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-[#18181C] border border-[#2E2E33] text-white font-mono text-[10px] px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none z-50">
+          <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 border border-slate-700 text-white font-mono text-[10px] px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none z-50">
             {formatTime(time, fps)}
           </div>
         </div>
@@ -64,7 +64,7 @@ export const Scrubber = memo(function Scrubber({
       {/* Synchronized Vertical Laser Playhead Bar */}
       <div
         className={`w-[2px] z-50 pointer-events-none ${
-          isCyan ? "shadow-[0_0_8px_rgba(0,229,255,0.85)]" : "shadow-[0_0_8px_rgba(239,68,68,0.7)]"
+          isCyan ? "shadow-[0_0_6px_rgba(2,132,199,0.5)]" : "shadow-[0_0_8px_rgba(239,68,68,0.7)]"
         }`}
         style={{
           backgroundColor: color,

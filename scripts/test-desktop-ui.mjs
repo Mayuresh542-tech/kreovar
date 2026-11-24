@@ -5,68 +5,47 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 
-test("Task 1: editor.css and editor-layout.css implement CapCut Desktop Dark Studio theme", () => {
-  const editorCss = fs.readFileSync(path.join(ROOT, "app/components/editor/workspace/editor.css"), "utf-8");
+test("Task 1: editor-layout.css implements CapCut Clean White Studio layout", () => {
   const layoutCss = fs.readFileSync(path.join(ROOT, "app/components/editor/workspace/editor-layout.css"), "utf-8");
 
-  // Check dark color scheme
-  assert.ok(editorCss.includes("#121214"), "editor.css must include background #121214");
-  assert.ok(editorCss.includes("#18181C"), "editor.css must include panel #18181C");
-  assert.ok(editorCss.includes("#222226"), "editor.css must include cards/headers #222226");
-  assert.ok(editorCss.includes("#2E2E33"), "editor.css must include borders #2E2E33");
-  assert.ok(editorCss.includes("#FFFFFF"), "editor.css must include text #FFFFFF");
-  assert.ok(editorCss.includes("#A0A0A8"), "editor.css must include secondary text #A0A0A8");
-  assert.ok(editorCss.includes("#00E5FF"), "editor.css must include CapCut Cyan #00E5FF");
-  assert.ok(editorCss.includes("#33EAFF"), "editor.css must include CapCut Cyan hover #33EAFF");
-
-  // Check editor-layout.css has dark studio overrides
-  assert.ok(layoutCss.includes("#121214"), "editor-layout.css must include background #121214");
-  assert.ok(layoutCss.includes("#18181C"), "editor-layout.css must include panel #18181C");
-  assert.ok(layoutCss.includes("#222226"), "editor-layout.css must include cards #222226");
-  assert.ok(layoutCss.includes("#2E2E33"), "editor-layout.css must include border #2E2E33");
-  assert.ok(layoutCss.includes("#00E5FF"), "editor-layout.css must include cyan #00E5FF");
+  // Check clean white layout scheme
+  assert.ok(layoutCss.includes("#FFFFFF"), "editor-layout.css must include background #FFFFFF");
+  assert.ok(layoutCss.includes("#E2E8F0"), "editor-layout.css must include border #E2E8F0");
+  assert.ok(layoutCss.includes("#0F172A"), "editor-layout.css must include text #0F172A");
+  assert.ok(layoutCss.includes("#64748B"), "editor-layout.css must include secondary text #64748B");
+  assert.ok(layoutCss.includes("#0284C7"), "editor-layout.css must include clean light blue accent #0284C7");
 });
 
-test("Task 2: EditorLayout.tsx Top Bar matches CapCut Studio specs", () => {
+test("Task 2: EditorLayout.tsx Top Bar matches Clean White CapCut Specs with Upper-Left Light Blue Export", () => {
   const layoutTsx = fs.readFileSync(path.join(ROOT, "app/components/editor/EditorLayout.tsx"), "utf-8");
 
-  // Check Top Bar container
-  assert.ok(layoutTsx.includes("bg-[#18181C]"), "Top bar must have dark background #18181C");
-  assert.ok(layoutTsx.includes("border-[#2E2E33]"), "Top bar must have border #2E2E33");
+  // Check Top Bar container has clean white background
+  assert.ok(layoutTsx.includes("bg-white"), "Top bar must have white background");
+  assert.ok(layoutTsx.includes("border-slate-200"), "Top bar must have border border-slate-200");
+
+  // Check prominent Light Blue Export button positioned in upper left corner
+  assert.ok(layoutTsx.includes("bg-sky-500"), "Export button must have clean light blue bg-sky-500");
+  assert.ok(layoutTsx.includes("text-white"), "Export button must have text-white");
+  assert.ok(layoutTsx.includes("font-bold"), "Export button must have font-bold");
+  assert.ok(layoutTsx.includes("hover:bg-sky-600"), "Export button must have hover:bg-sky-600");
 
   // Check Project title input
   assert.ok(layoutTsx.includes("project.title"), "Top bar must include project title");
-  assert.ok(layoutTsx.includes("bg-[#121214]"), "Title input must have dark background #121214");
-  assert.ok(layoutTsx.includes("focus:border-[#00E5FF]"), "Title input must focus with CapCut cyan border");
 
   // Check Auto-save status indicator
   assert.ok(layoutTsx.includes("persistenceState"), "Top bar must include persistence auto-save state");
-  assert.ok(layoutTsx.includes("text-[#00E5FF]"), "Saved indicator check must be CapCut cyan #00E5FF");
 
-  // Check Aspect ratio selector
+  // Check Aspect ratio selector (consolidated single ratio control)
   assert.ok(layoutTsx.includes("9:16"), "Aspect ratio must include 9:16");
   assert.ok(layoutTsx.includes("16:9"), "Aspect ratio must include 16:9");
   assert.ok(layoutTsx.includes("1:1"), "Aspect ratio must include 1:1");
-  assert.ok(layoutTsx.includes("4:5"), "Aspect ratio must include 4:5");
-  assert.ok(layoutTsx.includes("4:3"), "Aspect ratio must include 4:3");
-
-  // Check AI Editor quick button with sparkles
-  assert.ok(layoutTsx.includes("AI Editor"), "Top bar must have AI Editor quick button");
-  assert.ok(layoutTsx.includes("Sparkles"), "AI Editor button must include Sparkles icon");
 
   // Check Undo/Redo
   assert.ok(layoutTsx.includes("Undo2"), "Top bar must have Undo button");
   assert.ok(layoutTsx.includes("Redo2"), "Top bar must have Redo button");
-
-  // Check prominent CapCut Cyan Export button
-  assert.ok(layoutTsx.includes("bg-[#00E5FF]"), "Export button must have bg-[#00E5FF]");
-  assert.ok(layoutTsx.includes("text-black"), "Export button must have text-black");
-  assert.ok(layoutTsx.includes("font-bold"), "Export button must have font-bold");
-  assert.ok(layoutTsx.includes("hover:bg-[#33EAFF]"), "Export button must have hover:bg-[#33EAFF]");
-  assert.ok(layoutTsx.includes("px-4 py-1.5 rounded-lg"), "Export button must have px-4 py-1.5 rounded-lg");
 });
 
-test("Task 3: ToolSidebar.tsx & Library (AssetDrawer) Left Media Hub", () => {
+test("Task 3: ToolSidebar.tsx & Library (AssetDrawer) Clean White Left Media Hub", () => {
   const toolSidebar = fs.readFileSync(path.join(ROOT, "app/components/editor/ToolSidebar.tsx"), "utf-8");
   const assetDrawer = fs.readFileSync(path.join(ROOT, "app/components/editor/AssetDrawer.tsx"), "utf-8");
 
@@ -76,20 +55,18 @@ test("Task 3: ToolSidebar.tsx & Library (AssetDrawer) Left Media Hub", () => {
     assert.ok(toolSidebar.includes(`"${tab}"`) || toolSidebar.includes(`'${tab}'`) || toolSidebar.includes(`label: "${tab}"`), `ToolSidebar must include category tab "${tab}"`);
   }
 
-  // Check Dark Studio styling in ToolSidebar
-  assert.ok(toolSidebar.includes("bg-[#18181C]"), "ToolSidebar must have dark background #18181C");
-  assert.ok(toolSidebar.includes("border-[#2E2E33]"), "ToolSidebar must have border #2E2E33");
-  assert.ok(toolSidebar.includes("#00E5FF"), "ToolSidebar active states must use CapCut cyan #00E5FF");
+  // Check Clean White styling in ToolSidebar
+  assert.ok(toolSidebar.includes("bg-white"), "ToolSidebar must have white background");
+  assert.ok(toolSidebar.includes("border-slate-200"), "ToolSidebar must have border border-slate-200");
 
-  // Check Dark media grid with clean thumbnails and '+' button in AssetDrawer
+  // Check Clean Media Hub in AssetDrawer
   assert.ok(assetDrawer.includes("grid grid-cols-2"), "AssetDrawer must render 2-column media grid");
-  assert.ok(assetDrawer.includes("bg-[#222226]"), "Media card must have dark background #222226");
-  assert.ok(assetDrawer.includes("border-[#2E2E33]"), "Media card must have border #2E2E33");
+  assert.ok(assetDrawer.includes("bg-white"), "AssetDrawer must have clean white background");
+  assert.ok(assetDrawer.includes("border-slate-200"), "AssetDrawer cards must have border-slate-200");
   assert.ok(assetDrawer.includes("handlePlaceMedia"), "Media grid '+' button must insert clip at playhead");
-  assert.ok(assetDrawer.includes("bg-[#00E5FF]"), "'+' insert button must use CapCut cyan bg #00E5FF");
 });
 
-test("Task 4: TimelinePanel.tsx Action Strip, Track Controls, Waveforms, Selection Rings & Cyan Playhead", () => {
+test("Task 4: TimelinePanel.tsx Action Strip, Track Controls, Uniform Styling & Waveforms", () => {
   const timelinePanel = fs.readFileSync(path.join(ROOT, "app/components/editor/TimelinePanel.tsx"), "utf-8");
   const scrubber = fs.readFileSync(path.join(ROOT, "app/components/editor/Scrubber.tsx"), "utf-8");
 
@@ -121,11 +98,36 @@ test("Task 4: TimelinePanel.tsx Action Strip, Track Controls, Waveforms, Selecti
   assert.ok(timelinePanel.includes("waveformCache"), "TimelinePanel must use waveformCache");
   assert.ok(timelinePanel.includes("extractAudioPeaks"), "TimelinePanel must support extractAudioPeaks");
 
-  // Check Clip Selection Rings
-  assert.ok(timelinePanel.includes("ring-2 ring-[#00E5FF]"), "Selected clips must have CapCut Cyan ring-2 ring-[#00E5FF]");
-  assert.ok(timelinePanel.includes("border-[#00E5FF]"), "Selected clips must have border-[#00E5FF]");
+  // Check Uniform Neutral Track Badges (no rainbow)
+  assert.ok(timelinePanel.includes("bg-slate-100"), "Track badges must use uniform neutral bg-slate-100");
+  assert.ok(timelinePanel.includes("border-slate-200"), "Track badges must use uniform border-slate-200");
 
-  // Check Cyan Playhead (#00E5FF)
-  assert.ok(timelinePanel.includes('color="#00E5FF"'), "TimelinePanel must pass color='#00E5FF' to Scrubber");
-  assert.ok(scrubber.includes("#00E5FF"), "Scrubber must support CapCut Cyan #00E5FF playhead");
+  // Check Playhead
+  assert.ok(timelinePanel.includes('color="#0284c7"'), "TimelinePanel must pass clean light blue playhead color to Scrubber");
+  assert.ok(scrubber.includes("#0284c7"), "Scrubber must support clean light blue playhead");
+});
+
+test("Task 5: EditorPropertiesInspector.tsx Parity with CapCut Audio & Speed Tabs", () => {
+  const inspector = fs.readFileSync(path.join(ROOT, "app/components/editor/EditorPropertiesInspector.tsx"), "utf-8");
+
+  // Check dedicated tabs
+  assert.ok(inspector.includes('"video"'), "Inspector must have Video tab");
+  assert.ok(inspector.includes('"audio"'), "Inspector must have Audio tab");
+  assert.ok(inspector.includes('"speed"'), "Inspector must have dedicated Speed tab");
+
+  // Check Audio controls matching Image 3 Basic Section
+  assert.ok(inspector.includes("renderBasicAudioControls"), "Inspector must render basic audio controls");
+  assert.ok(inspector.includes("Volume"), "Audio controls must include Volume");
+  assert.ok(inspector.includes("Fade in"), "Audio controls must include Fade in");
+  assert.ok(inspector.includes("Fade out"), "Audio controls must include Fade out");
+  assert.ok(inspector.includes("KeyframeDiamond"), "Audio controls must include Keyframe Diamond <>");
+  assert.ok(inspector.includes("StepperBox"), "Audio controls must include StepperBox");
+
+  // Check Speed controls matching Image 4 & 5
+  assert.ok(inspector.includes("renderSpeedControls"), "Inspector must render speed controls");
+  assert.ok(inspector.includes("Standard"), "Speed controls must support Standard mode");
+  assert.ok(inspector.includes("Curve"), "Speed controls must support Curve mode");
+  assert.ok(inspector.includes("Change audio pitch"), "Speed controls must include Change audio pitch toggle");
+  assert.ok(inspector.includes("Smooth slow-mo"), "Speed controls must include Smooth slow-mo note");
+  assert.ok(inspector.includes("calculateTimelineDurationFromSource"), "Speed controls must compute dynamic duration");
 });

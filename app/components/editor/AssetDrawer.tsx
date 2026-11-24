@@ -479,16 +479,16 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
 
   return (
     <aside
-      className="w-80 flex-shrink-0 bg-[#18181C] border-r border-[#2E2E33] flex flex-col h-full overflow-hidden text-white z-20 select-none"
+      className="w-80 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden text-slate-800 z-20 select-none shadow-xs"
       aria-label="Secondary Asset & Tool Drawer"
     >
       {/* Drawer Header */}
-      <header className="h-12 px-4 flex items-center justify-between border-b border-[#2E2E33] bg-[#18181C] flex-shrink-0">
+      <header className="h-12 px-4 flex items-center justify-between border-b border-slate-200 bg-white flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-semibold text-sm text-white truncate">
+          <span className="font-semibold text-sm text-slate-900 truncate">
             {titles[activeTab] || "Library"}
           </span>
-          <span className="text-[10px] bg-[#222226] text-[#A0A0A8] border border-[#2E2E33] px-2 py-0.5 rounded font-mono">
+          <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded font-mono">
             {activeTab === "media"
               ? `${Object.keys(project.assets).length} assets`
               : activeTab === "captions"
@@ -503,25 +503,25 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
         <button
           onClick={onClose}
           aria-label="Close panel"
-          className="p-1 rounded-lg text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
+          className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
         >
           <X size={16} />
         </button>
       </header>
 
       {/* Drawer Body */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-[#2E2E33] scrollbar-track-transparent bg-[#18181C] text-white">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent bg-white text-slate-800">
         {/* ======================= TAB: CAPTIONS ======================= */}
         {activeTab === "captions" && (
           <div className="space-y-4">
             {/* Hinglish Toggle & Info */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-[#222226] border border-[#2E2E33]">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50/70 border border-amber-200/80">
               <div className="space-y-0.5">
-                <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                  <Sparkles size={13} className="text-[#00E5FF]" />
+                <span className="text-xs font-semibold text-amber-950 flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-amber-600" />
                   Hinglish & Hindi Pop
                 </span>
-                <p className="text-[10px] text-[#A0A0A8]">
+                <p className="text-[10px] text-amber-800">
                   Dynamic color accents on Hindi/Hinglish keywords
                 </p>
               </div>
@@ -537,10 +537,10 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                   }
                 }}
                 aria-pressed={isHinglishMode}
-                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer ${
+                className={`text-xs px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer ${
                   isHinglishMode
-                    ? "bg-[#00E5FF] text-black font-semibold shadow-sm"
-                    : "bg-[#18181C] border border-[#2E2E33] text-white hover:bg-[#2A2A30]"
+                    ? "bg-sky-500 text-white shadow-xs"
+                    : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 {isHinglishMode ? "Active" : "Enable"}
@@ -551,21 +551,21 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
             <div className="relative">
               <Search
                 size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0A8]"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               />
               <input
                 type="text"
                 placeholder="Search styles (Hormozi, Ali Abdaal, Beast)..."
                 value={captionQuery}
                 onChange={(e) => setCaptionQuery(e.target.value)}
-                className="w-full bg-[#121214] border border-[#2E2E33] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-[#6E6E78] focus:outline-none focus:border-[#00E5FF] focus:bg-[#18181C]"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white"
               />
             </div>
 
             {/* Registered Caption Presets Cards */}
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold tracking-wider text-[#A0A0A8] uppercase">
+                <span className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
                   Caption Presets ({ALL_CAPTION_TEMPLATES.length})
                 </span>
               </div>
@@ -587,26 +587,26 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                       key={preset.id}
                       onMouseEnter={() => setHoveredPreset(preset.id)}
                       onMouseLeave={() => setHoveredPreset(null)}
-                      className={`p-3 rounded-xl border bg-[#222226] transition-all cursor-pointer group ${
+                      className={`p-3 rounded-xl border bg-white transition-all cursor-pointer group ${
                         isSelected
-                          ? "border-[#00E5FF] bg-[#2A2A30] shadow-sm"
-                          : "border-[#2E2E33] hover:border-[#3E3E45] hover:bg-[#2A2A30]"
+                          ? "border-sky-500 ring-2 ring-sky-200 bg-sky-50/20 shadow-xs"
+                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/70"
                       }`}
                       onClick={() => handleApplyCaptionPreset(preset.id)}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-xs text-white">
+                        <span className="font-semibold text-xs text-slate-900">
                           {preset.name}
                         </span>
                         {isSelected && (
-                          <span className="text-[10px] bg-[#00E5FF] text-black px-1.5 py-0.5 rounded font-mono font-bold">
+                          <span className="text-[10px] text-sky-600 font-bold bg-sky-50 border border-sky-200 px-1.5 py-0.2 rounded font-mono">
                             Active
                           </span>
                         )}
                       </div>
 
                       {/* Live Hovering Preview Box */}
-                      <div className="mt-2 h-14 rounded-lg bg-[#121214] flex items-center justify-center p-2 relative overflow-hidden border border-[#2E2E33] group-hover:border-[#3E3E45] transition-colors">
+                      <div className="mt-2 h-14 rounded-lg bg-slate-950 flex items-center justify-center p-2 relative overflow-hidden border border-slate-800 group-hover:border-slate-700 transition-colors">
                         <CaptionRenderer
                           text={sampleText}
                           currentTime={1.0}
@@ -615,7 +615,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                         />
                       </div>
 
-                      <p className="mt-2 text-[11px] text-[#A0A0A8] line-clamp-1">
+                      <p className="mt-2 text-[11px] text-slate-500 line-clamp-1">
                         {tagline}
                       </p>
                     </div>
@@ -637,13 +637,13 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
         {activeTab === "audio" && (
           <div className="space-y-4">
             {/* Quick Silence Trimmer Feature Card */}
-            <details className="rounded-2xl border border-[#2E2E33] bg-[#222226] p-3 group">
-              <summary className="cursor-pointer text-xs font-semibold text-white flex items-center justify-between select-none">
+            <details className="rounded-2xl border border-slate-200 bg-slate-50 p-3 group">
+              <summary className="cursor-pointer text-xs font-semibold text-slate-800 flex items-center justify-between select-none">
                 <span className="flex items-center gap-2">
-                  <Scissors size={14} className="text-[#00E5FF]" />
+                  <Scissors size={14} className="text-sky-600" />
                   <span>Silence Trimmer Studio</span>
                 </span>
-                <span className="text-[10px] text-[#A0A0A8] font-normal group-open:hidden">Open Controls ↓</span>
+                <span className="text-[10px] text-slate-500 font-normal group-open:hidden">Open Controls ↓</span>
               </summary>
               <div className="pt-3">
                 <SilenceTrimmerControls compact />
@@ -657,8 +657,8 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                   onClick={() => setSfxCategory(cat)}
                   className={`px-3 py-1 rounded-full whitespace-nowrap transition-colors cursor-pointer ${
                     sfxCategory === cat
-                      ? "bg-[#00E5FF] text-black font-bold shadow-2xs"
-                      : "bg-[#222226] border border-[#2E2E33] text-[#A0A0A8] hover:text-white hover:bg-[#2A2A30] font-medium"
+                      ? "bg-sky-500 text-white font-bold shadow-2xs"
+                      : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium"
                   }`}
                 >
                   {cat}
@@ -670,20 +670,20 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
             <div className="relative">
               <Search
                 size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0A8]"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               />
               <input
                 type="text"
                 placeholder="Search SFX (Whoosh, click, pop, sub-drop)..."
                 value={sfxQuery}
                 onChange={(e) => setSfxQuery(e.target.value)}
-                className="w-full bg-[#121214] border border-[#2E2E33] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-[#6E6E78] focus:outline-none focus:border-[#00E5FF] focus:bg-[#18181C]"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white"
               />
             </div>
 
             {/* Categorized SFX List */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-[11px] text-[#A0A0A8]">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
                 <span>Sound Effects ({BUILTIN_SFX.length})</span>
                 <span className="font-mono text-[10px]">WAV 48kHz</span>
               </div>
@@ -698,7 +698,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                   return (
                     <div
                       key={sfx.id}
-                      className="p-2.5 rounded-lg bg-[#222226] border border-[#2E2E33] flex items-center justify-between hover:border-[#3E3E45] hover:bg-[#2A2A30] transition-colors group"
+                      className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between hover:border-slate-300 hover:bg-slate-50/70 transition-colors group"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         {/* Instant Preview Play Button */}
@@ -708,18 +708,18 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                           aria-label={`Preview ${sfx.name}`}
                           className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
                             isPlaying
-                              ? "bg-[#00E5FF] text-black"
-                              : "bg-[#18181C] border border-[#2E2E33] text-[#A0A0A8] hover:bg-[#00E5FF] hover:text-black hover:border-[#00E5FF]"
+                              ? "bg-sky-500 text-white"
+                              : "bg-slate-100 border border-slate-200 text-slate-600 hover:bg-sky-500 hover:text-white hover:border-sky-500"
                           }`}
                         >
                           {isPlaying ? <Pause size={12} /> : <Play size={12} className="ml-0.5" />}
                         </button>
 
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-white truncate">
+                          <p className="text-xs font-medium text-slate-900 truncate">
                             {sfx.name}
                           </p>
-                          <span className="text-[10px] text-[#A0A0A8] font-mono">
+                          <span className="text-[10px] text-slate-500 font-mono">
                             {sfx.category} · {sfx.duration}s
                           </span>
                         </div>
@@ -729,7 +729,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                       <button
                         onClick={() => handleAddSfxToTimeline(sfx)}
                         title="Add to Audio Track at Playhead"
-                        className="opacity-90 group-hover:opacity-100 flex items-center gap-1 px-2 py-1 rounded bg-[#18181C] hover:bg-[#00E5FF] text-[#A0A0A8] hover:text-black text-[10px] font-semibold border border-[#2E2E33] hover:border-[#00E5FF] transition-colors cursor-pointer"
+                        className="opacity-90 group-hover:opacity-100 flex items-center gap-1 px-2 py-1 rounded bg-slate-100 hover:bg-sky-500 text-slate-700 hover:text-white text-[10px] font-semibold border border-slate-300 hover:border-sky-500 transition-colors cursor-pointer"
                       >
                         <Plus size={11} />
                         <span>Add</span>
@@ -742,13 +742,13 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
           </div>
         )}
 
-        {/* ======================= TAB: MEDIA (CapCut Dark Media Grid) ======================= */}
+        {/* ======================= TAB: MEDIA (CapCut Clean Media Grid) ======================= */}
         {activeTab === "media" && (
           <div className="space-y-4">
             {/* Upload Zone */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="p-4 border-2 border-dashed border-[#2E2E33] hover:border-[#00E5FF] rounded-xl bg-[#121214] hover:bg-[#222226] text-center cursor-pointer transition-colors group"
+              className="p-4 border-2 border-dashed border-slate-300 hover:border-sky-500 rounded-xl bg-slate-50 hover:bg-slate-100/60 text-center cursor-pointer transition-colors group"
             >
               <input
                 ref={fileInputRef}
@@ -760,12 +760,12 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
               />
               <Upload
                 size={22}
-                className="mx-auto text-[#A0A0A8] group-hover:text-[#00E5FF] group-hover:scale-110 transition-all"
+                className="mx-auto text-slate-400 group-hover:text-sky-600 group-hover:scale-110 transition-all"
               />
-              <p className="mt-2 text-xs font-semibold text-white">
+              <p className="mt-2 text-xs font-semibold text-slate-900">
                 {isUploading ? `Uploading (${uploadProgress}%)` : "Upload Raw Footage"}
               </p>
-              <p className="text-[10px] text-[#A0A0A8] mt-1">
+              <p className="text-[10px] text-slate-500 mt-1">
                 MP4, MOV, WAV, MP3, PNG up to 100MB
               </p>
             </div>
@@ -775,25 +775,25 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
               <div className="relative flex-1">
                 <Search
                   size={13}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#A0A0A8]"
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
                 />
                 <input
                   type="text"
                   placeholder="Filter media..."
                   value={mediaQuery}
                   onChange={(e) => setMediaQuery(e.target.value)}
-                  className="w-full bg-[#121214] border border-[#2E2E33] rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-[#6E6E78] focus:outline-none focus:border-[#00E5FF] focus:bg-[#18181C]"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white"
                 />
               </div>
               <select
                 value={mediaFilter}
                 onChange={(e) => setMediaFilter(e.target.value as any)}
-                className="bg-[#121214] border border-[#2E2E33] rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-[#3E3E45] cursor-pointer"
+                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-sky-500 cursor-pointer"
               >
-                <option value="all" className="bg-[#18181C] text-white">All</option>
-                <option value="video" className="bg-[#18181C] text-white">Video</option>
-                <option value="audio" className="bg-[#18181C] text-white">Audio</option>
-                <option value="image" className="bg-[#18181C] text-white">Image</option>
+                <option value="all" className="bg-white text-slate-800">All</option>
+                <option value="video" className="bg-white text-slate-800">Video</option>
+                <option value="audio" className="bg-white text-slate-800">Audio</option>
+                <option value="image" className="bg-white text-slate-800">Image</option>
               </select>
             </div>
 
@@ -821,9 +821,9 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                       );
                       e.dataTransfer.effectAllowed = "copy";
                     }}
-                    className="p-1.5 rounded-xl bg-[#222226] border border-[#2E2E33] hover:border-[#3E3E45] flex flex-col group transition-all relative overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-xs"
+                    className="p-1.5 rounded-xl bg-white border border-slate-200 hover:border-slate-300 flex flex-col group transition-all relative overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-xs"
                   >
-                    <div className="w-full h-20 rounded-lg bg-[#18181C] border border-[#2E2E33] flex items-center justify-center overflow-hidden relative">
+                    <div className="w-full h-20 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden relative">
                       {asset.thumbnail ? (
                         <img
                           src={asset.thumbnail}
@@ -831,22 +831,22 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : asset.kind === "audio" ? (
-                        <Music size={22} className="text-emerald-400" />
+                        <Music size={22} className="text-emerald-500" />
                       ) : asset.kind === "image" ? (
-                        <ImageIcon size={22} className="text-pink-400" />
+                        <ImageIcon size={22} className="text-pink-500" />
                       ) : (
-                        <Film size={22} className="text-blue-400" />
+                        <Film size={22} className="text-blue-500" />
                       )}
 
                       {/* Duration Badge */}
                       {asset.duration > 0 && (
-                        <span className="absolute bottom-1 right-1 bg-black/80 text-white font-mono text-[9px] px-1 py-0.5 rounded backdrop-blur-xs">
+                        <span className="absolute bottom-1 right-1 bg-black/75 text-white font-mono text-[9px] px-1 py-0.5 rounded backdrop-blur-xs">
                           {asset.duration.toFixed(1)}s
                         </span>
                       )}
 
                       {/* Kind Badge */}
-                      <span className="absolute top-1 left-1 bg-black/80 text-[#A0A0A8] font-mono text-[8px] font-bold px-1 py-0.2 rounded uppercase tracking-wider">
+                      <span className="absolute top-1 left-1 bg-black/75 text-slate-200 font-mono text-[8px] font-bold px-1 py-0.2 rounded uppercase tracking-wider">
                         {asset.kind}
                       </span>
 
@@ -858,19 +858,19 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                         }}
                         title="Insert clip at playhead (+)"
                         aria-label={`Insert ${asset.name} at playhead`}
-                        className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+                        className="absolute inset-0 bg-sky-600/70 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer text-white"
                       >
-                        <div className="w-8 h-8 rounded-full bg-[#00E5FF] hover:bg-[#33EAFF] text-black flex items-center justify-center font-bold shadow-md transform scale-90 group-hover:scale-100 transition-transform">
+                        <div className="w-8 h-8 rounded-full bg-white text-sky-600 flex items-center justify-center font-bold shadow-md transform scale-90 group-hover:scale-100 transition-transform">
                           <Plus size={18} className="stroke-[3]" />
                         </div>
                       </button>
                     </div>
 
                     <div className="mt-1.5 px-0.5 min-w-0">
-                      <p className="text-[11px] font-medium text-white truncate" title={asset.name}>
+                      <p className="text-[11px] font-medium text-slate-900 truncate" title={asset.name}>
                         {asset.name}
                       </p>
-                      <p className="text-[9px] text-[#A0A0A8] font-mono truncate">
+                      <p className="text-[9px] text-slate-500 font-mono truncate">
                         {asset.kind.toUpperCase()}{asset.duration > 0 ? ` · ${asset.duration.toFixed(1)}s` : ""}
                       </p>
                     </div>
@@ -1062,7 +1062,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
         {/* ======================= TAB: TEXT & TITLES ======================= */}
         {activeTab === "text" && (
           <div className="space-y-4">
-            <span className="text-[11px] font-semibold text-[#A0A0A8] uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
               Title &amp; Typography Presets
             </span>
             <div className="grid grid-cols-2 gap-2">
@@ -1155,7 +1155,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
         {/* ======================= TAB: FILTERS & ZOOMS ======================= */}
         {activeTab === "filters" && (
           <div className="space-y-4">
-            <span className="text-[11px] font-semibold text-[#A0A0A8] uppercase tracking-wider block">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
               Camera Punch-in Zooms
             </span>
             <div className="grid grid-cols-2 gap-2">

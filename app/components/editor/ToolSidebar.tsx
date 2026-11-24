@@ -104,7 +104,7 @@ export default function ToolSidebar({
 }: ToolSidebarProps) {
   return (
     <aside
-      className="w-16 flex-shrink-0 bg-[#18181C] border-r border-[#2E2E33] flex flex-col items-center justify-between py-3 select-none z-30"
+      className="w-16 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col items-center justify-between py-3 select-none z-30 shadow-xs"
       aria-label="Primary Editor Tool Navigation"
     >
       {/* Top Tools List */}
@@ -122,22 +122,22 @@ export default function ToolSidebar({
               aria-pressed={isActive}
               className={`w-full h-11 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer ${
                 isActive
-                  ? "bg-[#222226] text-white font-bold border border-[#2E2E33] shadow-2xs"
-                  : "text-[#A0A0A8] hover:text-white hover:bg-[#222226]"
+                  ? "bg-sky-50 text-sky-700 font-bold border border-sky-200 shadow-2xs"
+                  : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
               {isActive && (
-                <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#00E5FF] rounded-r" />
+                <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-sky-500 rounded-r" />
               )}
               <Icon
                 size={18}
                 className={`transition-transform group-hover:scale-105 ${
-                  isActive ? "text-[#00E5FF]" : "text-[#A0A0A8] group-hover:text-white"
+                  isActive ? "text-sky-600" : "text-slate-500 group-hover:text-slate-900"
                 }`}
               />
               <span
                 className={`text-[9.5px] mt-0.5 tracking-tight truncate max-w-[54px] ${
-                  isActive ? "text-white font-bold" : "text-[#A0A0A8] font-medium group-hover:text-white"
+                  isActive ? "text-sky-700 font-bold" : "text-slate-500 font-medium group-hover:text-slate-900"
                 }`}
               >
                 {tool.label}
@@ -154,38 +154,38 @@ export default function ToolSidebar({
           aria-pressed={isDrawerOpen && activeTab === "inspector"}
           className={`w-full h-11 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer mt-1 ${
             isDrawerOpen && activeTab === "inspector"
-              ? "bg-[#222226] text-white font-bold border border-[#2E2E33] shadow-2xs"
+              ? "bg-sky-50 text-sky-700 font-bold border border-sky-200 shadow-2xs"
               : hasSelection
-              ? "text-[#00E5FF] bg-[#222226] hover:bg-[#2A2A30] border border-[#2E2E33]"
-              : "text-[#A0A0A8] hover:text-white hover:bg-[#222226]"
+              ? "text-sky-600 bg-sky-50/60 hover:bg-sky-100/80 border border-sky-200"
+              : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
           }`}
         >
           {isDrawerOpen && activeTab === "inspector" && (
-            <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#00E5FF] rounded-r" />
+            <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-sky-500 rounded-r" />
           )}
           <SlidersHorizontal
             size={18}
             className={
               isDrawerOpen && activeTab === "inspector"
-                ? "text-[#00E5FF]"
+                ? "text-sky-600"
                 : hasSelection
-                ? "text-[#00E5FF]"
-                : "text-[#A0A0A8] group-hover:text-white"
+                ? "text-sky-600"
+                : "text-slate-500 group-hover:text-slate-900"
             }
           />
           <span
             className={`text-[9.5px] mt-0.5 tracking-tight ${
               isDrawerOpen && activeTab === "inspector"
-                ? "text-white font-bold"
+                ? "text-sky-700 font-bold"
                 : hasSelection
-                ? "text-[#00E5FF] font-semibold"
-                : "text-[#A0A0A8] font-medium group-hover:text-white"
+                ? "text-sky-600 font-semibold"
+                : "text-slate-500 font-medium group-hover:text-slate-900"
             }`}
           >
             Inspector
           </span>
           {hasSelection && (
-            <div className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#00E5FF] ring-2 ring-[#18181C]" />
+            <div className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-sky-500 ring-2 ring-white" />
           )}
         </button>
 
@@ -197,23 +197,23 @@ export default function ToolSidebar({
           aria-pressed={isDrawerOpen && activeTab === "settings"}
           className={`w-full h-10 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer ${
             isDrawerOpen && activeTab === "settings"
-              ? "bg-[#222226] text-white font-bold border border-[#2E2E33]"
-              : "text-[#A0A0A8] hover:text-white hover:bg-[#222226]"
+              ? "bg-sky-50 text-sky-700 font-bold border border-sky-200 shadow-2xs"
+              : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
           }`}
         >
           <Settings2
             size={17}
             className={
               isDrawerOpen && activeTab === "settings"
-                ? "text-white"
-                : "text-[#A0A0A8] group-hover:text-white"
+                ? "text-sky-600"
+                : "text-slate-500 group-hover:text-slate-900"
             }
           />
           <span
             className={`text-[9px] mt-0.5 tracking-tight ${
               isDrawerOpen && activeTab === "settings"
-                ? "text-white font-bold"
-                : "text-[#A0A0A8] font-medium group-hover:text-white"
+                ? "text-sky-700 font-bold"
+                : "text-slate-500 font-medium group-hover:text-slate-900"
             }`}
           >
             Settings
@@ -222,13 +222,13 @@ export default function ToolSidebar({
       </nav>
 
       {/* Bottom Actions: Drawer Toggle & Keyboard Shortcuts */}
-      <div className="flex flex-col items-center gap-2 w-full px-1.5 border-t border-[#2E2E33] pt-3">
+      <div className="flex flex-col items-center gap-2 w-full px-1.5 border-t border-slate-200 pt-3">
         {/* Toggle Expand / Collapse Drawer */}
         <button
           onClick={onToggleDrawer}
           title={isDrawerOpen ? "Collapse Tool Drawer" : "Expand Tool Drawer"}
           aria-label={isDrawerOpen ? "Collapse Tool Drawer" : "Expand Tool Drawer"}
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
         >
           {isDrawerOpen ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
         </button>
@@ -239,7 +239,7 @@ export default function ToolSidebar({
             onClick={onOpenShortcuts}
             title="Keyboard Shortcuts (?)"
             aria-label="Keyboard Shortcuts"
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <Keyboard size={17} />
           </button>

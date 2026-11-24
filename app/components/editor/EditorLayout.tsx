@@ -398,32 +398,43 @@ export default function EditorLayout({
   };
 
   return (
-    <div className="hidden md:flex h-screen w-screen overflow-hidden bg-[#121214] text-white flex-col font-sans select-none antialiased">
+    <div className="hidden md:flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 flex-col font-sans select-none antialiased">
       <CaptionFonts />
 
       {/* ========================================================================= */}
-      {/* 1. TOP NAVIGATION BAR (CapCut Desktop Dark Studio UI)                     */}
+      {/* 1. TOP NAVIGATION BAR (CapCut Desktop Studio UI - Clean White Theme)     */}
       {/* ========================================================================= */}
-      <header className="h-14 bg-[#18181C] border-b border-[#2E2E33] px-3 flex items-center justify-between flex-shrink-0 z-30 select-none text-white">
-        {/* Left: Back, Brand, Project Title, Save State, AI Editor */}
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="h-14 bg-white border-b border-slate-200 px-3 flex items-center justify-between flex-shrink-0 z-30 select-none text-slate-900">
+        {/* Left: Back, Brand, Export (Upper Left Corner), Project Title, Save State */}
+        <div className="flex items-center gap-2.5 min-w-0">
           {onExit && (
             <button
               onClick={onExit}
               title="Back to Projects"
               aria-label="Back to Projects"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               <ArrowLeft size={16} />
             </button>
           )}
 
-          <div className="flex items-center gap-2 font-bold text-sm text-white">
+          <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
             <BrandMark size={26} />
             <span className="tracking-tight hidden sm:inline">Kreovar</span>
           </div>
 
-          <div className="h-4 w-[1px] bg-[#2E2E33]" />
+          {/* Prominent Light Blue Export Button on Upper Left Corner */}
+          <button
+            onClick={() => setExportOpen(true)}
+            disabled={!projectDuration(project)}
+            title="Export Video"
+            className="bg-sky-500 hover:bg-sky-600 text-white font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-40 active:scale-95 text-xs cursor-pointer ml-1"
+          >
+            <Download size={14} className="stroke-[2.5]" />
+            <span>Export</span>
+          </button>
+
+          <div className="h-4 w-[1px] bg-slate-200" />
 
           {/* Editable Project Title Input */}
           <input
@@ -442,21 +453,21 @@ export default function EditorLayout({
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
             }}
-            className="bg-[#121214] hover:bg-[#222226] focus:bg-[#18181C] border border-[#2E2E33] focus:border-[#00E5FF] rounded-lg px-2.5 py-1 text-xs font-semibold text-white outline-none w-44 sm:w-56 truncate transition-colors placeholder-[#6E6E78]"
+            className="bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-900 outline-none w-44 sm:w-56 truncate transition-colors placeholder-slate-400"
           />
 
           {/* Cloud Auto-Save Status Indicator */}
           <button
             onClick={retrySave}
             title="Save status / Click to sync with cloud"
-            className="flex items-center gap-1.5 text-[11px] font-mono text-[#A0A0A8] hover:text-white px-2.5 py-1 rounded-lg bg-[#121214] hover:bg-[#222226] border border-[#2E2E33] transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 text-[11px] font-mono text-slate-600 hover:text-slate-900 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
           >
             {persistenceState === "saving" || persistenceState === "loading" ? (
-              <LoaderCircle size={12} className="animate-spin text-blue-500" />
+              <LoaderCircle size={12} className="animate-spin text-sky-500" />
             ) : persistenceState === "failed" ? (
               <AlertCircle size={12} className="text-rose-500" />
             ) : (
-              <Check size={12} className="text-[#00E5FF]" />
+              <Check size={12} className="text-sky-600" />
             )}
             <span className="hidden md:inline">
               {
@@ -471,28 +482,16 @@ export default function EditorLayout({
               }
             </span>
           </button>
-
-          {/* AI Editor Quick Button with Sparkles */}
-          <button
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent("veelox:toggle-ai-chat"));
-            }}
-            title="AI Editor Studio Assistant"
-            className="flex items-center gap-1.5 bg-[#222226] hover:bg-[#2A2A30] border border-[#2E2E33] text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition-all active:scale-95 group cursor-pointer"
-          >
-            <Sparkles size={13} className="text-white group-hover:scale-110 group-hover:rotate-12 transition-transform" />
-            <span className="hidden sm:inline">AI Editor</span>
-          </button>
         </div>
 
-        {/* Right: Keyboard Shortcuts Help, Undo/Redo, Aspect Ratio, Reframe, Preview Quality, Export Button */}
+        {/* Right: Keyboard Shortcuts Help, Undo/Redo, Single Aspect Ratio Selector, Preview Quality */}
         <div className="flex items-center gap-2">
           {/* Keyboard Shortcuts Help Button */}
           <button
             onClick={() => setShortcutsOpen(true)}
             title="Keyboard Shortcuts (?)"
             aria-label="Keyboard Shortcuts"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <Keyboard size={15} />
           </button>
@@ -503,7 +502,7 @@ export default function EditorLayout({
             onClick={() => store.undo()}
             title="Undo (Ctrl+Z)"
             aria-label="Undo"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] disabled:opacity-25 disabled:hover:bg-transparent transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-25 disabled:hover:bg-transparent transition-colors cursor-pointer"
           >
             <Undo2 size={15} />
           </button>
@@ -514,16 +513,16 @@ export default function EditorLayout({
             onClick={() => store.redo()}
             title="Redo (Ctrl+Shift+Z)"
             aria-label="Redo"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#A0A0A8] hover:text-white hover:bg-[#222226] disabled:opacity-25 disabled:hover:bg-transparent transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-25 disabled:hover:bg-transparent transition-colors cursor-pointer"
           >
             <Redo2 size={15} />
           </button>
 
-          <div className="h-4 w-[1px] bg-[#2E2E33] mx-1" />
+          <div className="h-4 w-[1px] bg-slate-200 mx-1" />
 
-          {/* Aspect Ratio Selector (9:16, 16:9, 1:1, 4:5, 4:3) */}
-          <div className="flex items-center bg-[#121214] border border-[#2E2E33] rounded-lg px-2.5 py-1.5 text-xs text-white">
-            <span className="text-[#A0A0A8] mr-1.5 font-medium hidden sm:inline">Ratio</span>
+          {/* Single Aspect Ratio Selector (9:16, 16:9, 1:1, 4:5, 4:3) */}
+          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900">
+            <span className="text-slate-500 mr-1.5 font-medium hidden sm:inline">Ratio</span>
             <select
               value={project.settings.aspectRatio}
               aria-label="Video Aspect Ratio"
@@ -536,10 +535,10 @@ export default function EditorLayout({
                   },
                 }))
               }
-              className="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer"
+              className="bg-transparent text-slate-900 text-xs font-semibold focus:outline-none cursor-pointer"
             >
               {aspectRatios.map((ratio) => (
-                <option key={ratio} value={ratio} className="bg-[#18181C] text-white">
+                <option key={ratio} value={ratio} className="bg-white text-slate-900">
                   {ratio} ·{" "}
                   {
                     {
@@ -555,100 +554,17 @@ export default function EditorLayout({
             </select>
           </div>
 
-          {/* 1-Click 9:16 Smart Reframing Menu */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setReframeOpen((prev) => !prev)}
-              title="1-Click 16:9 to 9:16 Smart Reframing"
-              className="flex items-center gap-1.5 bg-[#121214] hover:bg-[#222226] border border-[#2E2E33] hover:border-[#3E3E45] text-white font-medium text-xs px-2.5 py-1.5 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer"
-            >
-              <Smartphone size={13} className="text-[#A0A0A8]" />
-              <span className="hidden md:inline">Reframe 9:16</span>
-              <ChevronDown
-                size={11}
-                className={reframeOpen ? "rotate-180 transition-transform" : "transition-transform"}
-              />
-            </button>
-            {reframeOpen && (
-              <div className="absolute right-0 mt-1.5 w-64 bg-[#18181C] border border-[#2E2E33] rounded-xl shadow-xl z-50 p-1.5 text-xs space-y-1">
-                <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#A0A0A8]">
-                  Smart 9:16 Conversion
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    run((p) => reframeProject(p, "fit-with-blur"));
-                    notify("Applied 1-Click Fit with Blur (9:16)");
-                    setReframeOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-[#222226] flex flex-col gap-0.5 text-white transition-colors"
-                >
-                  <span className="font-semibold flex items-center gap-1.5 text-white">
-                    <span className="w-2 h-2 rounded-full bg-blue-500" /> Fit with Blur
-                  </span>
-                  <span className="text-[11px] text-[#A0A0A8]">
-                    Scales to fit width; blurred background wings fill top &amp; bottom
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    run((p) => reframeProject(p, "center-crop"));
-                    notify("Applied 1-Click Center Crop (1.77x Eye-Line)");
-                    setReframeOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-[#222226] flex flex-col gap-0.5 text-white transition-colors"
-                >
-                  <span className="font-semibold flex items-center gap-1.5 text-white">
-                    <span className="w-2 h-2 rounded-full bg-indigo-400" /> Center Crop (Eye-Line)
-                  </span>
-                  <span className="text-[11px] text-[#A0A0A8]">
-                    1.77x punch-in centered on upper-third eye-line (focusY: -0.14)
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    run((p) => reframeProject(p, "split-screen"));
-                    notify("Applied 1-Click Split Screen (A-Roll + B-Roll)");
-                    setReframeOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-[#222226] flex flex-col gap-0.5 text-white transition-colors"
-                >
-                  <span className="font-semibold flex items-center gap-1.5 text-white">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" /> Split Screen
-                  </span>
-                  <span className="text-[11px] text-[#A0A0A8]">
-                    A-roll speaker top half + contextual B-roll / gameplay bottom half
-                  </span>
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* Preview Quality Selector */}
           <select
             value={previewQuality}
             onChange={(e) => setPreviewQuality(Number(e.target.value))}
             aria-label="Preview Resolution"
-            className="bg-[#121214] border border-[#2E2E33] rounded-lg px-2.5 py-1.5 text-xs text-white font-medium focus:outline-none focus:border-[#3E3E45] cursor-pointer hidden sm:block"
+            className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-sky-500 cursor-pointer hidden sm:block"
           >
-            <option value={540} className="bg-[#18181C] text-white">540p Draft</option>
-            <option value={720} className="bg-[#18181C] text-white">720p HD</option>
-            <option value={1080} className="bg-[#18181C] text-white">1080p FHD</option>
+            <option value={540} className="bg-white text-slate-800">540p Draft</option>
+            <option value={720} className="bg-white text-slate-800">720p HD</option>
+            <option value={1080} className="bg-white text-slate-800">1080p FHD</option>
           </select>
-
-          {/* Prominent CapCut Cyan Export Button */}
-          <button
-            onClick={() => setExportOpen(true)}
-            disabled={!projectDuration(project)}
-            title="Export Video"
-            className="bg-[#00E5FF] text-black font-bold hover:bg-[#33EAFF] px-4 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-40 active:scale-95 text-xs cursor-pointer"
-          >
-            <Download size={14} className="stroke-[2.5]" />
-            <span>Export</span>
-          </button>
         </div>
       </header>
 

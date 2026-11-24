@@ -66,66 +66,66 @@ interface TrackStyleInfo {
   icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 
-/** CapCut Desktop Dark Studio track themes (Uniform professional neutral palette) */
+/** CapCut Desktop Clean Studio track themes (Uniform professional neutral palette) */
 const TRACK_STYLES: Record<string, TrackStyleInfo> = {
   overlay: {
-    chipBg: "bg-[#222226]",
-    chipBorder: "border-[#2E2E33]",
-    chipText: "text-white",
-    clipBg: "bg-[#25252b] hover:bg-[#2e2e36]",
-    clipBorder: "border-[#383842]",
-    clipText: "text-white",
-    label: "Overlay / B-Roll",
+    chipBg: "bg-slate-100",
+    chipBorder: "border-slate-200",
+    chipText: "text-slate-700 font-medium",
+    clipBg: "bg-slate-100 hover:bg-slate-200/80",
+    clipBorder: "border-slate-300",
+    clipText: "text-slate-800",
+    label: "Overlay 1",
     icon: Layers,
   },
   caption: {
-    chipBg: "bg-[#222226]",
-    chipBorder: "border-[#2E2E33]",
-    chipText: "text-white",
-    clipBg: "bg-[#25252b] hover:bg-[#2e2e36]",
-    clipBorder: "border-[#383842]",
-    clipText: "text-white",
+    chipBg: "bg-slate-100",
+    chipBorder: "border-slate-200",
+    chipText: "text-slate-700 font-medium",
+    clipBg: "bg-sky-50 hover:bg-sky-100",
+    clipBorder: "border-sky-300",
+    clipText: "text-sky-950 font-medium",
     label: "Captions",
     icon: CaptionsIcon,
   },
   video: {
-    chipBg: "bg-[#222226]",
-    chipBorder: "border-[#2E2E33]",
-    chipText: "text-white",
-    clipBg: "bg-[#1E2638] hover:bg-[#242F45]",
-    clipBorder: "border-[#2E3A52]",
-    clipText: "text-white",
-    label: "Main Video",
+    chipBg: "bg-slate-100",
+    chipBorder: "border-slate-200",
+    chipText: "text-slate-700 font-medium",
+    clipBg: "bg-[#0e7490] hover:bg-[#155e75]",
+    clipBorder: "border-[#0891b2]",
+    clipText: "text-white font-medium",
+    label: "Video 1",
     icon: Film,
   },
   text: {
-    chipBg: "bg-[#222226]",
-    chipBorder: "border-[#2E2E33]",
-    chipText: "text-white",
-    clipBg: "bg-[#25252b] hover:bg-[#2e2e36]",
-    clipBorder: "border-[#383842]",
-    clipText: "text-white",
-    label: "Titles & GFX",
+    chipBg: "bg-slate-100",
+    chipBorder: "border-slate-200",
+    chipText: "text-slate-700 font-medium",
+    clipBg: "bg-slate-100 hover:bg-slate-200/80",
+    clipBorder: "border-slate-300",
+    clipText: "text-slate-800",
+    label: "Text 1",
     icon: Type,
   },
   audio: {
-    chipBg: "bg-[#222226]",
-    chipBorder: "border-[#2E2E33]",
-    chipText: "text-white",
-    clipBg: "bg-[#162923] hover:bg-[#1E362E]",
-    clipBorder: "border-[#1E3A30]",
-    clipText: "text-white",
-    label: "Audio / SFX",
+    chipBg: "bg-slate-100",
+    chipBorder: "border-slate-200",
+    chipText: "text-slate-700 font-medium",
+    clipBg: "bg-emerald-50 hover:bg-emerald-100",
+    clipBorder: "border-emerald-300",
+    clipText: "text-emerald-950 font-medium",
+    label: "Audio 1",
     icon: Music,
   },
   image: {
-    chipBg: "bg-[#222226]",
-    chipBorder: "border-[#2E2E33]",
-    chipText: "text-white",
-    clipBg: "bg-[#25252b] hover:bg-[#2e2e36]",
-    clipBorder: "border-[#383842]",
-    clipText: "text-white",
-    label: "Images",
+    chipBg: "bg-slate-100",
+    chipBorder: "border-slate-200",
+    chipText: "text-slate-700 font-medium",
+    clipBg: "bg-slate-100 hover:bg-slate-200/80",
+    clipBorder: "border-slate-300",
+    clipText: "text-slate-800",
+    label: "Image 1",
     icon: Film,
   },
 };
@@ -500,35 +500,35 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
 
   return (
     <section
-      className="w-full bg-[#18181C] border-t border-[#2E2E33] flex flex-col select-none text-white overflow-hidden"
+      className="w-full bg-white border-t border-slate-200 flex flex-col select-none text-slate-800 overflow-hidden"
       style={{ height: `${height}px` }}
       aria-label="Multi-Track Workstation Timeline"
     >
       {/* ========================================================================= */}
       {/* 1. TIMELINE TOOLBAR (CapCut Desktop Action Strip)                         */}
       {/* ========================================================================= */}
-      <header className="h-10 px-3 flex items-center justify-between border-b border-[#2E2E33] bg-[#18181C] text-xs flex-shrink-0 text-white">
+      <header className="h-10 px-3 flex items-center justify-between border-b border-slate-200 bg-white text-xs flex-shrink-0 text-slate-800">
         {/* Left Action Strip: Split, Delete, Duplicate, Marker, Magnet, Snap */}
         <div className="flex items-center gap-1.5 min-w-0">
-          <div className="flex items-center gap-1.5 font-semibold text-white mr-1.5">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900 mr-1.5">
             <span className="text-[12px] tracking-tight">Timeline</span>
             {selection.length > 0 && (
-              <span className="text-[10px] bg-[#222226] text-white border border-[#2E2E33] px-1.5 py-0.2 rounded-full font-mono">
+              <span className="text-[10px] bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.2 rounded-full font-mono">
                 {selection.length} selected
               </span>
             )}
           </div>
 
-          <div className="h-4 w-[1px] bg-[#2E2E33] mx-1" />
+          <div className="h-4 w-[1px] bg-slate-200 mx-1" />
 
           {/* Split (Scissors) */}
           <button
             onClick={handleSplit}
             title="Split at Playhead (Ctrl+B / S)"
             aria-label="Split at Playhead"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#222226] hover:bg-[#2A2A30] text-white border border-[#2E2E33] transition-colors cursor-pointer text-xs"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 transition-colors cursor-pointer text-xs shadow-2xs"
           >
-            <Scissors size={13} className="text-[#A0A0A8]" />
+            <Scissors size={13} className="text-slate-500" />
             <span className="text-[11px] font-medium hidden sm:inline">Split</span>
           </button>
 
@@ -538,9 +538,9 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
             disabled={!selection.length}
             title="Delete Selected Clip (Delete / Backspace)"
             aria-label="Delete Selected Clip"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#222226] hover:bg-rose-950/60 text-white hover:text-rose-400 border border-[#2E2E33] hover:border-rose-800 transition-colors disabled:opacity-30 disabled:hover:bg-[#222226] disabled:hover:text-white cursor-pointer text-xs"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-300 hover:border-rose-300 transition-colors disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-700 cursor-pointer text-xs shadow-2xs"
           >
-            <Trash2 size={13} className="text-[#A0A0A8]" />
+            <Trash2 size={13} className="text-slate-500 hover:text-rose-600" />
             <span className="text-[11px] font-medium hidden sm:inline">Delete</span>
           </button>
 
@@ -550,9 +550,9 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
             disabled={!selection.length}
             title="Duplicate Selected Clip (Ctrl+D)"
             aria-label="Duplicate Selected Clip"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#222226] hover:bg-[#2A2A30] text-white border border-[#2E2E33] transition-colors disabled:opacity-30 disabled:hover:bg-[#222226] cursor-pointer text-xs"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 transition-colors disabled:opacity-30 disabled:hover:bg-white cursor-pointer text-xs shadow-2xs"
           >
-            <Copy size={13} className="text-[#A0A0A8]" />
+            <Copy size={13} className="text-slate-500" />
             <span className="text-[11px] font-medium hidden sm:inline">Duplicate</span>
           </button>
 
@@ -561,13 +561,13 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
             onClick={handleToggleMarker}
             title="Add CapCut Marker at Playhead (M)"
             aria-label="Add Timeline Marker"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#222226] hover:bg-[#2A2A30] text-white border border-[#2E2E33] transition-colors cursor-pointer text-xs"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 transition-colors cursor-pointer text-xs shadow-2xs"
           >
-            <Bookmark size={13} className="text-[#A0A0A8]" />
+            <Bookmark size={13} className="text-slate-500" />
             <span className="text-[11px] font-medium hidden sm:inline">Marker</span>
           </button>
 
-          <div className="h-4 w-[1px] bg-[#2E2E33] mx-1" />
+          <div className="h-4 w-[1px] bg-slate-200 mx-1" />
 
           {/* Main Storyline Magnet Toggle */}
           <button
@@ -577,13 +577,13 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
             }}
             title="Main Storyline Magnet — Auto ripple & gap closure"
             aria-pressed={isMagnetEnabled}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors cursor-pointer ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors cursor-pointer shadow-2xs ${
               isMagnetEnabled
-                ? "bg-[#2E2E33] border-[#3E3E45] text-white font-semibold"
-                : "bg-[#222226] border-[#2E2E33] text-[#A0A0A8] hover:text-white hover:bg-[#2A2A30]"
+                ? "bg-sky-50 border-sky-300 text-sky-700 font-semibold"
+                : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
             }`}
           >
-            <Magnet size={13} className={isMagnetEnabled ? "text-white" : "text-[#A0A0A8]"} />
+            <Magnet size={13} className={isMagnetEnabled ? "text-sky-600" : "text-slate-500"} />
             <span className="text-[11px] hidden md:inline">Magnet</span>
           </button>
 
@@ -592,20 +592,20 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
             onClick={() => setSnapping(!snapping)}
             title="Auto-Snapping (N)"
             aria-pressed={snapping}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors cursor-pointer ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors cursor-pointer shadow-2xs ${
               snapping
-                ? "bg-[#2E2E33] border-[#3E3E45] text-white font-semibold"
-                : "bg-[#222226] border-[#2E2E33] text-[#A0A0A8] hover:text-white hover:bg-[#2A2A30]"
+                ? "bg-sky-50 border-sky-300 text-sky-700 font-semibold"
+                : "bg-white border-slate-300 text-slate-600 hover:bg-slate-50"
             }`}
           >
-            <Anchor size={13} className={snapping ? "text-white" : "text-[#A0A0A8]"} />
+            <Anchor size={13} className={snapping ? "text-sky-600" : "text-slate-500"} />
             <span className="text-[11px] hidden md:inline">Snap</span>
           </button>
 
           {/* Add Track Menu */}
           <div className="relative flex items-center ml-1">
-            <label className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#222226] hover:bg-[#2A2A30] text-white border border-[#2E2E33] cursor-pointer transition-colors text-[11px]">
-              <Plus size={13} className="text-[#A0A0A8]" />
+            <label className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 cursor-pointer transition-colors text-[11px] shadow-2xs">
+              <Plus size={13} className="text-slate-500" />
               <span className="hidden sm:inline">Track</span>
               <select
                 aria-label="Add track to timeline"
@@ -617,7 +617,7 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
                   }
                 }}
               >
-                <option value="" disabled className="bg-[#18181C] text-white">
+                <option value="" disabled className="bg-white text-slate-800">
                   + Add Track
                 </option>
                 <option value="overlay" className="bg-white text-slate-800">Overlay / B-Roll</option>
@@ -679,20 +679,20 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
       {/* ========================================================================= */}
       {/* 2. TRACK HEADERS (MUTE, HIDE, LOCK) + TIMELINE LANES & WAVEFORMS         */}
       {/* ========================================================================= */}
-      <div className="flex-1 flex min-h-0 relative overflow-hidden bg-[#121214]">
+      <div className="flex-1 flex min-h-0 relative overflow-hidden bg-slate-50/50">
         {/* Fixed Left Track Headers Column (Width: 195px) */}
         <div
           ref={labelsRef}
-          className="w-[195px] flex-shrink-0 bg-[#18181C] border-r border-[#2E2E33] flex flex-col z-20 select-none overflow-hidden"
+          className="w-[195px] flex-shrink-0 bg-white border-r border-slate-200 flex flex-col z-20 select-none overflow-hidden"
         >
           {/* Header ruler title spacer */}
-          <div className="h-7 border-b border-[#2E2E33] bg-[#141416] px-3 flex items-center justify-between text-[10px] font-mono tracking-wider text-[#A0A0A8]">
+          <div className="h-7 border-b border-slate-200 bg-slate-50 px-3 flex items-center justify-between text-[10px] font-mono tracking-wider text-slate-500">
             <span>TRACKS</span>
-            <span className="text-white font-mono font-semibold">{formatTime(time, project.settings.fps)}</span>
+            <span className="text-slate-900 font-mono font-semibold">{formatTime(time, project.settings.fps)}</span>
           </div>
 
           {/* List of track headers with Mute, Hide, Lock */}
-          <div className="flex-1 flex flex-col divide-y divide-[#222226]">
+          <div className="flex-1 flex flex-col divide-y divide-slate-100">
             {orderedTrackIds.map((id) => {
               const track = project.tracks[id];
               if (!track) return null;
@@ -702,20 +702,20 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
               return (
                 <div
                   key={id}
-                  className="h-[56px] shrink-0 px-2.5 flex items-center justify-between bg-[#18181C] hover:bg-[#202024] transition-colors"
+                  className="h-[56px] shrink-0 px-2.5 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {/* Track Accent Chip */}
                     <div
                       className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-medium ${style.chipBg} ${style.chipBorder} ${style.chipText}`}
                     >
-                      <Icon size={12} className="text-[#A0A0A8]" />
-                      <span className="truncate max-w-[70px] text-white font-medium">{track.name || style.label}</span>
+                      <Icon size={12} className="text-slate-500" />
+                      <span className="truncate max-w-[70px] text-slate-800 font-medium">{track.name || style.label}</span>
                     </div>
                   </div>
 
                   {/* Track Controls: Hide, Mute, Lock */}
-                  <div className="flex items-center gap-1 text-[#A0A0A8]">
+                  <div className="flex items-center gap-1 text-slate-400">
                     {/* Hide Track Toggle */}
                     <button
                       onClick={() =>
@@ -724,11 +724,11 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
                       title={track.hidden ? "Show Track" : "Hide Track"}
                       className={`p-1 rounded-md transition-colors cursor-pointer ${
                         track.hidden
-                          ? "bg-[#2E2E33] text-white border border-[#3E3E45]"
-                          : "hover:bg-[#222226] hover:text-white"
+                          ? "bg-slate-200 text-slate-900 border border-slate-300"
+                          : "hover:bg-slate-100 hover:text-slate-800"
                       }`}
                     >
-                      {track.hidden ? <EyeOff size={13} className="text-white" /> : <Eye size={13} />}
+                      {track.hidden ? <EyeOff size={13} className="text-slate-800" /> : <Eye size={13} />}
                     </button>
 
                     {/* Mute Track Toggle */}
@@ -739,8 +739,8 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
                       title={track.muted ? "Unmute Track" : "Mute Track"}
                       className={`p-1 rounded-md transition-colors cursor-pointer ${
                         track.muted
-                          ? "bg-rose-950/80 text-rose-400 border border-rose-800"
-                          : "hover:bg-[#222226] hover:text-white"
+                          ? "bg-rose-100 text-rose-700 border border-rose-300"
+                          : "hover:bg-slate-100 hover:text-slate-800"
                       }`}
                     >
                       {track.muted ? <VolumeX size={13} /> : <Volume2 size={13} />}
@@ -754,8 +754,8 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
                       title={track.locked ? "Unlock Track" : "Lock Track"}
                       className={`p-1 rounded-md transition-colors cursor-pointer ${
                         track.locked
-                          ? "bg-amber-950/80 text-amber-400 border border-amber-800"
-                          : "hover:bg-[#222226] hover:text-white"
+                          ? "bg-amber-100 text-amber-700 border border-amber-300"
+                          : "hover:bg-slate-100 hover:text-slate-800"
                       }`}
                     >
                       {track.locked ? <Lock size={13} /> : <Unlock size={13} />}
@@ -911,8 +911,8 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
                             style.clipBg
                           } ${style.clipBorder} ${style.clipText} ${
                             isSelected
-                              ? "ring-2 ring-[#00E5FF] border-[#00E5FF] shadow-sm z-20"
-                              : "hover:border-[#55555c] z-10"
+                              ? "ring-2 ring-sky-500 border-sky-500 shadow-sm z-20"
+                              : "hover:border-slate-400 z-10"
                           }`}
                           style={{
                             left: `${clipLeft}px`,
@@ -931,22 +931,22 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
                           <div
                             onPointerDown={(e) => handleClipDrag(e, clip, "left")}
                             title="Trim Start (Q)"
-                            className="absolute left-0 top-0 bottom-0 w-2.5 bg-black/0 group-hover:bg-black/30 hover:!bg-[#00E5FF] cursor-ew-resize z-30 transition-colors flex items-center justify-center"
+                            className="absolute left-0 top-0 bottom-0 w-2.5 bg-black/0 group-hover:bg-black/20 hover:!bg-sky-500 cursor-ew-resize z-30 transition-colors flex items-center justify-center"
                           >
-                            <div className="w-[1.5px] h-3 bg-white/60 group-hover:bg-white rounded-full" />
+                            <div className="w-[1.5px] h-3 bg-white/70 group-hover:bg-white rounded-full" />
                           </div>
 
                           {/* Clip Label & Duration */}
                           <div className="relative z-20 flex items-center gap-1.5 min-w-0 pr-2">
-                            <span className="truncate font-semibold text-[11px] text-white">
+                            <span className="truncate font-semibold text-[11px]">
                               {clip.name}
                             </span>
                             {clip.speed !== 1 && (
-                              <span className="text-[10px] text-amber-400 font-semibold font-mono">
+                              <span className="text-[10px] text-amber-500 font-semibold font-mono">
                                 {clip.speed}×
                               </span>
                             )}
-                            <span className="text-[10px] font-mono text-[#A0A0A8]">
+                            <span className="text-[10px] font-mono opacity-80">
                               {clip.duration.toFixed(1)}s
                             </span>
                           </div>
@@ -955,9 +955,9 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
                           <div
                             onPointerDown={(e) => handleClipDrag(e, clip, "right")}
                             title="Trim End (W)"
-                            className="absolute right-0 top-0 bottom-0 w-2.5 bg-black/0 group-hover:bg-black/30 hover:!bg-[#00E5FF] cursor-ew-resize z-30 transition-colors flex items-center justify-center"
+                            className="absolute right-0 top-0 bottom-0 w-2.5 bg-black/0 group-hover:bg-black/20 hover:!bg-sky-500 cursor-ew-resize z-30 transition-colors flex items-center justify-center"
                           >
-                            <div className="w-[1.5px] h-3 bg-white/60 group-hover:bg-white rounded-full" />
+                            <div className="w-[1.5px] h-3 bg-white/70 group-hover:bg-white rounded-full" />
                           </div>
                         </div>
                       );
@@ -974,16 +974,16 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
               height={trackLanesHeight}
               fps={project.settings.fps}
               showHandle={true}
-              color="#00E5FF"
+              color="#0284c7"
             />
 
             {/* Empty Timeline Helper Notice */}
             {Object.keys(project.clips).length === 0 && (
               <div
-                className="absolute top-16 flex items-center gap-2 text-white bg-[#18181C] border border-[#2E2E33] px-4 py-2.5 rounded-xl text-xs font-medium shadow-xl"
+                className="absolute top-16 flex items-center gap-2 text-slate-800 bg-white border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-medium shadow-md"
                 style={{ left: `${Math.max(24, viewport.left + 40)}px` }}
               >
-                <Sparkles size={14} className="text-[#00E5FF]" />
+                <Sparkles size={14} className="text-sky-600" />
                 <span>Drag media or use AI Editor to generate clips · Space to Play · S to Split</span>
               </div>
             )}

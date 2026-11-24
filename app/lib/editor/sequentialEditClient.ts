@@ -151,7 +151,7 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
     try{
      const footage=analysisFootage(project,job.selection),existing=Object.values(project.clips).filter(c=>c.contentId&&project.captions[c.contentId]&&footage.some(v=>c.startTime>=v.startTime-.01&&c.startTime+c.duration<=v.startTime+v.duration+.01));
      if(existing.some(c=>project.tracks[c.trackId].locked||project.tracks[c.trackId].hidden))throw Error('Unlock and show caption tracks before applying captions.');
-     const normalizedTemplate = normalizeCaptionPresetId(job.captionTemplate || 'study-hormozi-style');
+     const normalizedTemplate = normalizeCaptionPresetId(job.captionTemplate || 'viral-hinglish-pop');
      const requests=footage.filter(c=>!existing.some(cap=>cap.startTime<c.startTime+c.duration&&cap.startTime+cap.duration>c.startTime)).map(c=>({type:'captions' as const,clipId:c.id,templateId:normalizedTemplate}));
      return await prepare(saved||{summary:'Apply timed speech captions using Caption Studio template '+normalizedTemplate,animateCaptions:/animat|engaging|punchy|caption|subtitle|studio/i.test(job.instructions)||['engaging','punchy'].includes(job.presetId||''),decisions:existing.length?[{op:'applyCaptionTemplate',clipIds:existing.map(c=>c.id),templateId:normalizedTemplate}]:[],requests},project,checkpoint,signal);
     }catch(err){
@@ -373,7 +373,7 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
 
      // Caption style switch without altering timestamps or duplicating tracks
      if (constraints.requestedCaptionPreset || constraints.requestedCaptionStudio) {
-      const matched = constraints.requestedCaptionPreset || normalizeCaptionPresetId(job.captionTemplate || 'study-hormozi-style');
+      const matched = constraints.requestedCaptionPreset || normalizeCaptionPresetId(job.captionTemplate || 'viral-hinglish-pop');
       const existingCaptions = Object.values(project.clips).filter(c => c.contentId && project.captions[c.contentId]);
       if (existingCaptions.length > 0) {
        const cleanDecisions: import('./ai').EditDecision[] = (output.decisions || []).filter(d => d.op !== 'applyCaptionTemplate' && d.op !== 'addCaption');
