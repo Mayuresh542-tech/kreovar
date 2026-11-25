@@ -169,4 +169,19 @@ test("Task 10: Editorial plans are never colored in error red and client fail-op
   assert.ok(client.includes("reconcileEditingDecisions"), "sequentialEditClient must synthesize edits through inPlaceReconciler if server stage fails");
 });
 
+test("Task 11: Intermediate Project Hub is bypassed and opens editor directly", () => {
+  const projectDetail = fs.readFileSync(path.join(ROOT, "app/projects/[id]/page.tsx"), "utf-8");
+  const createModal = fs.readFileSync(path.join(ROOT, "app/components/projects/CreateProjectModal.tsx"), "utf-8");
+  const dashboard = fs.readFileSync(path.join(ROOT, "app/dashboard/page.tsx"), "utf-8");
+  const editorPage = fs.readFileSync(path.join(ROOT, "app/editor/page.tsx"), "utf-8");
+  const projectsPage = fs.readFileSync(path.join(ROOT, "app/projects/page.tsx"), "utf-8");
+
+  assert.ok(projectDetail.includes("router.replace(`/editor?projectId="), "Project detail route must redirect directly to editor");
+  assert.ok(!projectDetail.includes("Loading Project Hub"), "Project Hub screen must be removed");
+  assert.ok(createModal.includes("router.push(`/editor?projectId="), "CreateProjectModal must open editor directly");
+  assert.ok(!dashboard.includes("/projects/${project.id}"), "Dashboard cards must open editor directly");
+  assert.ok(!editorPage.includes("/projects/${activeProjectId}"), "Editor exit must return to /projects without Project Hub");
+  assert.ok(!projectsPage.includes("Asset Files & Hub"), "Projects menu must not link to Asset Files & Hub");
+});
+
 

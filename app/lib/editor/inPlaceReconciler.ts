@@ -5,11 +5,175 @@ import type { EditingConstraints } from './editingIntent';
 import { matchPhraseToSpeech, type SpeechSegmentLike } from './phraseMatcher';
 import { type KenBurnsPreset } from './kenBurns';
 import { detectKeywordMoments } from './kineticStickers';
+import type { GraphicIcon } from './motionGraphics';
+
+function mapStickerToGraphicIcon(stickerId: string): GraphicIcon {
+  switch (stickerId) {
+    case 'money': return 'dollar';
+    case 'fire': return 'flame';
+    case 'rocket': return 'rocket';
+    case 'warning':
+    case 'skull': return 'warning';
+    case 'growth': return 'chart';
+    case 'star': return 'star';
+    case 'target': return 'target';
+    case 'idea': return 'sparkles';
+    default: return 'bolt';
+  }
+}
+
+export interface VisualObservationHint {
+  subjectRegion?: string;
+  occupiedRegions?: string[];
+  clearRegions?: string[];
+}
 
 export interface ReconciliationResult {
   decisions: EditDecision[];
   toolRequests: AiToolRequest[];
   summaryNotes: string[];
+}
+
+function regionForGraphicCoords(x: number, y: number): string {
+  const col = x < -0.15 ? 'left' : x > 0.15 ? 'right' : 'center';
+  const row = y < -0.16 ? 'upper' : y > 0.12 ? 'lower' : 'middle';
+  return row === 'middle' && col === 'center' ? 'center' : `${row}-${col}`;
+}
+
+/**
+ * Ensures AI-placed addGraphic overlays never cover a talking head's face or bottom captions,
+ * using observed vision regions when present and talking-head safe zones otherwise.
+ */
+export function reconcileMotionGraphicPlacements(
+  project: EditorProject,
+  decisions: EditDecision[],
+  toolRequests: AiToolRequest[] = [],
+  visualObservations?: VisualObservationHint[]
+): EditDecision[] {
+  const isVertical = project.settings.aspectRatio === '9:16' || project.settings.aspectRatio === '4:5';
+  const hasCaptions =
+    Object.values(project.clips).some((c) => Boolean(c.contentId && project.captions[c.contentId] && !project.tracks[c.trackId]?.hidden)) ||
+    decisions.some((d) => d.op === 'addCaption' || d.op === 'applyCaptionTemplate') ||
+    toolRequests.some((r) => r.type === 'captions');
+
+  const avoidRegions = new Set<string>();
+  const clearRegions = new Set<string>();
+  let explicitCenterClear = false;
+
+  if (visualObservations && visualObservations.length > 0) {
+    let anySubjectAtCenter = false;
+    for (const obs of visualObservations) {
+      if (obs.subjectRegion && obs.subjectRegion !== 'unknown' && obs.subjectRegion !== 'full-frame') {
+        avoidRegions.add(obs.subjectRegion);
+        if (obs.subjectRegion === 'center' || obs.subjectRegion === 'upper-center') anySubjectAtCenter = true;
+      }
+      if (obs.subjectRegion === 'full-frame') {
+        anySubjectAtCenter = true;
+      }
+      for (const r of obs.occupiedRegions || []) {
+        avoidRegions.add(r);
+        if (r === 'center' || r === 'upper-center') anySubjectAtCenter = true;
+      }
+      for (const r of obs.clearRegions || []) {
+        if (!avoidRegions.has(r)) clearRegions.add(r);
+      }
+    }
+    explicitCenterClear = !anySubjectAtCenter && clearRegions.has('center') && clearRegions.has('upper-center');
+  }
+
+  let graphicCounter = Object.values(project.clips).filter((c) => Boolean(c.graphic)).length;
+
+  return decisions.map((d) => {
+    if (d.op !== 'addGraphic') return d;
+    const idx = graphicCounter++;
+    const isCompactTopKind =
+      d.kind === 'stat-counter' ||
+      d.kind === 'progress-ring' ||
+      d.kind === 'notification' ||
+      d.kind === 'kinetic-badge';
+
+    const curX = d.x ?? (isVertical ? 0 : d.kind === 'lower-third' ? -0.20 : idx % 2 === 0 ? 0.28 : -0.28);
+    const curY =
+      d.y ??
+      (isVertical
+        ? d.kind === 'lower-third'
+          ? 0.20
+          : isCompactTopKind
+            ? -0.37
+            : 0.17
+        : d.kind === 'lower-third'
+          ? 0.26
+          : -0.04);
+    const curScale = d.scale ?? (isVertical ? (isCompactTopKind ? 0.84 : 0.86) : 0.84);
+
+    const hitsFaceBox = isVertical
+      ? !explicitCenterClear && Math.abs(curX) < 0.24 && curY > -0.32 && curY < 0.08
+      : !explicitCenterClear && Math.abs(curX) < 0.18 && curY > -0.33 && curY < 0.15;
+
+    const hitsCaptions = hasCaptions && curY > 0.24 && (isVertical || Math.abs(curX) < 0.26);
+    const currentRegion = regionForGraphicCoords(curX, curY);
+    const hitsVisionSubject =
+      avoidRegions.has(currentRegion) && !(isVertical && curY >= 0.15 && curY <= 0.23);
+
+    if (!hitsFaceBox && !hitsCaptions && !hitsVisionSubject) {
+      return {
+        ...d,
+        x: clampCoord(curX, -0.45, 0.45),
+        y: clampCoord(curY, -0.45, 0.45),
+        scale: clampCoord(curScale, 0.4, 1.8),
+      };
+    }
+
+    if (isVertical) {
+      const verticalCandidates = isCompactTopKind
+        ? [
+            { region: 'upper-center', x: 0, y: -0.38, scale: 0.82 },
+            { region: 'lower-center', x: 0, y: 0.17, scale: 0.84 },
+            { region: 'upper-right', x: 0.20, y: -0.36, scale: 0.78 },
+            { region: 'upper-left', x: -0.20, y: -0.36, scale: 0.78 },
+          ]
+        : [
+            { region: 'lower-center', x: 0, y: 0.17, scale: 0.85 },
+            { region: 'upper-center', x: 0, y: -0.38, scale: 0.80 },
+          ];
+      const best =
+        verticalCandidates.find((c) => clearRegions.has(c.region) && !avoidRegions.has(c.region)) ??
+        verticalCandidates.find((c) => !avoidRegions.has(c.region)) ??
+        verticalCandidates[0];
+      return { ...d, x: best.x, y: best.y, scale: Math.min(curScale, best.scale) };
+    }
+
+    const sideOrder =
+      idx % 2 === 0
+        ? [
+            { region: 'middle-right', x: 0.29, y: -0.04, scale: 0.84 },
+            { region: 'middle-left', x: -0.29, y: -0.04, scale: 0.84 },
+            { region: 'upper-right', x: 0.28, y: -0.24, scale: 0.82 },
+            { region: 'upper-left', x: -0.28, y: -0.24, scale: 0.82 },
+          ]
+        : [
+            { region: 'middle-left', x: -0.29, y: -0.04, scale: 0.84 },
+            { region: 'middle-right', x: 0.29, y: -0.04, scale: 0.84 },
+            { region: 'upper-left', x: -0.28, y: -0.24, scale: 0.82 },
+            { region: 'upper-right', x: 0.28, y: -0.24, scale: 0.82 },
+          ];
+
+    const best =
+      sideOrder.find((c) => clearRegions.has(c.region) && !avoidRegions.has(c.region)) ??
+      sideOrder.find((c) => !avoidRegions.has(c.region)) ??
+      sideOrder[0];
+
+    return {
+      ...d,
+      x: best.x,
+      y: d.kind === 'lower-third' ? 0.24 : best.y,
+      scale: Math.min(curScale, best.scale),
+    };
+  });
+}
+
+function clampCoord(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
 }
 
 function getAllSpeechWords(speech?: SpeechSegmentLike[]): Array<{ word: string; start: number; end: number }> {
@@ -63,7 +227,8 @@ export function reconcileEditingDecisions(
   toolRequests: AiToolRequest[] = [],
   constraints?: EditingConstraints,
   speech?: SpeechSegmentLike[],
-  detectedSilences?: Array<{ start: number; end: number; duration: number; source?: string }>
+  detectedSilences?: Array<{ start: number; end: number; duration: number; source?: string }>,
+  visualObservations?: VisualObservationHint[]
 ): ReconciliationResult {
   const summaryNotes: string[] = [];
   let reconciledDecisions: EditDecision[] = [...decisions];
@@ -471,11 +636,13 @@ export function reconcileEditingDecisions(
           if (!collides) {
             reconciledDecisions.push({
               op: 'addGraphic',
-              kind: 'callout',
-              text: `${m.sticker.emoji} ${m.cleanWord.toUpperCase()}`,
+              kind: 'kinetic-badge',
+              text: m.cleanWord.toUpperCase(),
               startTime: m.startTime,
               duration: m.duration,
               accent: m.sticker.accentColor,
+              theme: 'clean-light',
+              icon: mapStickerToGraphicIcon(m.sticker.id),
               motion: 'pop'
             });
             stickerCount++;
@@ -809,6 +976,13 @@ export function reconcileEditingDecisions(
   } else {
     reconciledDecisions = nonRippleCuts;
   }
+
+  reconciledDecisions = reconcileMotionGraphicPlacements(
+    project,
+    reconciledDecisions,
+    reconciledTools,
+    visualObservations
+  );
 
   return {
     decisions: reconciledDecisions,

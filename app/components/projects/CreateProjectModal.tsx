@@ -65,7 +65,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
       const result = await saveProjectWithResult(newProj);
       if (!result.success) throw new Error(result.error || "Project could not be saved. Please retry.");
       onClose();
-      router.push(`/projects/${result.project.id}`);
+      router.push(`/editor?projectId=${result.project.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the project. Please retry.");
     } finally {
@@ -117,7 +117,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
               />
             </div>
 
-            <p className="text-xs text-slate-500">Add footage, voiceover, B-roll, thumbnails and captions inside your project, then open the editor.</p>
+            <p className="text-xs text-slate-500">Create your project and open it directly in the video editor.</p>
             {error && <p role="alert" className="text-sm text-rose-600">{error}</p>}
 
             {/* Footer Actions */}

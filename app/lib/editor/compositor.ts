@@ -311,7 +311,9 @@ export class Compositor {
         const rendered=motion?{...text,text:motion.text}:text;
         if(motion)ctx.scale(motion.scale,motion.scale);
         const metrics=layoutText(ctx,rendered,width,styledText(text).trim().split(/\s+/).length);bw=metrics.width;bh=metrics.height;const s=text.style;
-        if(c.graphic){const graphic=drawGraphicPanel(ctx,c.graphic,bw,bh,local);bw=graphic.width;bh=graphic.height;}
+        let graphicHandlesText=false;
+        if(c.graphic){const graphic=drawGraphicPanel(ctx,c.graphic,bw,bh,local,{title:text.text,frameWidth:width,frameHeight:height,duration:c.duration,font:s.font});bw=graphic.width;bh=graphic.height;graphicHandlesText=Boolean(graphic.handlesText);}
+        if(graphicHandlesText){if(!layer.hold)bounds.push({id:c.id,x:width*(.5+t.x),y:height*(.5+t.y),width:bw*t.scale*treatment.scale*Math.abs(animation.scaleX),height:bh*t.scale*treatment.scale*Math.abs(animation.scaleY),rotation:t.rotation});ctx.restore();continue;}
         if(s.background!=="transparent"){ctx.fillStyle=s.background;ctx.fillRect(-bw/2,-bh/2,bw,bh);}
         ctx.direction=textDirection(text.text);ctx.textAlign=s.align;ctx.textBaseline="middle";ctx.fillStyle=textFill(ctx,s.gradient,s.color,metrics.inkWidth,bh,s.align==="left"?-bw/2+16+metrics.inkWidth/2:s.align==="right"?bw/2-16-metrics.inkWidth/2:0);ctx.strokeStyle=s.stroke;ctx.lineWidth=s.strokeWidth*2;ctx.lineJoin="round";ctx.shadowColor="rgba(0,0,0,.8)";ctx.shadowBlur=s.shadow;
         const x=s.align==="left"?-bw/2+16:s.align==="right"?bw/2-16:0;

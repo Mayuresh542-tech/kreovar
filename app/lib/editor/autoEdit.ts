@@ -101,7 +101,17 @@ export function finishAutoEditPlan(snapshot:EditorProject,baseList:EditDecisionL
   const textTrack=staged.trackOrder.map(id=>staged.tracks[id]).find(t=>t.kind==='text'&&!t.locked&&!t.hidden);
   for(const beat of graphics){
    if(!textTrack||textTrack.clipIds.some(id=>{const c=staged.clips[id];return c.startTime<beat.end&&c.startTime+c.duration>beat.start;}))continue;
-   decisions.push({op:'addGraphic',kind:beat.numeric?'stat':'callout',text:beat.text,startTime:beat.start,duration:Math.min(4,beat.end-beat.start),accent:options.captionColor||'#c8ff00',motion:options.styleId==='social'?'pop':'slide-up'});
+   decisions.push({
+    op:'addGraphic',
+    kind:beat.numeric?'stat-counter':'kinetic-badge',
+    text:beat.text,
+    startTime:beat.start,
+    duration:Math.min(4,beat.end-beat.start),
+    accent:options.captionColor||'#7c3aed',
+    theme:'clean-light',
+    icon:beat.numeric?'chart':'sparkles',
+    motion:options.styleId==='social'?'pop':'slide-up'
+   });
    notes.push(`${beat.start.toFixed(2)}s: ${beat.reason} — “${beat.text}”. Review placement; faces were not detected.`);
   }
   if(!editorial.length)notes.push('No timed emphasis cues were found. No decorative callouts were invented.');

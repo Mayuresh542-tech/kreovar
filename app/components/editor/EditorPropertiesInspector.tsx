@@ -47,6 +47,7 @@ import {
   decibelsToLinearGain,
   formatDecibels,
 } from "@/app/lib/editor/speedCurves";
+import GraphicControls from "./workspace/GraphicControls";
 
 interface EditorPropertiesInspectorProps {
   timeline: VeeloxTimelineProject;
@@ -1692,6 +1693,7 @@ export default function EditorPropertiesInspector({
         {/* ========================================================= */}
         {inspectorType === "text" && selectedClip && (
           <>
+            <GraphicControls clipId={selectedClip.id} />
             {/* Text Content */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">

@@ -4,7 +4,7 @@ import {preserveCaptionAnchors} from './captionAnchors';
 import {addShape,type ShapeKind,type ShapeStyle} from "./shapes";
 import {addZoom,clearZooms} from "./zoom";
 import {setTransformKeyframes,type TransformKeyframe,type MotionPreset,applyMotionPreset} from './keyframes';
-import {addMotionGraphic,addAnimatedOverlay,type GraphicKind} from './motionGraphics';
+import {addMotionGraphic,addAnimatedOverlay,type GraphicKind,type GraphicTheme,type GraphicIcon,type GraphicBar,type GraphicComparison} from './motionGraphics';
 import {rippleCut,type CutRange} from "./rippleCut";
 import {applyTextPlacement,type TextPlacementId} from "./textPlacement";
 import {MAX_VIDEO_SECONDS} from "./limits";
@@ -22,7 +22,7 @@ export type EditDecision =
   | {op:'addShape';kind:ShapeKind;startTime:number;duration:number;style?:Partial<ShapeStyle>;transform?:Partial<Clip["transform"]>;motion?:MotionPreset}
   | {op:'keyframes';clipId:string;frames:TransformKeyframe[]}
   | {op:'animate';clipId:string;preset:MotionPreset}
-  | {op:'addGraphic';kind:GraphicKind;text:string;startTime:number;duration:number;accent?:string;motion?:MotionPreset}
+  | {op:'addGraphic';kind:GraphicKind;text:string;startTime:number;duration:number;accent?:string;motion?:MotionPreset;theme?:GraphicTheme;subtitle?:string;icon?:GraphicIcon;value?:number;prefix?:string;suffix?:string;items?:string[];bars?:GraphicBar[];comparison?:GraphicComparison;targetX?:number;targetY?:number;x?:number;y?:number;scale?:number}
   | {op:'addOverlay';assetId:string;trackId:string;startTime:number;duration:number;motion?:MotionPreset}
   | {op:"addZoom";clipId:string;startTime:number;endTime:number;fromScale:number;toScale:number;returnToStart?:boolean;easing?:"linear"|"smooth";focusX?:number;focusY?:number;style?:import('./zoom').ZoomStyle}
   | {op:"clearZooms";clipId:string}
@@ -59,7 +59,7 @@ export function applyEditDecisionList(p:EditorProject,list:EditDecisionList):Edi
       case'keyframes':return setTransformKeyframes(project,d.clipId,d.frames);
       case'animate':return applyMotionPreset(project,d.clipId,d.preset);
       case'addShape':{const next=addShape(project,d.kind,d.startTime,d.duration,d.style,d.transform);if(!d.motion)return next;const id=Object.keys(next.clips).find(id=>!project.clips[id])!;return applyMotionPreset(next,id,d.motion);}
-      case'addGraphic':return addMotionGraphic(project,d.kind,d.text,d.startTime,d.duration,d.accent,d.motion);
+      case'addGraphic':return addMotionGraphic(project,d.kind,d.text,d.startTime,d.duration,d.accent,d.motion,{theme:d.theme,subtitle:d.subtitle,icon:d.icon,value:d.value,prefix:d.prefix,suffix:d.suffix,items:d.items,bars:d.bars,comparison:d.comparison,targetX:d.targetX,targetY:d.targetY,x:d.x,y:d.y,scale:d.scale,allowNewTrack:true});
       case'addOverlay':return addAnimatedOverlay(project,d.assetId,d.trackId,d.startTime,d.duration,d.motion);
       case"addZoom":return addZoom(project,d.clipId,d.startTime,d.endTime,d.fromScale,d.toScale,d.returnToStart,d.easing,d.focusX,d.focusY,d.style);
       case"clearZooms":return clearZooms(project,d.clipId);

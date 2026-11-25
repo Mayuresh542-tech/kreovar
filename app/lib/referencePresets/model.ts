@@ -1,4 +1,5 @@
 import type {EditorProject,CaptionMotion,TextStyle,Ratio} from '../editor/model';
+import type {GraphicKind} from '../editor/motionGraphics';
 import type {EditDecision} from '../editor/ai';
 import type {AiToolRequest} from '../editor/aiTools';
 export const CATEGORIES=['Talking Head','Podcasts','Real Estate','Educational','Vlogs'] as const;
@@ -7,7 +8,7 @@ export interface StyleSpec {
  schemaVersion:1;summary:string;confidence:'low'|'medium'|'high';limitations:string[];
  caption:{enabled:boolean;font:string;sizeRatio:number;weight:number;color:string;highlightColor:string;background:string;stroke:string;strokeWidth:number;y:number;maxWidth:number;wordsPerCaption:number;motion:CaptionMotion};
  pacing:{enabled:boolean;minimumPause:number;padding:number;maxRemovalRatio:number;description:string};
- graphics:{enabled:boolean;kinds:('label'|'lower-third'|'stat'|'callout')[];accent:string;motion:'pop'|'slide-up'|'slide-left'|'float';maximumPerMinute:number;description:string};
+ graphics:{enabled:boolean;kinds:GraphicKind[];accent:string;motion:'pop'|'slide-up'|'slide-left'|'float';maximumPerMinute:number;description:string};
  broll:{enabled:boolean;fit:'cover'|'contain';minimumDuration:number;maximumDuration:number;maxCoverage:number;description:string};
  zooms:{enabled:boolean;maximumScale:number;minimumInterval:number;description:string};
  transitions:{enabled:boolean;kind:'fade'|'dissolve'|'slide'|'zoom';duration:number};

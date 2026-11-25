@@ -151,11 +151,11 @@ export default function AddToProjectModal({
                 type="button"
                 onClick={() => {
                   onClose();
-                  router.push(`/projects/${savedProject.id}`);
+                  router.push("/projects");
                 }}
                 className="py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
               >
-                View Project
+                All Projects
               </button>
               <button
                 type="button"

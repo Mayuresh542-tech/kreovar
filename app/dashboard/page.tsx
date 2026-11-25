@@ -313,7 +313,7 @@ export default function Dashboard() {
               return (
                 <div
                   key={project.id}
-                  onClick={() => router.push(`/projects/${project.id}`)}
+                  onClick={() => router.push(`/editor?projectId=${project.id}`)}
                   className="vx-project-card bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 overflow-hidden hover:border-slate-300 hover:shadow-xs transition-all cursor-pointer group flex flex-col justify-between"
                 >
                   {/* Thumbnail Banner */}
@@ -390,11 +390,11 @@ export default function Dashboard() {
                                 type="button"
                                 onClick={() => {
                                   setActiveMenuId(null);
-                                  router.push(`/projects/${project.id}`);
+                                  router.push(`/editor?projectId=${project.id}`);
                                 }}
                                 className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 transition-colors"
                               >
-                                Project Detail
+                                Open Editor
                               </button>
                               {project.isReal && (
                                 <button

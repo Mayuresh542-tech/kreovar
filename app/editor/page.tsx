@@ -70,11 +70,7 @@ function EditorIndexContent() {
         initialMediaUrl={searchParams.get("video") || searchParams.get("rawVideoUrl") || undefined}
         authToken={authToken}
         onExit={() => {
-          if (activeProjectId && activeProjectId !== "demo_creator_starter") {
-            router.push(`/projects/${activeProjectId}`);
-          } else {
-            router.push("/projects");
-          }
+          router.push("/projects");
         }}
       />
     </div>

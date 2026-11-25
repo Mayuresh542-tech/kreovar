@@ -307,12 +307,12 @@ function ProjectsContent() {
                           type="button"
                           onClick={() => {
                             setActiveMenuId(null);
-                            router.push(`/projects/${project.id}`);
+                            router.push(`/editor?projectId=${project.id}`);
                           }}
                           className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
-                          <span>Asset Files & Hub</span>
+                          <span>Open in Editor</span>
                         </button>
                         {project.isReal&&<button type="button" onClick={()=>void toggleCompleted(project.id)} className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-50">{project.status==='Completed'?'Reopen project':'Mark complete'}</button>}
                         {project.isReal && (

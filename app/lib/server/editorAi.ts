@@ -7,7 +7,7 @@ import type {FootageFrame} from '../editor/footageContext';
 import {TEXT_PLACEMENTS} from "../editor/textPlacement";
 import {readEditingIntent} from "../editor/editingIntent";
 import {extractConversationalIntent} from "../editor/conversationalIntent";
-import {reconcileEditingDecisions} from "../editor/inPlaceReconciler";
+import {reconcileEditingDecisions,reconcileMotionGraphicPlacements} from "../editor/inPlaceReconciler";
 import {planningMetadata} from '../editor/planningMetadata';
 import {ALL_CAPTION_TEMPLATES as DEFAULT_CAPTION_TEMPLATES} from "../captions/referenceTemplates";
 import {applyEditDecisionList} from "../editor/ai";
@@ -23,6 +23,7 @@ import {generateEditPlanJson,editorProviderSummary,type EditorProviderResult} fr
 import {EDITOR_AI_MAX_TOKENS} from "./radoxConfig";
 import {editorStyleReferenceContext} from "./editorStyleReferences";
 import {STRICT_CAPTION_CONSTRAINT_PROMPT,CAPTION_PRESET_WHITELIST_PROMPT,STRICT_ZOOM_CONSTRAINT_PROMPT} from "../editor/prompts";
+import {getMotionDirectorPromptSection} from "../editor/skills/motionDirectorSkill";
 
 export async function planAiEdit(project: EditorProject, instruction: string, selectedClipIds: string[], userId: string, signal: AbortSignal, playheadTime=0,context:{fallbackFootageFrames?:FootageFrame[];footageFrames?:FootageFrame[];completeEdit?:boolean;editingBudget?:import("./editorTokenBudget").EditingBudget;pipelineStage?:EditStage;conversationHistory?:{instructions:string;summary:string}[];videoFile?:{uri?:string;data?:string;buffer?:Buffer;mimeType:string};detectedSilences?:Array<{start:number;end:number;duration:number;source?:'acoustic'|'transcript'|'hybrid'}>}={}) {
   const catalog=await loadAiCatalog(userId);
@@ -91,7 +92,8 @@ EDITORIAL RULES FOR SPEED, AUDIO, TRIMMING & POSITIONING:
 - TEXT & CAPTIONS: Use applyCaptionTemplate for curated viral styles (study-hormozi-style, study-ali-abdaal, kinetic-impact). In composeCaption, highlight 1–2 emotional power words per phrase with vibrant colors (#FAFF00 yellow, #00F0FF cyan, #00F298 green).
 {op:"addZoom",clipId,startTime,endTime,fromScale,toScale,style?:"punch-in"|"smooth-push"|"snap-in"|"slow-pull-back",easing?:"linear"|"smooth",returnToStart?,focusX?,focusY?} inside an existing visual clip. Multipliers 1.0..1.22; restrained default 1.15..1.20. Default style is "punch-in" (0ms cut on emphasis word, flat hold for 2.0s–3.5s, 0ms hard cut reset). NEVER animate smoothly back down to 1.0x (no rubber-band bounce). Forbid generating paired zoom-in + zoom-out cycles within < 2.5s. Minimum 2.2s cooldown between consecutive zooms. Use "smooth-push" (slow creep) for continuous storytelling or "snap-in" for topic shifts. Snap zoom resets strictly to word boundaries or speech pauses. Focus 0 unless position is supplied. {op:"clearZooms",clipId} only if replacement requested.
 {op:"addShape",kind:"rectangle"|"ellipse"|"triangle"|"arrow"|"line"|"star",startTime,duration,transform?:{x,y,scale,rotation,opacity},style?:{width,height,fill,stroke,strokeWidth,radius,shadow},motion?} adds an editable vector overlay. width/height are frame fractions; color hex6, radius0..0.5, strokeWidth0..40, shadow0..80. New shape IDs are not predictable.
-{op:"addGraphic",kind:"label"|"lower-third"|"stat"|"callout",text,startTime,duration,accent?:string,motion?:"slide-up"|"slide-left"|"pop"|"float"|"spin-in"} creates editable text/shapes/keyframes. accent is a hex color string such as "#ff7f50", never a boolean or style name. Motion must use the listed enum; for bouncy movement choose pop, never "bounce". Need a visible unlocked text track; respect existing text intervals. Quote exact supplied/timed text; do not invent factual claims.
+{op:"addGraphic",kind:"stat-counter"|"progress-ring"|"bar-chart"|"comparison"|"checklist"|"step-flow"|"lower-third"|"notification"|"pointer-callout"|"quote-card"|"kinetic-badge"|"label"|"stat"|"callout",text,startTime,duration,accent?:string,theme?:"clean-light"|"frosted-glass"|"editorial-paper"|"dark-slate",subtitle?:string,icon?:"none"|"rocket"|"chart"|"dollar"|"rupee"|"check"|"warning"|"bolt"|"clock"|"star"|"target"|"flame"|"user"|"sparkles",value?:number,prefix?:string,suffix?:string,items?:string[],bars?:[{label,value,displayValue?}],comparison?:{leftTitle,leftValue,rightTitle,rightValue},targetX?:number,targetY?:number,x?:number,y?:number,scale?:number,motion?:"slide-up"|"slide-left"|"pop"|"float"|"spin-in"} creates rich multi-element procedural motion graphics (animated count-ups, progress rings, bar charts, split comparisons, checklists, step flows, lower-thirds, notifications, pointer callouts, quote cards, kinetic badges) on an unlocked text/graphics track. Keep text concise (2-6 words max, never full captions). accent is hex6 ("#7c3aed"). Prefer theme:"clean-light" unless footage is white/very bright ("dark-slate"). Quote exact supplied/timed numbers and facts; never invent statistics.
+${getMotionDirectorPromptSection(true)}
 {op:"addOverlay",assetId,trackId,startTime,duration,motion?} places a project-owned image as a small animated overlay on image/overlay tracks.
 {op:"animate",clipId,preset:"slide-up"|"slide-left"|"pop"|"float"|"spin-in"} replaces existing transform animation only when requested.
 {op:"keyframes",clipId,frames:[{sourceTime,value:{x,y,scale,rotation,opacity},easing:"linear"|"smooth"|"ease-out"|"overshoot"}]} at most 96; sourceTime=sourceStart+(timelineTime-startTime)*speed. Supply complete transforms. New graphics are animated internally; do not guess generated IDs.
@@ -148,13 +150,26 @@ NO CHAT DELAYS OR CONFIRMATION QUESTIONS: Never return conversational plans, que
         rawTools,
         intent?.constraints,
         speech,
-        context.detectedSilences
+        context.detectedSilences,
+        providerResult?.visualContext?.observations
       );
       summaryNotes = reconciled.summaryNotes;
       workingValue = {
         ...valObj,
         decisions: reconciled.decisions,
         toolRequests: reconciled.toolRequests
+      };
+    } else if (context.pipelineStage === 'planMotionGraphics' && value && typeof value === 'object') {
+      const valObj = value as Record<string, unknown>;
+      const rawDecisions = Array.isArray(valObj.decisions) ? (valObj.decisions as any[]) : [];
+      workingValue = {
+        ...valObj,
+        decisions: reconcileMotionGraphicPlacements(
+          project,
+          rawDecisions,
+          [],
+          providerResult?.visualContext?.observations
+        )
       };
     }
     if(context.pipelineStage){

@@ -8,7 +8,7 @@ import {validateZoom} from "./zoom";
 import {readShape,SHAPE_KINDS,defaultShape} from './shapes';
 import {readStyleSurface} from './styleSurface';
 import {readKeyframes,MOTION_PRESETS} from './keyframes';
-import {readMotionGraphic,GRAPHIC_KINDS} from './motionGraphics';
+import {readMotionGraphic,GRAPHIC_KINDS,GRAPHIC_THEMES,GRAPHIC_ICONS} from './motionGraphics';
 import {textPlacementId} from "./textPlacement";
 import {ALL_CAPTION_TEMPLATES as DEFAULT_CAPTION_TEMPLATES} from "../captions/referenceTemplates";
 import { EditorProject, MediaAsset, Clip, Track, TextLayer, Ratio, defaultStyle, defaultTransform, aspectRatios, isKnownCaptionPreset, normalizeCaptionPresetId } from "./model";
@@ -121,7 +121,80 @@ function decision(value: unknown): EditDecision {
     case 'addShape':{const kind=choice(d.kind,SHAPE_KINDS);return {op:d.op,kind,startTime:number(d.startTime),duration:number(d.duration,1/120,60),...(d.style===undefined?{}:{style:readShape({...defaultShape,...object(d.style),kind})}),...(d.transform===undefined?{}:{transform:transform({...defaultTransform,...object(d.transform)})}),...(d.motion===undefined?{}:{motion:choice(d.motion,MOTION_PRESETS)})};}
     case 'keyframes':return {op:d.op,clipId:id(d.clipId),frames:readKeyframes(d.frames)};
     case 'animate':return {op:d.op,clipId:id(d.clipId),preset:choice(d.preset,MOTION_PRESETS)};
-    case 'addGraphic':return {op:d.op,kind:choice(d.kind,GRAPHIC_KINDS),text:string(d.text,120),startTime:number(d.startTime),duration:number(d.duration,.5,12),...(d.accent===undefined?{}:{accent:string(d.accent,9)}),...(d.motion===undefined?{}:{motion:choice(d.motion,MOTION_PRESETS)})};
+    case 'addGraphic': {
+      const kind = choice(d.kind, GRAPHIC_KINDS);
+      const accent = d.accent === undefined ? undefined : string(d.accent, 9);
+      const motion = d.motion === undefined ? undefined : choice(d.motion, MOTION_PRESETS);
+      const theme = d.theme === undefined ? undefined : choice(d.theme, GRAPHIC_THEMES);
+      const subtitle = d.subtitle === undefined ? undefined : string(d.subtitle, 120);
+      const icon = d.icon === undefined ? undefined : choice(d.icon, GRAPHIC_ICONS);
+      const value = d.value === undefined ? undefined : number(d.value, -1e9, 1e9);
+      const prefix = d.prefix === undefined ? undefined : string(d.prefix, 12);
+      const suffix = d.suffix === undefined ? undefined : string(d.suffix, 16);
+      const items = d.items === undefined ? undefined : array(d.items, 6).map(v => string(v, 80));
+      const bars = d.bars === undefined ? undefined : array(d.bars, 5).map(v => {
+        const b = object(v);
+        return {
+          label: string(b.label, 40),
+          value: number(b.value, 0, 1e9),
+          ...(b.displayValue === undefined ? {} : { displayValue: string(b.displayValue, 24) }),
+          ...(b.color === undefined ? {} : { color: string(b.color, 9) }),
+        };
+      });
+      const comparison = d.comparison === undefined ? undefined : (() => {
+        const cmp = object(d.comparison);
+        return {
+          leftTitle: string(cmp.leftTitle, 40),
+          leftValue: string(cmp.leftValue, 60),
+          rightTitle: string(cmp.rightTitle, 40),
+          rightValue: string(cmp.rightValue, 60),
+        };
+      })();
+      const targetX = d.targetX === undefined ? undefined : number(d.targetX, -0.5, 0.5);
+      const targetY = d.targetY === undefined ? undefined : number(d.targetY, -0.5, 0.5);
+      const x = d.x === undefined ? undefined : number(d.x, -0.45, 0.45);
+      const y = d.y === undefined ? undefined : number(d.y, -0.45, 0.45);
+      const scale = d.scale === undefined ? undefined : number(d.scale, 0.4, 1.8);
+      readMotionGraphic({
+        kind,
+        accent: accent ?? '#7c3aed',
+        panel: '#fbfbfdf2',
+        ...(theme ? { theme } : {}),
+        ...(subtitle ? { subtitle } : {}),
+        ...(icon ? { icon } : {}),
+        ...(value !== undefined ? { value } : {}),
+        ...(prefix ? { prefix } : {}),
+        ...(suffix ? { suffix } : {}),
+        ...(items ? { items } : {}),
+        ...(bars ? { bars } : {}),
+        ...(comparison ? { comparison } : {}),
+        ...(targetX !== undefined ? { targetX } : {}),
+        ...(targetY !== undefined ? { targetY } : {}),
+      });
+      return {
+        op: d.op,
+        kind,
+        text: string(d.text, 120),
+        startTime: number(d.startTime),
+        duration: number(d.duration, 0.5, 12),
+        ...(accent === undefined ? {} : { accent }),
+        ...(motion === undefined ? {} : { motion }),
+        ...(theme === undefined ? {} : { theme }),
+        ...(subtitle === undefined ? {} : { subtitle }),
+        ...(icon === undefined ? {} : { icon }),
+        ...(value === undefined ? {} : { value }),
+        ...(prefix === undefined ? {} : { prefix }),
+        ...(suffix === undefined ? {} : { suffix }),
+        ...(items === undefined ? {} : { items }),
+        ...(bars === undefined ? {} : { bars }),
+        ...(comparison === undefined ? {} : { comparison }),
+        ...(targetX === undefined ? {} : { targetX }),
+        ...(targetY === undefined ? {} : { targetY }),
+        ...(x === undefined ? {} : { x }),
+        ...(y === undefined ? {} : { y }),
+        ...(scale === undefined ? {} : { scale }),
+      };
+    }
     case 'addOverlay':return {op:d.op,assetId:id(d.assetId),trackId:id(d.trackId),startTime:number(d.startTime),duration:number(d.duration,.5,12),...(d.motion===undefined?{}:{motion:choice(d.motion,MOTION_PRESETS)})};
     case "addZoom":return {op:d.op,clipId:id(d.clipId),startTime:number(d.startTime),endTime:number(d.endTime),fromScale:number(d.fromScale,1,2),toScale:number(d.toScale,1,2),...(d.returnToStart===undefined?{}:{returnToStart:boolean(d.returnToStart)}),...(d.easing===undefined?{}:{easing:choice(d.easing,["linear","smooth"] as const)}),...(d.focusX===undefined?{}:{focusX:number(d.focusX,-.4,.4)}),...(d.focusY===undefined?{}:{focusY:number(d.focusY,-.4,.4)}),...(d.style===undefined?{}:{style:choice(d.style,["punch-in","smooth-push","snap-in","slow-pull-back"] as const)})};
     case "clearZooms":return {op:d.op,clipId:id(d.clipId)};
