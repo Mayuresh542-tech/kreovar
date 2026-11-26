@@ -1,4 +1,5 @@
 import {saveStudioAsset} from "@/app/lib/server/assetStore";
+import {assetExtensions} from "@/app/lib/server/assetPolicy";
 import { withSafeResponse } from "@/app/lib/server/safeResponse";
 import { withBoundedRequest } from "@/app/lib/server/boundedRequest";
 import { NextRequest, NextResponse } from "next/server";
@@ -23,10 +24,10 @@ async function postHandler(req: NextRequest) {
       return NextResponse.json({ error: "No video file provided." }, { status: 400 });
     }
 
-    const mimeType = file.type || "video/mp4";
-    const validMimes = ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/ogg"];
+    const mimeType = file.type;
+    const validMimes = ["video/mp4", "video/webm", "video/quicktime"];
 
-    if (!validMimes.includes(mimeType)) {
+    if (!validMimes.includes(mimeType) || !assetExtensions[mimeType]) {
       return NextResponse.json(
         { error: "Invalid video format. Please upload MP4, WebM, or MOV files." },
         { status: 400 }

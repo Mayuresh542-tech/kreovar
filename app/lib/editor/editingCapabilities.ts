@@ -1,7 +1,7 @@
 import type {EditDecision} from './ai';
 
 export const NATIVE_EDIT_OPERATIONS = [
- 'composeCaption','setVisualTreatment','addShape','keyframes','animate','addGraphic','addOverlay','addZoom','clearZooms','rippleCut','applyTextPlacement','appendSequence','applyCaptionTemplate','setAudioDucking','addClip','removeClip','moveClip','trimClip','splitClip','addText','addCaption','addTransition','duplicateClip','changeText','mergeCaptions','changeTrack','setAspectRatio','reframeProject','applySpeedCurve','changeClipProperty'
+ 'composeCaption','setVisualTreatment','addShape','keyframes','animate','addGraphic','changeGraphic','removeGraphic','addOverlay','addZoom','clearZooms','rippleCut','applyTextPlacement','appendSequence','applyCaptionTemplate','setAudioDucking','addClip','removeClip','moveClip','trimClip','splitClip','addText','addCaption','addTransition','duplicateClip','changeText','mergeCaptions','changeTrack','setAspectRatio','reframeProject','applySpeedCurve','changeClipProperty'
 ] as const satisfies readonly EditDecision['op'][];
 
 /** One capability boundary for planner prompts and both execution validators.
@@ -10,7 +10,7 @@ export const NATIVE_EDIT_OPERATIONS = [
 export const STAGE_CAPABILITIES:Record<string,{operations:readonly string[];tools:readonly string[]}>= {
  analyzeFootage:{operations:[],tools:[]},
  applyCaptions:{operations:['addCaption','applyCaptionTemplate','composeCaption'],tools:[]},
- planMotionGraphics:{operations:['addGraphic','addShape'],tools:[]},
+ planMotionGraphics:{operations:['addGraphic','changeGraphic','removeGraphic','addShape','changeClipProperty','moveClip'],tools:[]},
  findBroll:{operations:['addClip'],tools:['broll','library']},
  applyZooms:{operations:['addZoom'],tools:[]},
  applySoundEffects:{operations:['addClip'],tools:['sfx','library']},

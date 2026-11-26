@@ -1,4 +1,6 @@
 import {STAGE_CAPABILITIES} from '../editor/editingCapabilities';
+import {TRANSITION_KINDS} from '../editor/transitions';
+import {MEDIA_MOTIONS,MEDIA_LOOPS,MEDIA_EASINGS} from '../editor/mediaAnimation';
 import type {EditorJsonOptions} from './radoxService';
 type Schema=Record<string,unknown>;
 const str:Schema={type:'string'},num:Schema={type:'number'},bool:Schema={type:'boolean'};
@@ -26,7 +28,8 @@ export function editorFallbackResponseFormat(options:Pick<EditorJsonOptions,'pro
  const focus:Schema={type:'number',minimum:-.4,maximum:.4,description:'Signed offset from frame center. 0 is centered; 0.5 is invalid. Use 0 unless a focus was requested.'},zoomScale:Schema={type:'number',minimum:1,maximum:1.22};
  const zoom=object({op:enumeration(['addZoom']),clipId:visualClipId,startTime:num,endTime:num,fromScale:zoomScale,toScale:zoomScale,easing:enumeration(['linear','smooth']),returnToStart:bool,focusX:focus,focusY:focus,style:enumeration(['punch-in','smooth-push','snap-in','slow-pull-back'])});
  const transform=object({x:num,y:num,scale:num,rotation:num,opacity:num}),effects=object({brightness:num,contrast:num,saturation:num,blur:num});
- const changes=union([object({fadeIn:num}),object({fadeOut:num}),object({effects}),object({transform}),object({volume:num}),object({speed:num}),object({preservePitch:bool}),object({audioRole:enumeration(['speech','background','sfx'])}),object({ducking:bool}),object({surface:enumeration(['none','paper','grid','grain','marker','retro'])})]);
- const effect=union([object({op:enumeration(['changeClipProperty']),clipId,changes}),object({op:enumeration(['setAudioDucking']),enabled:bool}),...(visualIds.length?[object({op:enumeration(['addTransition']),fromClipId:visualClipId,toClipId:visualClipId,kind:enumeration(['fade','dissolve','slide','zoom']),duration:num})]:[])]);
+ const mediaAnim=object({entrance:enumeration([...MEDIA_MOTIONS]),exit:enumeration([...MEDIA_MOTIONS]),loop:enumeration([...MEDIA_LOOPS]),entranceDuration:num,exitDuration:num,loopDuration:num,easing:enumeration([...MEDIA_EASINGS])});
+ const changes=union([object({fadeIn:num}),object({fadeOut:num}),object({effects}),object({transform}),object({volume:num}),object({speed:num}),object({preservePitch:bool}),object({audioRole:enumeration(['speech','background','sfx'])}),object({ducking:bool}),object({surface:enumeration(['none','paper','grid','grain','marker','retro'])}),object({mediaAnimation:mediaAnim})]);
+ const effect=union([object({op:enumeration(['changeClipProperty']),clipId,changes}),object({op:enumeration(['setAudioDucking']),enabled:bool}),...(visualIds.length?[object({op:enumeration(['addTransition']),fromClipId:visualClipId,toClipId:visualClipId,kind:enumeration([...TRANSITION_KINDS]),duration:num})]:[])]);
  return strict(data.pipelineStage==='applyZooms'?'editor_zoom_stage':'editor_effect_stage',object({summary:str,decisions:array(data.pipelineStage==='applyZooms'?zoom:effect),toolRequests:{type:'array',items:{type:'null'},maxItems:0}}));
 }

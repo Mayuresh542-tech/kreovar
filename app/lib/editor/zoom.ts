@@ -93,7 +93,7 @@ export function addZoom(p:EditorProject,id:string,startTime:number,endTime:numbe
  const frame=1/p.settings.fps;
  if(!finite(startTime)||!finite(endTime)||startTime<c.startTime-1e-6||endTime>c.startTime+c.duration+1e-6||endTime-startTime<frame)throw Error('Keep the zoom interval inside its clip, at least one frame long.');
  const zoom=validateZoom({sourceStart:c.sourceStart+(startTime-c.startTime)*c.speed,sourceEnd:c.sourceStart+(endTime-c.startTime)*c.speed,fromScale,toScale,easing,returnToStart,focusX,focusY,...(style?{style}:{})});
- if((c.zooms?.length||0)>=12)throw Error('Use at most 12 zooms per clip.');
+ if((c.zooms?.length||0)>=60)throw Error('Use at most 60 zooms per clip.');
  if(c.zooms?.some(z=>zoom.sourceStart<z.sourceEnd-1e-6&&zoom.sourceEnd>z.sourceStart+1e-6))throw Error('Zoom intervals cannot overlap. Clear or adjust the existing zoom first.');
  return {...p,clips:{...p.clips,[id]:{...c,zooms:[...(c.zooms||[]),zoom].sort((a,b)=>a.sourceStart-b.sourceStart)}}};
 }

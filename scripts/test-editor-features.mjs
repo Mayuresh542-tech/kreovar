@@ -69,8 +69,63 @@ test("stale revisions, unsupported decisions and unsafe properties fail without 
 test("locked tracks, invalid transitions and oversized plans are rejected", () => {
   const p = fixture(); p.tracks["track-video"].locked = true;
   assert.throws(() => validateAiPlan({ summary: "Bad", decisions: [{ op: "removeClip", clipId: "clip-1" }] }, p), /Unlock/);
-  assert.throws(() => validateAiPlan({ summary: "Bad", decisions: Array.from({ length: 101 }, () => ({ op: "setAspectRatio", aspectRatio: "9:16" })) }, p));
+  assert.throws(() => validateAiPlan({ summary: "Bad", decisions: Array.from({ length: 401 }, () => ({ op: "setAspectRatio", aspectRatio: "9:16" })) }, p));
   assert.throws(() => validateAiPlan({ summary: "Bad", decisions: [{ op: "addTransition", fromClipId: "clip-1", toClipId: "missing", kind: "zoom", duration: .5 }] }, fixture()));
+});
+test("5-minute (300s) timelines support AI editing with 200+ captions, zooms, graphics, shapes, and transcription audio", () => {
+  const { speechWav } = load("app/lib/editor/transcriptionAudio.ts");
+  const { checkCaptionSources } = load("app/lib/editor/captionBatch.ts");
+  let p = model.createProject("five-min-project");
+  p = operations.addAsset(p, { id: "asset-5m", name: "five-min.mp4", kind: "video", mime: "video/mp4", size: 50000000, duration: 295, width: 1080, height: 1920 });
+  p = operations.addClip(p, "asset-5m", "track-video", 0, { id: "clip-5m", duration: 295, sourceStart: 0, sourceEnd: 295 });
+
+  // Caption source check allows 295s timeline
+  assert.doesNotThrow(() => checkCaptionSources(p, ["clip-5m"]));
+
+  // Speech WAV generator handles full 300s @ 16kHz mono
+  const wav300 = speechWav(new Float32Array(300 * 16000), 16000);
+  assert.ok(wav300.size > 300 * 16000 * 2);
+
+  // AI edit plan with 180 captions + 20 punch zooms + 10 motion graphics + 5 shapes validates & applies up to 295s
+  const decisions = [
+    ...Array.from({ length: 180 }, (_, i) => ({
+      op: "addCaption",
+      text: `Line ${i + 1}`,
+      startTime: i * 1.6,
+      duration: 1.4,
+      templateId: "clean-sub",
+    })),
+    ...Array.from({ length: 20 }, (_, i) => ({
+      op: "addZoom",
+      clipId: "clip-5m",
+      startTime: i * 14 + 1,
+      endTime: i * 14 + 3.5,
+      fromScale: 1,
+      toScale: 1.18,
+      style: "punch-in",
+      returnToStart: true,
+    })),
+    ...Array.from({ length: 10 }, (_, i) => ({
+      op: "addGraphic",
+      kind: "stat-counter",
+      text: `Metric ${i + 1}`,
+      value: i + 1,
+      startTime: i * 28 + 2,
+      duration: 2.5,
+    })),
+    ...Array.from({ length: 5 }, (_, i) => ({
+      op: "addShape",
+      kind: "rectangle",
+      startTime: i * 55 + 5,
+      duration: 2.0,
+    })),
+  ];
+
+  const validated = validateAiPlan({ summary: "5-minute AI edit", decisions }, p);
+  const edited = applyEditDecisionList(p, validated.list);
+  assert.equal(Object.keys(edited.captions).length, 180);
+  assert.equal(edited.clips["clip-5m"].zooms.length, 20);
+  assert.ok(model.projectDuration(edited) <= 300);
 });
 test("filename and MIME handling matches actual file type, handles Unicode and unsafe names", () => {
   assert.equal(mediaFilename("Clip.mp4", "video/webm"), "Clip.webm");
@@ -127,7 +182,7 @@ test("AI route reports missing editing-provider configuration and rejects invali
   const route = loader({ "app/lib/server/adminAuth.ts": { getAdminClient: () => ({ auth: { getUser: async () => ({ data: { user: { id: "user-2" } }, error: null }) } }) }, "app/lib/server/radoxService.ts": { RadoxEditorError, generateEditorJson: async () => { calls++; throw new RadoxEditorError("RADOX_NOT_CONFIGURED"); } } })("app/api/editor/ai-edit/route.ts");
   const request = body => new NextRequest("http://localhost/api/editor/ai-edit", { method: "POST", headers: { Authorization: "Bearer test-session" }, body: JSON.stringify(body) });
   const bad = await route.POST(request({ instruction: "", project: fixture(), selectedClipIds: [] })); assert.equal(bad.status, 400); assert.equal(calls, 0);
-  const oversized = await route.POST(request({ instruction: "x".repeat(1100000) })); assert.equal(oversized.status, 413);
+  const oversized = await route.POST(request({ instruction: "x".repeat(4300000) })); assert.equal(oversized.status, 413);
   const missing = await route.POST(request({ instruction: "Make portrait", project: fixture(), selectedClipIds: [] })); assert.equal(missing.status, 503); const missingData=await missing.json(); assert.equal(missingData.code,'AI_NOT_CONFIGURED'); assert.match(missingData.error, /AI editing is temporarily unavailable/); assert.equal(calls,1);
 });
 test("client download hands correct filename to the browser and releases temporary resources", async () => {
@@ -246,7 +301,7 @@ test('MP4 finishing rejects unauthenticated requests before reading files or lau
  let rendered=false;const route=loader({'app/lib/server/adminAuth.ts':{getAuthenticatedUserId:async()=>null},'app/lib/server/render/editorAudio.ts':{finalizeEditorMp4:()=>{rendered=true;}}})('app/api/editor/export-mp4/route.ts');const {NextRequest}=require('next/server');const r=await route.POST(new NextRequest('http://localhost/api/editor/export-mp4',{method:'POST'}));assert.equal(r.status,401);assert.equal(rendered,false);
 });
 test('MP4 finishing rejects foreign projects before resolving private originals',async()=>{
- let rendered=false;const route=loader({'app/lib/server/adminAuth.ts':{getAuthenticatedUserId:async()=> 'owner',getAdminClient:()=>({})},'app/lib/server/projectAccess.ts':{requireOwnedProject:async()=>{throw Error('foreign');}},'app/lib/server/render/editorAudio.ts':{finalizeEditorMp4:()=>{rendered=true;}}})('app/api/editor/export-mp4/route.ts');const {NextRequest}=require('next/server');const form=new FormData();form.set('recording',new File([new Uint8Array([1])],'video.mp4',{type:'video/mp4'}));form.set('project',JSON.stringify({id:'foreign'}));const r=await route.POST(new NextRequest('http://localhost/api/editor/export-mp4',{method:'POST',body:form}));assert.equal(r.status,404);assert.equal(rendered,false);
+ let rendered=false;const route=loader({'app/lib/server/adminAuth.ts':{getAuthenticatedUserId:async()=> 'owner',getAdminClient:()=>({})},'app/lib/server/projectAccess.ts':{requireOwnedProject:async()=>{throw Error('foreign');}},'app/lib/server/render/editorAudio.ts':{finalizeEditorMp4:()=>{rendered=true;}}})('app/api/editor/export-mp4/route.ts');const {NextRequest}=require('next/server');const form=new FormData();form.set('recording',new File([new Uint8Array([1])],'video.mp4',{type:'video/mp4'}));form.set('project',JSON.stringify({id:'11111111-1111-4111-8111-111111111111'}));const r=await route.POST(new NextRequest('http://localhost/api/editor/export-mp4',{method:'POST',body:form}));assert.equal(r.status,404);assert.equal(rendered,false);
 });
 test('MP4 finishing refuses unknown private originals instead of silently omitting sound',async()=>{
  const renderer=loader({'app/lib/server/assetStore.ts':{getStudioAsset:async()=>null}})('app/lib/server/render/editorAudio.ts');let p=fixture();p.assets['asset-1'].libraryId='22222222-2222-4222-8222-222222222222';await assert.rejects(()=>renderer.finalizeEditorMp4('owner',p,Buffer.from('0000ftyp00000000'),new AbortController().signal),/original is unavailable/);
@@ -281,7 +336,7 @@ test("project SFX merges into editor media without changing clips or duplicating
 test("offline export schedules every frame and preserves trim/speed audio alignment",()=>{
  const {frameSchedule,clipAudioSlice}=loader({"mediabunny":{}})("app/lib/editor/offlineExport.ts");
  const frames=frameSchedule(8,30);assert.equal(frames.length,240);assert.equal(frames[239].time,239/30);assert.ok(Math.abs(frames.reduce((n,f)=>n+f.duration,0)-8)<1e-9);
- assert.equal(frameSchedule(.105,30).length,4);assert.throws(()=>frameSchedule(61,30));assert.throws(()=>frameSchedule(8,25));
+ assert.equal(frameSchedule(.105,30).length,4);assert.throws(()=>frameSchedule(301,30));assert.throws(()=>frameSchedule(8,25));
  const clip={sourceStart:2,sourceEnd:4,startTime:3,speed:2};
  assert.deepEqual(clipAudioSlice(clip,1.9,.2),{offset:2-1.9,length:.2-(2-1.9),when:3});
  const end=clipAudioSlice(clip,3.95,.1);assert.ok(Math.abs(end.length-.05)<1e-9);assert.equal(end.when,3+(3.95-2)/2);
@@ -372,7 +427,7 @@ test('untranscribed speech ducks across the voice clip; no speech or out-of-rang
 test('caption correction preserves style, validates range, supports Undo and protects locked tracks',()=>{
  const {editCaption}=load('app/lib/editor/captionEditing.ts');let p=model.createProject('correction');p=operations.addCaption(p,'Speling',1,2,{color:'#abcdef'});const id=Object.keys(p.clips)[0],store=new EditorStore(p),style=p.captions[p.clips[id].contentId].style;
  store.execute(q=>editCaption(q,id,'Spelling',1.5,3));const next=store.getSnapshot();assert.equal(next.captions[next.clips[id].contentId].text,'Spelling');assert.equal(next.clips[id].duration,1.5);assert.deepEqual(next.captions[next.clips[id].contentId].style,style);store.undo();assert.equal(store.getSnapshot().captions[p.clips[id].contentId].text,'Speling');
- for(const [start,end]of [[NaN,2],[-1,2],[3,2],[1,61],[1,1.001]])assert.throws(()=>editCaption(p,id,'Text',start,end));p.tracks['track-caption'].locked=true;assert.throws(()=>editCaption(p,id,'Text',1,2),/Unlock/);
+ for(const [start,end]of [[NaN,2],[-1,2],[3,2],[1,301],[1,1.001]])assert.throws(()=>editCaption(p,id,'Text',start,end));p.tracks['track-caption'].locked=true;assert.throws(()=>editCaption(p,id,'Text',1,2),/Unlock/);
 });
 test('stock choice skips previous and same-batch footage, short originals and oversized downloads',()=>{
  const {stockKeys,chooseStock}=load('app/lib/editor/stockSelection.ts');let p=fixture();p.assets.old={...p.assets['asset-1'],id:'old',name:'AI-broll-10.mp4'};const used=stockKeys(p),videos=[{id:10,videoUrl:'a',duration:10},{id:11,videoUrl:'b',duration:1},{id:12,videoUrl:'c',duration:10,size:101*1048576},{id:13,videoUrl:'d',duration:10},{id:14,videoUrl:'e',duration:10}];
@@ -407,7 +462,7 @@ test('sequence insertion preserves the chosen order, original source bounds, exa
 test('sequence appends to the target video track and rejects incompatible, locked or oversized batches atomically',()=>{
  const {appendSequence}=load('app/lib/editor/sequence.ts');const p=fixture();p.assets.second={...p.assets['asset-1'],id:'second',duration:12.5};const next=appendSequence(p,['second']).project;assert.equal(Object.values(next.clips).find(c=>c.assetId==='second').startTime,10);assert.equal(Object.keys(p.clips).length,1);
  assert.throws(()=>appendSequence(p,[]));assert.throws(()=>appendSequence(p,['missing']));assert.throws(()=>appendSequence(p,['second','second']));assert.throws(()=>appendSequence(p,['second'],'track-audio'));
- p.assets.long={...p.assets.second,id:'long',duration:55};const store=new EditorStore(p);assert.throws(()=>store.execute(q=>appendSequence(q,['long']).project));assert.strictEqual(store.getSnapshot(),p);p.tracks['track-video'].locked=true;assert.throws(()=>appendSequence(p,['second']));
+ p.assets.long={...p.assets.second,id:'long',duration:295};const store=new EditorStore(p);assert.throws(()=>store.execute(q=>appendSequence(q,['long']).project));assert.strictEqual(store.getSnapshot(),p);p.tracks['track-video'].locked=true;assert.throws(()=>appendSequence(p,['second']));
 });
 test('multi-clip transcription applies actual source timestamps with the second clip timeline offset',()=>{
  const {appendSequence}=load('app/lib/editor/sequence.ts'),{captionSourceSignature,applyCaptionBatch}=load('app/lib/editor/captionBatch.ts'),{captionsForClip}=load('app/lib/editor/captionTiming.ts');let p=model.createProject('captions-sequence');
@@ -448,8 +503,8 @@ test("word animations use source timings through move, split, trim and speed",()
  assert.equal(captionMotionFrame(layer(),p.clips[id],2.5).text,'Hello');
  p=operations.moveClip(p,id,4);assert.equal(captionMotionFrame(layer(),p.clips[id],5.2).text,'Hello world');
  p=operations.changeClipProperty(p,id,{speed:2});assert.equal(captionMotionFrame(layer(),p.clips[id],4.6).text,'Hello world');
- p=operations.splitClip(p,id,4.5);const right=Object.values(p.clips).find(c=>c.id!==id);assert.equal(captionMotionFrame(p.captions[right.contentId],right,4.6).text,'Hello world');
- p=setCaptionMotion(p,[right.id],'karaoke');assert.equal(captionMotionFrame(p.captions[right.contentId],right,4.6).active,1);
+ p=operations.splitClip(p,id,4.5);const right=Object.values(p.clips).find(c=>c.id!==id);assert.equal(captionMotionFrame(p.captions[right.contentId],right,4.6).text,'world');
+ p=setCaptionMotion(p,[right.id],'karaoke');assert.equal(captionMotionFrame(p.captions[right.contentId],right,4.6).active,0);
 });
 test("manual captions and changed transcripts never invent word timestamps",()=>{
  const {captionMotionFrame,setCaptionMotion}=load('app/lib/editor/captionMotion.ts');let p=model.createProject('manual');p=operations.addCaption(p,'Hello world',0,2);

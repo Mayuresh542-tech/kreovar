@@ -1,4 +1,5 @@
-import {readMediaAnimation} from './mediaAnimation';
+import {KEN_BURNS_MOTIONS, readMediaAnimation} from './mediaAnimation';
+import {TRANSITION_KINDS, resolveTransitionKind} from './transitions';
 import {readCaptionComposition} from './captionComposition';
 import {readVisualTreatment,setVisualTreatment} from './visualTreatment';
 import {readStudioStyle,readStudioData} from './editorCaptionStudio';
@@ -8,10 +9,11 @@ import {validateZoom} from "./zoom";
 import {readShape,SHAPE_KINDS,defaultShape} from './shapes';
 import {readStyleSurface} from './styleSurface';
 import {readKeyframes,MOTION_PRESETS} from './keyframes';
-import {readMotionGraphic,GRAPHIC_KINDS,GRAPHIC_THEMES,GRAPHIC_ICONS} from './motionGraphics';
+import {readMotionGraphic,readCustomSpec,GRAPHIC_KINDS,GRAPHIC_THEMES,GRAPHIC_ICONS} from './motionGraphics';
 import {textPlacementId} from "./textPlacement";
+import {MAX_VIDEO_SECONDS} from "./limits";
 import {ALL_CAPTION_TEMPLATES as DEFAULT_CAPTION_TEMPLATES} from "../captions/referenceTemplates";
-import { EditorProject, MediaAsset, Clip, Track, TextLayer, Ratio, defaultStyle, defaultTransform, aspectRatios, isKnownCaptionPreset, normalizeCaptionPresetId } from "./model";
+import { EditorProject, MediaAsset, Clip, Track, Transition, TransitionEasing, TransitionDirection, TextLayer, Ratio, defaultStyle, defaultTransform, aspectRatios, isKnownCaptionPreset, normalizeCaptionPresetId } from "./model";
 import { MAX_RIPPLE_CUT_RANGES } from "./rippleCut";
 export { MAX_RIPPLE_CUT_RANGES };
 import { EditDecision, EditDecisionList, applyEditDecisionList } from "./ai";
@@ -19,6 +21,7 @@ import { EditDecision, EditDecisionList, applyEditDecisionList } from "./ai";
 const ratios = aspectRatios;
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Expected an object.");
+  if (["__proto__", "prototype", "constructor"].some((k) => Object.prototype.hasOwnProperty.call(value, k))) throw new Error("Invalid object key.");
   return value as Record<string, unknown>;
 }
 function string(value: unknown, max = 200): string {
@@ -42,13 +45,13 @@ function boolean(value: unknown): boolean {
   if (typeof value !== "boolean") throw new Error("Expected a boolean.");
   return value;
 }
-function array(value: unknown, max = 300): unknown[] {
+function array(value: unknown, max = 600): unknown[] {
   if (!Array.isArray(value) || value.length > max) throw new Error("Too many items or invalid list.");
   return value;
 }
 function record<T>(value: unknown, read: (item: unknown) => T): Record<string, T> {
   const entries = Object.entries(object(value));
-  if (entries.length > 300) throw new Error("Use a project with at most 300 assets or clips for AI editing.");
+  if (entries.length > 600) throw new Error("Use a project with at most 600 assets or clips for AI editing.");
   return Object.fromEntries(entries.map(([key, item]) => [id(key), read(item)]));
 }
 function transform(value: unknown): Clip["transform"] {
@@ -80,7 +83,7 @@ export function aiProjectSnapshot(value: unknown): EditorProject {
   });
   const clips = record<Clip>(p.clips, value => {
     const c = object(value);
-    return { id: id(c.id),...(c.mediaAnimation===undefined?{}:{mediaAnimation:readMediaAnimation(c.mediaAnimation)}),...(c.kenBurns===undefined?{}:{kenBurns:choice(c.kenBurns,["ken-burns-push","ken-burns-pull","ken-burns-pan-left","ken-burns-pan-right"] as const)}),...(c.visualTreatment===undefined?{}:{visualTreatment:readVisualTreatment(c.visualTreatment)}),...(c.keyframes===undefined?{}:{keyframes:readKeyframes(c.keyframes)}),...(c.graphic===undefined?{}:{graphic:readMotionGraphic(c.graphic)}),...(c.shape===undefined?{}:{shape:readShape(c.shape)}),...(c.surface===undefined?{}:{surface:readStyleSurface(c.surface)}), ...(c.zooms===undefined?{}:{zooms:array(c.zooms,12).map(value=>{const z=object(value);return validateZoom({sourceStart:number(z.sourceStart),sourceEnd:number(z.sourceEnd),fromScale:number(z.fromScale,1,2),toScale:number(z.toScale,1,2),easing:choice(z.easing,["linear","smooth"]),returnToStart:boolean(z.returnToStart),focusX:number(z.focusX,-.4,.4),focusY:number(z.focusY,-.4,.4)});})}), ...(c.assetId ? { assetId: id(c.assetId) } : {}), ...(c.contentId ? { contentId: id(c.contentId) } : {}), trackId: id(c.trackId), name: string(c.name), startTime: number(c.startTime), duration: number(c.duration, 1 / 120), sourceStart: number(c.sourceStart), sourceEnd: number(c.sourceEnd), transform: transform(c.transform), effects: effects(c.effects), volume: number(c.volume, 0, 2), speed: number(c.speed, .25, 4), fadeIn: number(c.fadeIn), fadeOut: number(c.fadeOut),...(c.audioRole===undefined?{}:{audioRole:choice(c.audioRole,["speech","background","sfx"] as const)}),...(c.ducking===undefined?{}:{ducking:boolean(c.ducking)}),...(c.speedCurveId===undefined?{}:{speedCurveId:choice(c.speedCurveId,["hero","bullet","montage","jump_cut","flash_in","flash_out","standard"] as const)}) };
+    return { id: id(c.id),...(c.mediaAnimation===undefined?{}:{mediaAnimation:readMediaAnimation(c.mediaAnimation)}),...(c.kenBurns===undefined?{}:{kenBurns:choice(c.kenBurns,["ken-burns-push","ken-burns-pull","ken-burns-pan-left","ken-burns-pan-right"] as const)}),...(c.visualTreatment===undefined?{}:{visualTreatment:readVisualTreatment(c.visualTreatment)}),...(c.keyframes===undefined?{}:{keyframes:readKeyframes(c.keyframes)}),...(c.graphic===undefined?{}:{graphic:readMotionGraphic(c.graphic)}),...(c.shape===undefined?{}:{shape:readShape(c.shape)}),...(c.surface===undefined?{}:{surface:readStyleSurface(c.surface)}), ...(c.zooms===undefined?{}:{zooms:array(c.zooms,60).map(value=>{const z=object(value);return validateZoom({sourceStart:number(z.sourceStart),sourceEnd:number(z.sourceEnd),fromScale:number(z.fromScale,1,2),toScale:number(z.toScale,1,2),easing:choice(z.easing,["linear","smooth"]),returnToStart:boolean(z.returnToStart),focusX:number(z.focusX,-.4,.4),focusY:number(z.focusY,-.4,.4)});})}), ...(c.assetId ? { assetId: id(c.assetId) } : {}), ...(c.contentId ? { contentId: id(c.contentId) } : {}), trackId: id(c.trackId), name: string(c.name), startTime: number(c.startTime), duration: number(c.duration, 1 / 120), sourceStart: number(c.sourceStart), sourceEnd: number(c.sourceEnd), transform: transform(c.transform), effects: effects(c.effects), volume: number(c.volume, 0, 2), speed: number(c.speed, .25, 4), fadeIn: number(c.fadeIn), fadeOut: number(c.fadeOut),...(c.audioRole===undefined?{}:{audioRole:choice(c.audioRole,["speech","background","sfx"] as const)}),...(c.ducking===undefined?{}:{ducking:boolean(c.ducking)}),...(c.speedCurveId===undefined?{}:{speedCurveId:choice(c.speedCurveId,["hero","bullet","montage","jump_cut","flash_in","flash_out","standard"] as const)}) };
   });
   for(const c of Object.values(clips))if(c.visualTreatment && !tracks[c.trackId]?.locked)setVisualTreatment({assets,tracks,clips} as EditorProject,c.id,c.visualTreatment);
   const readText = (value: unknown): TextLayer => {
@@ -109,7 +112,23 @@ export function aiProjectSnapshot(value: unknown): EditorProject {
     const asset = clip.assetId ? assets[clip.assetId] : undefined;
     if (asset && asset.kind !== "image" && clip.sourceEnd > asset.duration + .01) throw new Error("Clip exceeds its original media.");
   }
-  return { schemaVersion: 1, id: id(p.id), title: string(p.title), revision: number(p.revision, 0, Number.MAX_SAFE_INTEGER), updatedAt: "", trackOrder, tracks, clips, assets, textLayers, captions, transitions: {}, settings: { aspectRatio: choice(settings.aspectRatio, ratios), fps: number(settings.fps, 1, 120), background: "#000000",...(settings.audioDucking===undefined?{}:{audioDucking:boolean(settings.audioDucking)}) } };
+  const transitions = record<Transition>(p.transitions && typeof p.transitions === "object" ? p.transitions : {}, (value) => {
+    const t = object(value);
+    const fromClipId = id(t.fromClipId);
+    const toClipId = id(t.toClipId);
+    if (!clips[fromClipId] || !clips[toClipId]) throw new Error("Transition references missing clip.");
+    return {
+      id: id(t.id),
+      fromClipId,
+      toClipId,
+      kind: choice(t.kind, TRANSITION_KINDS),
+      duration: number(t.duration, 1 / 120, 5),
+      ...(t.intensity === undefined ? {} : { intensity: number(t.intensity, 0.25, 2) }),
+      ...(t.easing === undefined ? {} : { easing: choice(t.easing, ["linear", "easeIn", "easeOut", "easeInOut", "expoOut", "snap"] as const) as TransitionEasing }),
+      ...(t.direction === undefined ? {} : { direction: choice(t.direction, ["auto", "left", "right", "up", "down"] as const) as TransitionDirection }),
+    };
+  });
+  return { schemaVersion: 1, id: id(p.id), title: string(p.title), revision: number(p.revision, 0, Number.MAX_SAFE_INTEGER), updatedAt: "", trackOrder, tracks, clips, assets, textLayers, captions, transitions, settings: { aspectRatio: choice(settings.aspectRatio, ratios), fps: number(settings.fps, 1, 120), background: "#000000",...(settings.audioDucking===undefined?{}:{audioDucking:boolean(settings.audioDucking)}) } };
 }
 
 function templateId(value:unknown){const result=id(value);if(isKnownCaptionPreset(result))return result;if(!DEFAULT_CAPTION_TEMPLATES.some(t=>t.id===result)){const normalized=normalizeCaptionPresetId(result);if(isKnownCaptionPreset(normalized))return normalized;throw new Error("Unknown caption template.");}return result;}
@@ -118,11 +137,12 @@ function decision(value: unknown): EditDecision {
   switch (d.op) {
     case 'composeCaption':return {op:d.op,clipId:id(d.clipId),presentation:readCaptionComposition(d.presentation)};
     case 'setVisualTreatment':return {op:d.op,clipId:id(d.clipId),treatment:readVisualTreatment(d.treatment)};
-    case 'addShape':{const kind=choice(d.kind,SHAPE_KINDS);return {op:d.op,kind,startTime:number(d.startTime),duration:number(d.duration,1/120,60),...(d.style===undefined?{}:{style:readShape({...defaultShape,...object(d.style),kind})}),...(d.transform===undefined?{}:{transform:transform({...defaultTransform,...object(d.transform)})}),...(d.motion===undefined?{}:{motion:choice(d.motion,MOTION_PRESETS)})};}
+    case 'addShape':{const kind=choice(d.kind,SHAPE_KINDS);return {op:d.op,kind,startTime:number(d.startTime),duration:number(d.duration,1/120,MAX_VIDEO_SECONDS),...(d.style===undefined?{}:{style:readShape({...defaultShape,...object(d.style),kind})}),...(d.transform===undefined?{}:{transform:transform({...defaultTransform,...object(d.transform)})}),...(d.motion===undefined?{}:{motion:choice(d.motion,MOTION_PRESETS)})};}
     case 'keyframes':return {op:d.op,clipId:id(d.clipId),frames:readKeyframes(d.frames)};
     case 'animate':return {op:d.op,clipId:id(d.clipId),preset:choice(d.preset,MOTION_PRESETS)};
-    case 'addGraphic': {
-      const kind = choice(d.kind, GRAPHIC_KINDS);
+    case 'addGraphic':
+    case 'changeGraphic': {
+      const kind = d.op === 'addGraphic' || d.kind !== undefined ? choice(d.kind, GRAPHIC_KINDS) : undefined;
       const accent = d.accent === undefined ? undefined : string(d.accent, 9);
       const motion = d.motion === undefined ? undefined : choice(d.motion, MOTION_PRESETS);
       const theme = d.theme === undefined ? undefined : choice(d.theme, GRAPHIC_THEMES);
@@ -152,11 +172,12 @@ function decision(value: unknown): EditDecision {
       })();
       const targetX = d.targetX === undefined ? undefined : number(d.targetX, -0.5, 0.5);
       const targetY = d.targetY === undefined ? undefined : number(d.targetY, -0.5, 0.5);
+      const customSpec = d.customSpec === undefined ? undefined : readCustomSpec(d.customSpec);
       const x = d.x === undefined ? undefined : number(d.x, -0.45, 0.45);
       const y = d.y === undefined ? undefined : number(d.y, -0.45, 0.45);
       const scale = d.scale === undefined ? undefined : number(d.scale, 0.4, 1.8);
       readMotionGraphic({
-        kind,
+        kind: kind ?? 'stat-counter',
         accent: accent ?? '#7c3aed',
         panel: '#fbfbfdf2',
         ...(theme ? { theme } : {}),
@@ -170,13 +191,9 @@ function decision(value: unknown): EditDecision {
         ...(comparison ? { comparison } : {}),
         ...(targetX !== undefined ? { targetX } : {}),
         ...(targetY !== undefined ? { targetY } : {}),
+        ...(customSpec !== undefined ? { customSpec } : {}),
       });
-      return {
-        op: d.op,
-        kind,
-        text: string(d.text, 120),
-        startTime: number(d.startTime),
-        duration: number(d.duration, 0.5, 12),
+      const sharedFields = {
         ...(accent === undefined ? {} : { accent }),
         ...(motion === undefined ? {} : { motion }),
         ...(theme === undefined ? {} : { theme }),
@@ -190,11 +207,33 @@ function decision(value: unknown): EditDecision {
         ...(comparison === undefined ? {} : { comparison }),
         ...(targetX === undefined ? {} : { targetX }),
         ...(targetY === undefined ? {} : { targetY }),
+        ...(customSpec === undefined ? {} : { customSpec }),
         ...(x === undefined ? {} : { x }),
         ...(y === undefined ? {} : { y }),
         ...(scale === undefined ? {} : { scale }),
       };
+      if (d.op === 'changeGraphic') {
+        return {
+          op: d.op,
+          clipId: id(d.clipId),
+          ...(kind === undefined ? {} : { kind }),
+          ...(d.text === undefined ? {} : { text: string(d.text, 120) }),
+          ...(d.startTime === undefined ? {} : { startTime: number(d.startTime) }),
+          ...(d.duration === undefined ? {} : { duration: number(d.duration, 0.5, 12) }),
+          ...sharedFields,
+        };
+      }
+      return {
+        op: d.op,
+        kind: kind!,
+        text: string(d.text, 120),
+        startTime: number(d.startTime),
+        duration: number(d.duration, 0.5, 12),
+        ...sharedFields,
+      };
     }
+    case 'removeGraphic':
+      return { op: d.op, clipId: id(d.clipId) };
     case 'addOverlay':return {op:d.op,assetId:id(d.assetId),trackId:id(d.trackId),startTime:number(d.startTime),duration:number(d.duration,.5,12),...(d.motion===undefined?{}:{motion:choice(d.motion,MOTION_PRESETS)})};
     case "addZoom":return {op:d.op,clipId:id(d.clipId),startTime:number(d.startTime),endTime:number(d.endTime),fromScale:number(d.fromScale,1,2),toScale:number(d.toScale,1,2),...(d.returnToStart===undefined?{}:{returnToStart:boolean(d.returnToStart)}),...(d.easing===undefined?{}:{easing:choice(d.easing,["linear","smooth"] as const)}),...(d.focusX===undefined?{}:{focusX:number(d.focusX,-.4,.4)}),...(d.focusY===undefined?{}:{focusY:number(d.focusY,-.4,.4)}),...(d.style===undefined?{}:{style:choice(d.style,["punch-in","smooth-push","snap-in","slow-pull-back"] as const)})};
     case "clearZooms":return {op:d.op,clipId:id(d.clipId)};
@@ -230,10 +269,23 @@ function decision(value: unknown): EditDecision {
       presetId: choice(d.presetId, ["hero", "bullet", "montage", "jump_cut", "flash_in", "flash_out", "standard"] as const),
       ...(d.preservePitch === undefined ? {} : { preservePitch: boolean(d.preservePitch) })
     };
-    case "addTransition": return { op: d.op, fromClipId: id(d.fromClipId), toClipId: id(d.toClipId), kind: choice(d.kind, ["fade", "dissolve", "slide", "zoom"]), duration: number(d.duration, 1 / 120, 5) };
+    case "addTransition": {
+      const resolved = resolveTransitionKind(d.kind);
+      const kind = resolved ?? choice(d.kind, TRANSITION_KINDS);
+      return {
+        op: d.op,
+        fromClipId: id(d.fromClipId),
+        toClipId: id(d.toClipId),
+        kind,
+        duration: number(d.duration, 1 / 120, 5),
+        ...(d.intensity === undefined ? {} : { intensity: number(d.intensity, 0.25, 2) }),
+        ...(d.easing === undefined ? {} : { easing: choice(d.easing, ["linear", "easeIn", "easeOut", "easeInOut", "expoOut", "snap"] as const) as TransitionEasing }),
+        ...(d.direction === undefined ? {} : { direction: choice(d.direction, ["auto", "left", "right", "up", "down"] as const) as TransitionDirection }),
+      };
+    }
     case "changeClipProperty": {
       const c = object(d.changes), changes: Extract<EditDecision, { op: "changeClipProperty" }>["changes"] = {};
-      if (Object.keys(c).some(key => !["transform", "effects", "volume", "speed", "preservePitch", "fadeIn", "fadeOut", "audioRole", "ducking", "surface", "speedCurveId"].includes(key)) || !Object.keys(c).length) throw new Error("Unsupported clip property.");
+      if (Object.keys(c).some(key => !["transform", "effects", "volume", "speed", "preservePitch", "fadeIn", "fadeOut", "audioRole", "ducking", "surface", "speedCurveId", "mediaAnimation", "kenBurns"].includes(key)) || !Object.keys(c).length) throw new Error("Unsupported clip property.");
       if(c.audioRole!==undefined)changes.audioRole=choice(c.audioRole,["speech","background","sfx"] as const);
       if(c.ducking!==undefined)changes.ducking=boolean(c.ducking);
       if(c.preservePitch!==undefined)changes.preservePitch=boolean(c.preservePitch);
@@ -245,6 +297,8 @@ function decision(value: unknown): EditDecision {
       if (c.fadeIn !== undefined) changes.fadeIn = number(c.fadeIn);
       if (c.fadeOut !== undefined) changes.fadeOut = number(c.fadeOut);
       if(c.surface!==undefined)changes.surface=readStyleSurface(c.surface);
+      if (c.mediaAnimation !== undefined) changes.mediaAnimation = readMediaAnimation(c.mediaAnimation);
+      if (c.kenBurns !== undefined) changes.kenBurns = choice(c.kenBurns, KEN_BURNS_MOTIONS);
       return { op: d.op, clipId: id(d.clipId), changes };
     }
     default: throw new Error("Unsupported AI editing operation.");
@@ -253,7 +307,7 @@ function decision(value: unknown): EditDecision {
 
 export function validateAiPlan(value: unknown, project: EditorProject): { summary: string; list: EditDecisionList } {
   const result = object(value);
-  const list: EditDecisionList = { version: 1, projectId: project.id, baseRevision: project.revision, decisions: array(result.decisions, 100).map(decision) };
+  const list: EditDecisionList = { version: 1, projectId: project.id, baseRevision: project.revision, decisions: array(result.decisions, 400).map(decision) };
   const cutIndex=list.decisions.findIndex(d=>d.op==="rippleCut");
   if(cutIndex>=0&&(cutIndex!==list.decisions.length-1||list.decisions.filter(d=>d.op==="rippleCut").length!==1))throw Error("Combine all cut ranges in one rippleCut operation and put it last, after clip-specific edits.");
   // A dry run rejects missing assets, locked tracks and incompatible transitions atomically.

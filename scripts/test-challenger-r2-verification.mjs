@@ -410,20 +410,22 @@ describe("R2 Empirical Challenge: B-Roll & Overlay Insertion", () => {
 });
 
 describe("R2 Empirical Challenge: Transitions Mapping & Adjacent Clip Validation", () => {
-  test("Transitions strictly map to TransitionKind: fade, dissolve, slide, zoom", () => {
+  const transitionsMod = load("app/lib/editor/transitions.ts");
+
+  test("Transitions strictly map to TRANSITION_KINDS (>= 30 CapCut transitions)", () => {
     const rawAssetDrawer = fs.readFileSync(path.resolve(root, "app/components/editor/AssetDrawer.tsx"), "utf8");
     const transitionMatches = [...rawAssetDrawer.matchAll(/kind:\s*"([a-zA-Z0-9_-]+)"\s+as\s+TransitionKind/g)].map(
       (m) => m[1]
     );
-
-    assert.deepStrictEqual(
-      new Set(transitionMatches),
-      new Set(["dissolve", "fade", "slide", "zoom"]),
-      "AssetDrawer transition buttons must strictly match TransitionKind"
-    );
+    assert.ok(rawAssetDrawer.includes("TRANSITION_CATALOG"), "AssetDrawer must expose full TRANSITION_CATALOG");
+    assert.ok(transitionsMod.TRANSITION_KINDS.length >= 30, "Must provide at least 30 CapCut transitions");
+    assert.ok(transitionMatches.length >= 4);
+    for (const kind of transitionMatches) {
+      assert.ok(transitionsMod.isTransitionKind(kind), `Quick transition ${kind} must be valid TransitionKind`);
+    }
   });
 
-  test("addTransition succeeds between adjacent visual clips for all 4 TransitionKind types", () => {
+  test("addTransition succeeds between adjacent visual clips for all TransitionKind types", () => {
     let p = model.createProject("transitions-test");
     const asset = {
       id: "asset-tr",
@@ -440,8 +442,7 @@ describe("R2 Empirical Challenge: Transitions Mapping & Adjacent Clip Validation
     p = operations.addClip(p, "asset-tr", "track-video", 8, { duration: 4 });
     const clipIds = Object.keys(p.clips);
 
-    const kinds = ["fade", "dissolve", "slide", "zoom"];
-    for (const kind of kinds) {
+    for (const kind of transitionsMod.TRANSITION_KINDS) {
       const next = operations.addTransition(p, clipIds[0], clipIds[1], kind, 0.5);
       const trId = `transition-${clipIds[0]}-${clipIds[1]}`;
       assert.ok(next.transitions[trId], `Transition ${kind} must be recorded`);

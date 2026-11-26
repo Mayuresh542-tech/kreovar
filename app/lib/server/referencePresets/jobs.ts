@@ -34,7 +34,7 @@ export async function createReferenceJob(store:ReferenceStore,owner:string,body:
  if(existing){if(existing.presetId!==presetId||existing.rawAssetId!==rawAssetId)throw Error('This job ID already belongs to another request.');await mirrorProject(existing);return existing;}
  const preset=(await store.get<ReferencePreset>(owner,'preset',presetId))?.value,raw=await getStudioAsset(owner,rawAssetId);
  if(!preset?.spec||preset.status!=='ready'||!preset.referenceInfo)throw Error('Analyze the reference once before using this preset.');
- if(!raw||raw.kind!=='video'||Number(raw.metadata.duration)<=0||Number(raw.metadata.duration)>60)throw Error('Choose a raw video with valid duration, up to 60 seconds.');
+ if(!raw||raw.kind!=='video'||Number(raw.metadata.duration)<=0||Number(raw.metadata.duration)>300)throw Error('Choose a raw video with valid duration, up to 300 seconds (5 minutes).');
  if(rawAssetId===preset.referenceAssetId)throw Error('Choose different raw footage from the selected reference.');
  let project=createProject(randomUUID(),(preset.name+' · '+raw.filename).slice(0,180));project.settings.aspectRatio=preset.referenceInfo.aspectRatio;project=addClip(addAsset(project,mediaView(raw)),raw.id,'track-video',0,{audioRole:'speech'});
  const job:ReferenceJob={id,ownerId:owner,presetId,presetVersion:preset.version,spec:structuredClone(preset.spec),referenceAssetId:preset.referenceAssetId,rawAssetId,projectId:project.id,status:'ready',cursor:0,stages:stagesForReference(preset.spec).map(id=>({id,status:'pending',attempts:0})),original:structuredClone(project),project,appliedKeys:[],tokenLimit:productionLimit(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};

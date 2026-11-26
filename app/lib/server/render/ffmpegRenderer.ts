@@ -53,11 +53,20 @@ async function downloadAsset(url: string, destPath: string, timeoutMs = 30000): 
   }
 }
 
+export function sanitizeAssText(text: string): string {
+  return String(text || "")
+    .replace(/[\r\n\u2028\u2029]+/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/\{/g, "\\{")
+    .replace(/\}/g, "\\}")
+    .slice(0, 500);
+}
+
 /**
  * Generates an Advanced Substation Alpha (ASS) file from the timeline captions track
  * matching Veelox presets (Clean, Bold, Highlight, Minimal, Creator).
  */
-function generateAssSubtitles(timeline: VeeloxTimelineProject): string {
+export function generateAssSubtitles(timeline: VeeloxTimelineProject): string {
   const { width, height } = timeline.resolution;
   const presetId = (timeline.settings?.captionPreset || "clean") as CaptionPresetId;
   const position = timeline.settings?.captionPosition || "center";
@@ -122,9 +131,9 @@ Format: Marked, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         const wStartStr = formatAssTime(activeWord.start);
         const wEndStr = formatAssTime(activeWord.end);
 
-        // Build text with active word highlighted
+        // Build text with active word highlighted (escaped against ASS override injection)
         const formattedWords = seg.words.map((w, idx) => {
-          const clean = w.word.toUpperCase();
+          const clean = sanitizeAssText(w.word.toUpperCase());
           if (idx === wIdx) {
             return `{\\c${highlightColor}\\fscx108\\fscy108}${clean}{\\c${primaryColor}\\fscx100\\fscy100}`;
           }
@@ -135,7 +144,7 @@ Format: Marked, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       }
     } else {
       // Standard segment dialogue line
-      const cleanText = item.source.toUpperCase();
+      const cleanText = sanitizeAssText(item.source.toUpperCase());
       ass += `Dialogue: 0,${startTimeStr},${endTimeStr},Main,,0,0,0,,${cleanText}\n`;
     }
   }

@@ -33,6 +33,7 @@ import {
   formatTime,
   projectDuration,
 } from "@/app/lib/editor/model";
+import { getTransitionSpec } from "@/app/lib/editor/transitions";
 import {
   addClip,
   addTrack,
@@ -44,9 +45,10 @@ import {
   splitClip,
   trimClip,
 } from "@/app/lib/editor/operations";
-import { usePlayback, useProject } from "@/app/lib/editor/store";
+import { PlaybackStore, usePlayback, useProject } from "@/app/lib/editor/store";
 import { pointerEdit } from "@/app/lib/editor/interaction";
 import { zoomAnchor } from "@/app/lib/editor/timelineNavigation";
+import { deleteOrRippleDeleteClips } from "@/app/lib/editor/shortcuts";
 import {
   extractAudioPeaks,
   sliceWaveformPeaks,
@@ -222,10 +224,37 @@ export interface TimelinePanelProps {
   height?: number;
 }
 
+const TimelinePlayheadTime = React.memo(function TimelinePlayheadTime({
+  playback,
+  fps,
+}: {
+  playback: PlaybackStore;
+  fps: number;
+}) {
+  const { time } = usePlayback(playback);
+  return <span className="text-slate-900 font-mono font-semibold">{formatTime(time, fps)}</span>;
+});
+
+const TimelinePlayheadScrubber = React.memo(function TimelinePlayheadScrubber({
+  playback,
+  pps,
+  height,
+  fps,
+  color,
+}: {
+  playback: PlaybackStore;
+  pps: number;
+  height: number;
+  fps: number;
+  color: string;
+}) {
+  const { time } = usePlayback(playback);
+  return <Scrubber time={time} pps={pps} height={height} fps={fps} showHandle={true} color={color} />;
+});
+
 export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
   const { store, playback, selection, select, run, notify, detectedSilences = [] } = useEditor();
   const project = useProject(store);
-  const { time, playing } = usePlayback(playback);
 
   const [pps, setPps] = useState(60); // Pixels per second
   const [snapping, setSnapping] = useState(true);
@@ -462,17 +491,24 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
       return;
     }
     run((p) => targets.reduce((next, id) => splitClip(next, id, curTime), p));
+    notify(`Split ${targets.length} clip(s) at playhead.`);
   };
 
   const handleDelete = () => {
     if (!selection.length) return;
-    run((p) => selection.reduce((next, id) => removeClip(next, id), p));
+    run((p) => deleteOrRippleDeleteClips(p, selection, { ripple: isMagnetEnabled }));
+    notify(
+      isMagnetEnabled
+        ? `Ripple deleted ${selection.length} clip(s).`
+        : `Deleted ${selection.length} clip(s).`
+    );
     select([]);
   };
 
   const handleDuplicate = () => {
     if (!selection.length) return;
     run((p) => selection.reduce((next, id) => duplicateClip(next, id), p));
+    notify(`Duplicated ${selection.length} clip(s).`);
   };
 
   // Drop asset from library onto track
@@ -507,9 +543,9 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
       {/* ========================================================================= */}
       {/* 1. TIMELINE TOOLBAR (CapCut Desktop Action Strip)                         */}
       {/* ========================================================================= */}
-      <header className="h-10 px-3 flex items-center justify-between border-b border-slate-200 bg-white text-xs flex-shrink-0 text-slate-800">
+      <header className="min-h-[40px] px-3 py-1 flex items-center justify-between gap-2 border-b border-slate-200 bg-white text-xs flex-shrink-0 text-slate-800 overflow-x-auto overflow-y-hidden scrollbar-none">
         {/* Left Action Strip: Split, Delete, Duplicate, Marker, Magnet, Snap */}
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <div className="flex items-center gap-1.5 font-semibold text-slate-900 mr-1.5">
             <span className="text-[12px] tracking-tight">Timeline</span>
             {selection.length > 0 && (
@@ -631,7 +667,7 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
         </div>
 
         {/* Right Action Strip: Timeline Zoom Slider & Fit to Screen (Shift+Z) */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-shrink-0">
           {/* Timeline Zoom Slider */}
           <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg">
             <button
@@ -680,19 +716,18 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
       {/* 2. TRACK HEADERS (MUTE, HIDE, LOCK) + TIMELINE LANES & WAVEFORMS         */}
       {/* ========================================================================= */}
       <div className="flex-1 flex min-h-0 relative overflow-hidden bg-slate-50/50">
-        {/* Fixed Left Track Headers Column (Width: 195px) */}
+        {/* Fixed Left Track Headers Column */}
         <div
-          ref={labelsRef}
-          className="w-[195px] flex-shrink-0 bg-white border-r border-slate-200 flex flex-col z-20 select-none overflow-hidden"
+          className="w-[172px] xl:w-[195px] flex-shrink-0 bg-white border-r border-slate-200 flex flex-col z-20 select-none overflow-hidden"
         >
-          {/* Header ruler title spacer */}
-          <div className="h-7 border-b border-slate-200 bg-slate-50 px-3 flex items-center justify-between text-[10px] font-mono tracking-wider text-slate-500">
+          {/* Header ruler title spacer (pinned above vertically scrolling track headers) */}
+          <div className="h-7 shrink-0 border-b border-slate-200 bg-slate-50 px-3 flex items-center justify-between text-[10px] font-mono tracking-wider text-slate-500">
             <span>TRACKS</span>
-            <span className="text-slate-900 font-mono font-semibold">{formatTime(time, project.settings.fps)}</span>
+            <TimelinePlayheadTime playback={playback} fps={project.settings.fps} />
           </div>
 
           {/* List of track headers with Mute, Hide, Lock */}
-          <div className="flex-1 flex flex-col divide-y divide-slate-100">
+          <div ref={labelsRef} className="flex-1 min-h-0 flex flex-col divide-y divide-slate-100 overflow-hidden">
             {orderedTrackIds.map((id) => {
               const track = project.tracks[id];
               if (!track) return null;
@@ -702,25 +737,28 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
               return (
                 <div
                   key={id}
-                  className="h-[56px] shrink-0 px-2.5 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
+                  className="h-[56px] shrink-0 px-2.5 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors gap-1"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
                     {/* Track Accent Chip */}
                     <div
-                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-medium ${style.chipBg} ${style.chipBorder} ${style.chipText}`}
+                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-medium min-w-0 ${style.chipBg} ${style.chipBorder} ${style.chipText}`}
                     >
-                      <Icon size={12} className="text-slate-500" />
-                      <span className="truncate max-w-[70px] text-slate-800 font-medium">{track.name || style.label}</span>
+                      <Icon size={12} className="text-slate-500 shrink-0" />
+                      <span className="truncate max-w-[66px] text-slate-800 font-medium">{track.name || style.label}</span>
                     </div>
                   </div>
 
                   {/* Track Controls: Hide, Mute, Lock */}
-                  <div className="flex items-center gap-1 text-slate-400">
+                  <div className="flex items-center gap-0.5 text-slate-400 shrink-0">
                     {/* Hide Track Toggle */}
                     <button
+                      type="button"
                       onClick={() =>
                         run((p) => changeTrack(p, id, { hidden: !track.hidden }))
                       }
+                      aria-label={track.hidden ? `Show ${track.name}` : `Hide ${track.name}`}
+                      aria-pressed={track.hidden}
                       title={track.hidden ? "Show Track" : "Hide Track"}
                       className={`p-1 rounded-md transition-colors cursor-pointer ${
                         track.hidden
@@ -733,9 +771,12 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
 
                     {/* Mute Track Toggle */}
                     <button
+                      type="button"
                       onClick={() =>
                         run((p) => changeTrack(p, id, { muted: !track.muted }))
                       }
+                      aria-label={track.muted ? `Unmute ${track.name}` : `Mute ${track.name}`}
+                      aria-pressed={track.muted}
                       title={track.muted ? "Unmute Track" : "Mute Track"}
                       className={`p-1 rounded-md transition-colors cursor-pointer ${
                         track.muted
@@ -748,9 +789,12 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
 
                     {/* Lock Track Toggle */}
                     <button
+                      type="button"
                       onClick={() =>
                         run((p) => changeTrack(p, id, { locked: !track.locked }))
                       }
+                      aria-label={track.locked ? `Unlock ${track.name}` : `Lock ${track.name}`}
+                      aria-pressed={track.locked}
                       title={track.locked ? "Unlock Track" : "Lock Track"}
                       className={`p-1 rounded-md transition-colors cursor-pointer ${
                         track.locked
@@ -962,18 +1006,45 @@ export default function TimelinePanel({ height = 300 }: TimelinePanelProps) {
                         </div>
                       );
                     })}
+
+                    {/* Transition Cut-Seam Pills */}
+                    {Object.values(project.transitions)
+                      .filter((tr) => project.clips[tr.toClipId]?.trackId === track.id)
+                      .map((tr) => {
+                        const toClip = project.clips[tr.toClipId];
+                        if (!toClip) return null;
+                        const spec = getTransitionSpec(tr.kind);
+                        const seamLeft = toClip.startTime * pps;
+                        return (
+                          <button
+                            key={tr.id}
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={() => {
+                              select([tr.toClipId]);
+                              playback.set(Math.max(0, toClip.startTime - 0.15), false);
+                            }}
+                            title={`${spec.name} (${tr.duration.toFixed(2)}s) — click to inspect transition`}
+                            style={{ left: `${seamLeft}px`, transform: "translate(-50%, -50%)" }}
+                            className="absolute top-1/2 z-40 px-1.5 py-0.5 rounded-full bg-slate-900 text-white border border-white/80 shadow-md hover:bg-sky-600 text-[9px] font-mono font-bold flex items-center gap-0.5 cursor-pointer whitespace-nowrap"
+                          >
+                            <span>✦</span>
+                            <span>{spec.name.split(" ")[0]}</span>
+                            <span className="opacity-75">{tr.duration.toFixed(1)}s</span>
+                          </button>
+                        );
+                      })}
                   </div>
                 );
               })}
             </div>
 
             {/* Signature CapCut Scrubber Playhead */}
-            <Scrubber
-              time={time}
+            <TimelinePlayheadScrubber
+              playback={playback}
               pps={pps}
               height={trackLanesHeight}
               fps={project.settings.fps}
-              showHandle={true}
               color="#0284c7"
             />
 

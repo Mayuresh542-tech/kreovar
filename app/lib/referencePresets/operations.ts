@@ -40,7 +40,7 @@ export function createReferenceCaptions(p:EditorProject,analysis:MediaAnalysis,s
 }
 export function animateReferenceCaptions(p:EditorProject,s:StyleSpec){const ids=Object.values(p.clips).filter(c=>c.contentId&&p.captions[c.contentId]).map(c=>c.id);return setCaptionMotion(p,ids,s.caption.motion,s.caption.highlightColor);}
 export function validateReferenceTimeline(p:EditorProject,s:StyleSpec){
- aiProjectSnapshot(p);const duration=projectDuration(p);if(duration<=0||duration>60.1)throw Error('The reference timeline duration is invalid.');
+ aiProjectSnapshot(p);const duration=projectDuration(p);if(duration<=0||duration>300.1)throw Error('The reference timeline duration is invalid.');
  const clips=Object.values(p.clips),visible=clips.filter(c=>!p.tracks[c.trackId].hidden&&c.transform.opacity>0);
  for(const c of clips){if(c.startTime<0||c.startTime+c.duration>duration+.001||c.assetId&&!p.assets[c.assetId]||c.assetId&&p.assets[c.assetId].kind!=='image'&&c.sourceEnd>p.assets[c.assetId].duration+.04)throw Error('An edited timeline element has invalid timing or media.');}
  if(s.caption.enabled&&!visible.some(c=>c.contentId&&p.captions[c.contentId]))throw Error('Reference captions are missing.');

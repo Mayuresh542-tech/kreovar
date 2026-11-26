@@ -86,8 +86,8 @@ test('AI assembles two originals and prepares whole-footage captions as one revi
 test('AI sequence validation preserves the original on invalid assets, duplicates, locked tracks and over-limit edits',()=>{
  const p=twoOriginals(),validation=load('app/lib/editor/aiValidation.ts');
  for(const assetIds of [['first','foreign'],['first','first'],[]])assert.throws(()=>validation.validateAiPlan({summary:'Join',decisions:[{op:'appendSequence',assetIds}]},p));
- p.tracks['track-video'].locked=true;assert.throws(()=>validation.validateAiPlan({summary:'Join',decisions:[{op:'appendSequence',assetIds:['first']}]},p));p.tracks['track-video'].locked=false;p.assets.first.duration=59;
- assert.throws(()=>validation.validateAiPlan({summary:'Join',decisions:[{op:'appendSequence',assetIds:['first','second']}]},p),/60/);assert.equal(Object.keys(p.clips).length,0);
+ p.tracks['track-video'].locked=true;assert.throws(()=>validation.validateAiPlan({summary:'Join',decisions:[{op:'appendSequence',assetIds:['first']}]},p));p.tracks['track-video'].locked=false;p.assets.first.duration=299;
+ assert.throws(()=>validation.validateAiPlan({summary:'Join',decisions:[{op:'appendSequence',assetIds:['first','second']}]},p),/300/);assert.equal(Object.keys(p.clips).length,0);
 });
 test('AI caption expansion rejects duplicate transcription, existing captions and excessive provider calls before preparation',()=>{
  let p=load('app/lib/editor/sequence.ts').appendSequence(twoOriginals(),['first','second']).project;const ids=tools.mainFootage(p).map(c=>c.id);

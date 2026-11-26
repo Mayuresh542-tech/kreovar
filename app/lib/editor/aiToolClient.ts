@@ -14,7 +14,7 @@ import {readMediaDuration} from "../media/metadata";
 export interface PreparedTool {asset:StudioAsset;media?:MediaAsset;decisions:EditDecision[];role:AssetRole;sourceLabel?:string;selection?:{candidateId:string;startTime:number;relevanceScore:number|null;reason:string}}
 async function checked(response:Response){if(!response.ok){const d=await response.json().catch(()=>({}));throw new Error(d.error||"This editing tool failed. Please retry.");}return response;}
 export async function prepareAiTool(request:AiToolRequest,project:EditorProject,resolve:(asset:MediaAsset)=>Promise<string>,signal:AbortSignal,usedStock=stockKeys(project),editingBudget?:{jobId:string}):Promise<PreparedTool>{
- if(request.type==="captions")signal=AbortSignal.any([signal,AbortSignal.timeout(120000)]);
+ if(request.type==="captions")signal=AbortSignal.any([signal,AbortSignal.timeout(180000)]);
  const headers=await assetHeaders();signal.throwIfAborted();const jsonHeaders={...headers,"Content-Type":"application/json"};let asset:StudioAsset,role:AssetRole="raw_footage",selection:PreparedTool["selection"],sourceLabel:string|undefined,stockKey:string|undefined;
  const send=(url:string,body:unknown)=>fetch(url,{method:"POST",headers:jsonHeaders,body:JSON.stringify(body),signal});
  if(request.type==="captions"){if(!("clipId"in request))throw new Error("Resolve the footage caption batch before preparation.");const clip=project.clips[request.clipId],original=project.assets[clip?.assetId||""];if(!clip||!original)throw new Error("The source clip is unavailable.");const form=new FormData();

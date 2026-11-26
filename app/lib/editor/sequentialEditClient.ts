@@ -1,5 +1,6 @@
 ﻿import {publicErrorMessage,publicServiceText} from '../serviceMessages';
 import {captureFootageEvidence} from './footageFramesClient';
+import {captureVideoFileForAi,type UploadedAiVideoFile} from './videoPerceptionClient';
 import {analysisFootage,type FootageFrame} from './footageContext';
 import {speechContext} from './speechContext';
 import {prepareAiTool} from './aiToolClient';
@@ -37,7 +38,15 @@ function canSkipSupportingStage(stage:EditStage,project:EditorProject,output?:St
 function persistentMedia(asset:MediaAsset):MediaAsset{return {...asset,url:asset.libraryId?'/api/assets/'+encodeURIComponent(asset.libraryId)+'/file':asset.url?.startsWith('blob:')?undefined:asset.url};}
 export async function runSequentialEdit(store:EditorStore,repository:MediaRepository,scope:string,initial:EditingJob,signal:AbortSignal,authToken?:string|null){
  let frames:FootageFrame[]|undefined,fallbackFrames:FootageFrame[]|undefined;
- const readFrames=async(project:EditorProject,selection:string[])=>{const evidence=await captureFootageEvidence(project,selection,a=>repository.resolve(a),signal);frames=evidence.footageFrames;fallbackFrames=evidence.fallbackFootageFrames;};
+ const videoCache=new Map<string,UploadedAiVideoFile|null>();
+ let videoFile:UploadedAiVideoFile|undefined;
+ const readFrames=async(project:EditorProject,selection:string[],token?:string|null)=>{
+  const evidencePromise=captureFootageEvidence(project,selection,a=>repository.resolve(a),signal);
+  const videoPromise=token?captureVideoFileForAi(project,selection,a=>repository.resolve(a),token,signal,videoCache).catch(()=>undefined):Promise.resolve(undefined);
+  const [evidence,uploadedVideo]=await Promise.all([evidencePromise,videoPromise]);
+  frames=evidence.footageFrames;fallbackFrames=evidence.fallbackFootageFrames;
+  if(uploadedVideo)videoFile=uploadedVideo;
+ };
  const persist=async(project:EditorProject,job:EditingJob)=>{
   if(store.interacting)throw Error('Finish your manual edit before continuing the AI job.');
   const current=store.getSnapshot();if(current.revision!==job.timelineRevision&&!(job.requiresNewJob&&project===current&&['failed','cancelled'].includes(job.status)))throw Error('Timeline changed during the AI job. Start a new edit.');
@@ -53,7 +62,7 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
  const plan=async(stage:EditStage,project:EditorProject,job:EditingJob,signal:AbortSignal)=>{
   const token=(await supabase.auth.getSession()).data.session?.access_token||authToken;
   if(!token)throw Error('Sign in to use AI editing.');
-  if(!frames)await readFrames(project,job.selection);
+  if(!frames)await readFrames(project,job.selection,token);
   const conversationHistory=(project.editingHistory||[]).filter(h=>h.status==='completed'&&!h.summary?.includes('stopped')).map(h=>({instructions:h.instructions,summary:h.summary}));
   let detectedSilences: Array<{ start: number; end: number; duration: number; source: 'acoustic' | 'transcript' | 'hybrid' }> | undefined;
   const cacheKey = `${project.id}:${project.revision}`;
@@ -85,7 +94,7 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
             minKeptGap: 0.15
           });
           if (scan.silentRanges && scan.silentRanges.length > 0) {
-            detectedSilences = scan.silentRanges.slice(0, 100).map(r => ({
+            detectedSilences = scan.silentRanges.slice(0, 300).map(r => ({
               start: r.start,
               end: r.end,
               duration: r.duration,
@@ -99,7 +108,7 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
       detectedSilences = undefined;
     }
   }
-  const response=await fetch('/api/editor/ai-edit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,'Idempotency-Key':job.id+':'+stage},body:JSON.stringify({instruction:stageInstruction(stage,job),pipelineStage:stage,editingJobId:job.id,project:aiProjectSnapshot(project),selectedClipIds:job.selection.filter(id=>!!project.clips[id]),footageFrames:frames,fallbackFootageFrames:fallbackFrames,conversationHistory,detectedSilences:detectedSilences?.length?detectedSilences:undefined}),signal:AbortSignal.any([signal,AbortSignal.timeout(85000)])});
+  const response=await fetch('/api/editor/ai-edit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token,'Idempotency-Key':job.id+':'+stage},body:JSON.stringify({instruction:stageInstruction(stage,job),pipelineStage:stage,editingJobId:job.id,project:aiProjectSnapshot(project),selectedClipIds:job.selection.filter(id=>!!project.clips[id]),footageFrames:frames,fallbackFootageFrames:fallbackFrames,videoFile,conversationHistory,detectedSilences:detectedSilences?.length?detectedSilences:undefined}),signal:AbortSignal.any([signal,AbortSignal.timeout(115000)])});
   const result=await response.json();if(!response.ok)throw Error(publicErrorMessage(result.error,'This AI stage could not be completed. Please retry.'));
   if(result.list?.projectId!==project.id||result.list?.baseRevision!==project.revision)throw Error('AI returned a stale stage plan.');
   const validated=validateAiPlan({summary:publicServiceText(result.summary),decisions:result.list.decisions},project),requests=validateAiTools(result.toolRequests,stage==='applyRequestedEdits'?buildStageProject(project,{summary:result.summary,decisions:validated.list.decisions}):project,result.catalog||[]);
@@ -124,7 +133,7 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
   switch(stage){
    case 'analyzeFootage':{
     const footage=analysisFootage(project,job.selection);if(!footage.length&&job.presetId)throw Error('Add original footage to the timeline first.');
-    if(!frames)await readFrames(project,job.selection);
+    if(!frames){const tok=(await supabase.auth.getSession()).data.session?.access_token||authToken;await readFrames(project,job.selection,tok);}
     const segments=speechContext(project);
     let viralHooks: Array<{ start: number; end: number; text: string; type: string; score: number; recommendation: string }> | undefined;
     try {
@@ -356,7 +365,7 @@ export async function runSequentialEdit(store:EditorStore,repository:MediaReposi
    }
    case 'applyRequestedEdits':{
     try {
-     let output=saved||await plan(stage,project,job,signal);
+     const output=saved||await plan(stage,project,job,signal);
      const constraints = extractEditingConstraints(job.instructions);
 
      // Zero-hallucination guardrail: Block arbitrary floating summary text

@@ -1,4 +1,5 @@
 import {addCaption} from './operations';
+import {MAX_VIDEO_SECONDS} from './limits';
 import type {EditorProject} from './model';
 import type {TimedCaption} from './captionTiming';
 export interface CaptionBatch {clipId:string;signature:string;captions:TimedCaption[]}
@@ -7,7 +8,7 @@ export function checkCaptionSources(p:EditorProject,ids:string[]){
  if(!ids.length||new Set(ids).size!==ids.length)throw new Error('Choose footage to transcribe.');
  if(!Object.values(p.tracks).some(t=>t.kind==='caption'&&!t.locked))throw new Error('Add or unlock a caption track first.');
  for(const id of ids){const c=p.clips[id],a=c?.assetId?p.assets[c.assetId]:undefined;if(!c||!a||a.kind==='image'||p.tracks[c.trackId].locked)throw new Error('Choose unlocked audio/video clips.');
-  if(c.startTime+c.duration>60+.000001)throw new Error('Caption generation supports a timeline up to 60 seconds.');
+  if(c.startTime+c.duration>MAX_VIDEO_SECONDS+.000001)throw new Error(`Caption generation supports a timeline up to ${MAX_VIDEO_SECONDS} seconds.`);
   if(Object.values(p.clips).some(cap=>cap.contentId&&p.captions[cap.contentId]&&cap.startTime<c.startTime+c.duration&&cap.startTime+cap.duration>c.startTime))throw new Error('Captions already overlap this footage. Remove the older caption clips before generating again.');
  }
 }

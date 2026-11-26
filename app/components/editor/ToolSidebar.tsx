@@ -14,6 +14,7 @@ import {
   Keyboard,
   PanelLeftClose,
   PanelLeftOpen,
+  Sparkles,
 } from "lucide-react";
 
 export type EditorToolTab =
@@ -21,6 +22,7 @@ export type EditorToolTab =
   | "audio"
   | "text"
   | "captions"
+  | "graphics"
   | "broll"
   | "transitions"
   | "filters"
@@ -75,6 +77,12 @@ const TOOLS: ToolItem[] = [
     description: "Caption Studio templates, kinetic text, and styles",
   },
   {
+    id: "graphics",
+    label: "Graphics",
+    icon: Sparkles,
+    description: "18 editable animated charts, lower-thirds, callouts & infographics",
+  },
+  {
     id: "broll",
     label: "B-Roll",
     icon: Clapperboard,
@@ -104,11 +112,14 @@ export default function ToolSidebar({
 }: ToolSidebarProps) {
   return (
     <aside
-      className="w-16 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col items-center justify-between py-3 select-none z-30 shadow-xs"
+      className="w-16 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col items-center justify-between pt-2.5 pb-2 select-none z-30 shadow-xs h-full min-h-0 overflow-hidden"
       aria-label="Primary Editor Tool Navigation"
     >
-      {/* Top Tools List */}
-      <nav className="flex flex-col items-center gap-1.5 w-full px-1.5" aria-label="Tool Tabs">
+      {/* Top Tools List (Scrollable on shorter laptop screens so lower buttons never clip) */}
+      <nav
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin flex flex-col items-center gap-1.5 w-full px-1.5 pb-2"
+        aria-label="Tool Tabs"
+      >
         {TOOLS.map((tool) => {
           const Icon = tool.icon;
           const isActive = isDrawerOpen && activeTab === tool.id;
@@ -120,7 +131,7 @@ export default function ToolSidebar({
               title={`${tool.label} — ${tool.description}`}
               aria-label={tool.label}
               aria-pressed={isActive}
-              className={`w-full h-11 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer ${
+              className={`w-full h-11 shrink-0 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer ${
                 isActive
                   ? "bg-sky-50 text-sky-700 font-bold border border-sky-200 shadow-2xs"
                   : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
@@ -152,7 +163,7 @@ export default function ToolSidebar({
           title="Inspector — Adjust selected clip properties"
           aria-label="Clip Inspector"
           aria-pressed={isDrawerOpen && activeTab === "inspector"}
-          className={`w-full h-11 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer mt-1 ${
+          className={`w-full h-11 shrink-0 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer mt-1 ${
             isDrawerOpen && activeTab === "inspector"
               ? "bg-sky-50 text-sky-700 font-bold border border-sky-200 shadow-2xs"
               : hasSelection
@@ -195,7 +206,7 @@ export default function ToolSidebar({
           title="Project Settings"
           aria-label="Project Settings"
           aria-pressed={isDrawerOpen && activeTab === "settings"}
-          className={`w-full h-10 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer ${
+          className={`w-full h-10 shrink-0 flex flex-col items-center justify-center rounded-xl transition-all relative group cursor-pointer ${
             isDrawerOpen && activeTab === "settings"
               ? "bg-sky-50 text-sky-700 font-bold border border-sky-200 shadow-2xs"
               : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
@@ -222,7 +233,7 @@ export default function ToolSidebar({
       </nav>
 
       {/* Bottom Actions: Drawer Toggle & Keyboard Shortcuts */}
-      <div className="flex flex-col items-center gap-2 w-full px-1.5 border-t border-slate-200 pt-3">
+      <div className="flex-shrink-0 flex flex-col items-center gap-1.5 w-full px-1.5 border-t border-slate-200 pt-2 bg-white">
         {/* Toggle Expand / Collapse Drawer */}
         <button
           onClick={onToggleDrawer}

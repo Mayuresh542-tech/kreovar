@@ -18,7 +18,7 @@ import { groupWordsIntoSegments, TTSWordTimestamp } from "@/app/lib/captions/pre
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 async function postHandler(req: NextRequest) {
  let usageUser:string|undefined,usageId:string|undefined,usageDone=false;
@@ -44,7 +44,7 @@ async function postHandler(req: NextRequest) {
     }
 
     if(Number(req.headers.get("content-length"))>101*1024*1024)return NextResponse.json({error:"Transcription supports files up to 100 MB."},{status:413});
-    const signal=AbortSignal.any([req.signal,AbortSignal.timeout(80000)]);
+    const signal=AbortSignal.any([req.signal,AbortSignal.timeout(120000)]);
     const contentType = req.headers.get("content-type") || "";
     let speechLanguage:string|undefined;
     let fileBuffer: Buffer | null = null;
@@ -102,7 +102,7 @@ async function postHandler(req: NextRequest) {
       );
     }
 
-    let seconds:number;try{seconds=await speechDuration(fileBuffer,signal);}catch{return NextResponse.json({error:"Audio duration could not be verified. Use a supported speech audio file up to four minutes."},{status:422});}
+    let seconds:number;try{seconds=await speechDuration(fileBuffer,signal);}catch{return NextResponse.json({error:"Audio duration could not be verified. Use a supported speech audio file up to five minutes."},{status:422});}
     usageUser=userId;usageId=(await reserveUsage(userId,{caption_seconds:seconds})).reservationId;
     let elevenData;
     if(local)elevenData=await transcribeLocally(fileBuffer,signal,speechLanguage);

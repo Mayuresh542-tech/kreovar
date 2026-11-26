@@ -96,7 +96,7 @@ function CaptionsContent(){
  }
  if(status!=="authed")return <AuthLoadingScreen label="Loading Captions Studio…"/>;
  return <StudioShell active="captions"><div className="space-y-5 pb-8">
-  <div><h1 className="text-2xl font-bold text-slate-900">Captions Studio</h1><p className="mt-1 text-sm text-slate-500">Videos up to 60 seconds.</p>{detectedLanguage&&<p className="mt-1 text-xs text-slate-500">Detected language: {detectedLanguage}</p>}</div>
+  <div><h1 className="text-2xl font-bold text-slate-900">Captions Studio</h1><p className="mt-1 text-sm text-slate-500">Videos up to 5 minutes (300 seconds).</p>{detectedLanguage&&<p className="mt-1 text-xs text-slate-500">Detected language: {detectedLanguage}</p>}</div>
   {error&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
   <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
    <div className="min-w-0 space-y-4">

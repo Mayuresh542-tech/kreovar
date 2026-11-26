@@ -3,7 +3,7 @@ import {MAX_VIDEO_SECONDS} from './limits';
 import type {EditorProject} from './model';
 export function editCaption(p:EditorProject,id:string,text:string,start:number,end:number):EditorProject{
  const c=p.clips[id];if(!c?.contentId||!p.captions[c.contentId])throw new Error('This caption is unavailable.');
- if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end>MAX_VIDEO_SECONDS||end-start<1/p.settings.fps-1e-7)throw new Error('Use a valid start and end within 60 seconds, at least one frame apart.');
+ if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end>MAX_VIDEO_SECONDS||end-start<1/p.settings.fps-1e-7)throw new Error(`Use a valid start and end within ${MAX_VIDEO_SECONDS} seconds, at least one frame apart.`);
  if(text.length>5000)throw new Error('Caption text is too long.');
  const next=changeText(p,id,text);
  if(start!==c.startTime||end!==c.startTime+c.duration){const layer=next.captions[c.contentId];next.captions={...next.captions,[c.contentId]:{...layer,words:undefined}};}

@@ -26,7 +26,7 @@
         {
           "title": "3. Plans, allowances and availability",
           "paragraphs": [
-            "Free and Pro include the features and monthly allowances displayed on our Pricing page and at checkout. Pro is currently offered at USD 9 per month or USD 90 per year, before any taxes or charges disclosed by checkout. Both billing cycles receive monthly allowances; unused allowances do not roll over. Active-project limits apply at any time. Exported videos are limited to 60 seconds. Image and video generation are excluded unless expressly offered in your plan.",
+            "Free and Pro include the features and monthly allowances displayed on our Pricing page and at checkout. Pro is currently offered at USD 9 per month or USD 90 per year, before any taxes or charges disclosed by checkout. Both billing cycles receive monthly allowances; unused allowances do not roll over. Active-project limits apply at any time. Exported videos are limited to 5 minutes (300 seconds). Image and video generation are excluded unless expressly offered in your plan.",
             "Provider rate limits, outages, browser capabilities and supported file formats can affect availability. Unlimited exports do not mean unlimited AI generation or guaranteed rendering speed. We may apply reasonable security and abuse controls. We will not retroactively reduce purchased allowances for the current paid term; material future changes will be notified before they take effect."
           ]
         },

@@ -52,7 +52,7 @@ export default function EditorAIChat({ onClose }: EditorAIChatProps = {}) {
 
   return (
     <aside
-      className="flex h-full w-[360px] flex-shrink-0 flex-col border-l border-slate-200 bg-white text-slate-800 select-none z-20 shadow-xs"
+      className="flex h-full w-[310px] xl:w-[360px] flex-shrink-0 flex-col border-l border-slate-200 bg-white text-slate-800 select-none z-20 shadow-xs"
       aria-label="Kreovar AI Editor"
     >
       {/* 1. Minimalist Header: Logo + Status Indicator + Close */}

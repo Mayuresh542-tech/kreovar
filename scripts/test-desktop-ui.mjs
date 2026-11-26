@@ -184,4 +184,59 @@ test("Task 11: Intermediate Project Hub is bypassed and opens editor directly", 
   assert.ok(!projectsPage.includes("Asset Files & Hub"), "Projects menu must not link to Asset Files & Hub");
 });
 
+test("Task 12: Preview Maximize button & reachable editor controls across all panels", () => {
+  const canvasStage = fs.readFileSync(path.join(ROOT, "app/components/editor/CanvasStage.tsx"), "utf-8");
+  const layoutTsx = fs.readFileSync(path.join(ROOT, "app/components/editor/EditorLayout.tsx"), "utf-8");
+  const toolSidebar = fs.readFileSync(path.join(ROOT, "app/components/editor/ToolSidebar.tsx"), "utf-8");
+  const timelinePanel = fs.readFileSync(path.join(ROOT, "app/components/editor/TimelinePanel.tsx"), "utf-8");
+  const mobileStage = fs.readFileSync(path.join(ROOT, "app/components/editor/mobile/MobileCanvasStage.tsx"), "utf-8");
+
+  // Preview Maximize & full-player Fullscreen controls must exist and be reachable
+  assert.ok(canvasStage.includes('data-testid="preview-maximize-btn"'), "CanvasStage must expose a dedicated Maximize Preview button in the stage header");
+  assert.ok(canvasStage.includes("toggleMaximizePreview"), "CanvasStage must toggle maximized theater preview");
+  assert.ok(canvasStage.includes("toggleBrowserFullscreen"), "CanvasStage must support fullscreen on the full preview section with transport controls");
+  assert.ok(!canvasStage.includes("overflow-x-hidden min-w-0 flex-wrap sm:flex-nowrap"), "Transport bar must wrap cleanly instead of clipping right-side buttons at narrow preview widths");
+
+  // ToolSidebar must scroll vertically on shorter laptop screens so bottom buttons remain reachable
+  assert.ok(toolSidebar.includes("overflow-y-auto"), "ToolSidebar nav must scroll vertically so bottom tools never clip on shorter screens");
+
+  // EditorLayout must wire Inspector collapse/expand & multi-clip / keyframe seek / caption sync handlers
+  assert.ok(layoutTsx.includes("isInspectorOpen"), "EditorLayout must support collapsing and expanding the Properties Inspector");
+  assert.ok(layoutTsx.includes("onUpdateMultipleClips={handleUpdateMultipleClips}"), "EditorLayout must wire batch multi-clip edits to Inspector");
+  assert.ok(layoutTsx.includes("onDeleteMultipleClips={handleDeleteMultipleClips}"), "EditorLayout must wire batch multi-clip deletion to Inspector");
+  assert.ok(layoutTsx.includes("onSeek="), "EditorLayout must wire keyframe seek handler to Inspector");
+  assert.ok(layoutTsx.includes("handleApplyStyleToAllCaptions"), "EditorLayout must wire Apply Style to All Captions to Inspector");
+
+  // Timeline toolbar & mobile fullscreen controls must remain reachable without overlap
+  assert.ok(timelinePanel.includes("overflow-x-auto overflow-y-hidden"), "TimelinePanel toolbar must allow scrolling on narrow desktop widths instead of clipping Zoom/Fit controls");
+  assert.ok(timelinePanel.includes("deleteOrRippleDeleteClips"), "TimelinePanel Delete button must honor Magnetic Ripple state");
+  assert.ok(mobileStage.includes("Exit Maximize"), "MobileCanvasStage must render non-overlapping Exit Maximize control when maximized");
+});
+
+test("Task 13: Canvas object movement through full-frame outline & clean AssetDrawer layout", () => {
+  const canvasStage = fs.readFileSync(path.join(ROOT, "app/components/editor/CanvasStage.tsx"), "utf-8");
+  const assetDrawer = fs.readFileSync(path.join(ROOT, "app/components/editor/AssetDrawer.tsx"), "utf-8");
+  const compositor = fs.readFileSync(path.join(ROOT, "app/lib/editor/compositor.ts"), "utf-8");
+
+  // Outline overlay must let user pick & move topmost motion graphic, caption, or text over selected video
+  assert.ok(canvasStage.includes("pickLayerAtPoint"), "CanvasStage must share topmost hit-test across canvas and selection outline");
+  assert.ok(canvasStage.includes("topmost && topmost.id !== selection[0]"), "Outline pointerdown must switch to topmost overlay under cursor");
+
+  // Studio caption bounds must align cleanly with transform coordinates
+  assert.ok(compositor.includes("dx*Math.cos(rad)-dy*Math.sin(rad)"), "Compositor must project Studio caption bounds accurately under rotation/scale");
+
+  // AssetDrawer search and category pills must not clip or overlap
+  assert.ok(!assetDrawer.includes('right-1.5 top-1/2 -translate-y-1/2 px-2 py-1 bg-cyan-600'), "B-Roll Search button must not overlap input text");
+  assert.ok(assetDrawer.includes("flex-wrap items-center gap-1.5"), "Category niche pills must wrap cleanly instead of showing clipped horizontal scrollbar");
+
+  // 18 Motion Graphics templates paired in UI & legacy GraphicControls panel removed
+  const toolSidebar = fs.readFileSync(path.join(ROOT, "app/components/editor/ToolSidebar.tsx"), "utf-8");
+  const inspector = fs.readFileSync(path.join(ROOT, "app/components/editor/EditorPropertiesInspector.tsx"), "utf-8");
+  assert.ok(toolSidebar.includes('"graphics"'), "ToolSidebar must include Graphics tab");
+  assert.ok(assetDrawer.includes("KREOVAR_MOTION_TEMPLATES"), "AssetDrawer must render Kreovar motion graphic templates");
+  assert.ok(!inspector.includes("GraphicControls"), "Legacy GraphicControls import must be removed from Inspector");
+});
+
+
+
 

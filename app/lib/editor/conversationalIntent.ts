@@ -169,11 +169,15 @@ export function extractConversationalIntent(
     ops.add("sfx");
   }
 
-  if (/\b(?:transitions?|crossfade|dissolve|fade|slide)\b/i.test(lower) || isCinematicStyle) {
+  if (
+    !constraints.disallowedTransitions &&
+    (/\b(?:transitions?|crossfade|dissolve|fade|slide|whip\s*pan|zoom\s*blur|pull\s*in|pull\s*out|glitch\s*(?:cut|transition|split)?|light\s*leak|film\s*burn|luma|s-?shake|camera\s*shake|iris|wipe|barn\s*door|blinds|clock\s*wipe|flash\s*(?:white|black|cut)|spin\s*(?:left|right|transition)|flip\s*(?:x|y|transition)|capcut\s*(?:transitions?|animations?)|rock\s*(?:vertically|horizontally)|swing\s*(?:top|bottom|left|right))\b/i.test(lower) ||
+      isCinematicStyle)
+  ) {
     ops.add("transitions");
   }
 
-  if (/\b(?:graphics?|callout|lower[-\s]?third|badge|stat|shape)\b/i.test(lower)) {
+  if (/\b(?:graphics?|motion\s+graphics?|infographics?|callout|lower[-\s]?third|badge|stat|progress\s*ring|bar\s*chart|line\s*chart|kpi|comparison|checklist|step\s*flow|timeline|chapter\s*card|poll|offer\s*tag|promo\s*tag|i?message\s+bubbles?|diagram|shape)\b/i.test(lower)) {
     ops.add("graphics");
   }
 

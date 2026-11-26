@@ -1,4 +1,5 @@
 import {readSpeechLanguage} from "../captions/speechLanguages";
+import {MAX_VIDEO_SECONDS} from "../editor/limits";
 import {normalizeHinglishWords,normalizeHinglishText} from "../editor/hinglishNormalizer";
 /** Server-side ASR adapter. No translation, key logging, or provider fallback. */
 export class SpeechProviderError extends Error {
@@ -30,7 +31,7 @@ export async function transcribeWithGroq(audio:Buffer,mime:string,key:string,sig
  const data=await response.json().catch(()=>null);signal.throwIfAborted();
  if(!data||!Array.isArray(data.words)||data.words.length>20000)throw new SpeechProviderError('Speech provider returned no usable word timing.',422);
  const words=data.words.map((w:{word?:unknown;start?:unknown;end?:unknown})=>{
-  if(typeof w.word!=='string'||!w.word.trim()||typeof w.start!=='number'||typeof w.end!=='number'||!Number.isFinite(w.start)||!Number.isFinite(w.end)||w.start<0||w.end<w.start||w.end>240.5)throw new SpeechProviderError('Speech provider returned invalid word timing. Please retry.',422);
+  if(typeof w.word!=='string'||!w.word.trim()||typeof w.start!=='number'||typeof w.end!=='number'||!Number.isFinite(w.start)||!Number.isFinite(w.end)||w.start<0||w.end<w.start||w.end>MAX_VIDEO_SECONDS+0.5)throw new SpeechProviderError('Speech provider returned invalid word timing. Please retry.',422);
   return {text:w.word.trim(),start:w.start,end:w.end,type:'word'};
  });
  // Whisper alignment can overlap across segment boundaries. Merge measured spans

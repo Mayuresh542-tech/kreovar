@@ -30,9 +30,9 @@ export const Scrubber = memo(function Scrubber({
 
   return (
     <div
-      className="absolute top-0 bottom-0 pointer-events-none z-40 transition-transform duration-75 will-change-transform"
+      className="absolute top-0 bottom-0 pointer-events-none z-40 will-change-transform"
       style={{
-        transform: `translateX(${left}px)`,
+        transform: `translate3d(${left}px, 0, 0)`,
         height: `${height}px`,
       }}
       aria-hidden="true"

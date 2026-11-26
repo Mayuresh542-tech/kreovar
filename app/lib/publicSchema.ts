@@ -8,7 +8,7 @@ const software={
  description:SITE_DESCRIPTION,applicationCategory:'MultimediaApplication',operatingSystem:'Web',
  browserRequirements:'A modern browser. Media preview and export depend on browser capabilities.',
  publisher:{'@id':SITE_URL+'/#organization'},isAccessibleForFree:true,
- featureList:['Manual multi-track video editing','AI-assisted editing in saved stages','Timed video captions and subtitle downloads','Text-to-speech voiceovers','B-roll and sound effects','Video exports up to 60 seconds'],
+ featureList:['Manual multi-track video editing','AI-assisted editing in saved stages','Timed video captions and subtitle downloads','Text-to-speech voiceovers','B-roll and sound effects','Video exports up to 5 minutes (300 seconds)'],
 };
 function graph(nodes:Record<string,unknown>[]){return {'@context':'https://schema.org','@graph':[...BRAND_SCHEMA['@graph'],software,...nodes]};}
 function webPage(path:string,name:string,description:string){return {'@type':'WebPage','@id':SITE_URL+path+'#webpage',url:SITE_URL+path,name,description,inLanguage:'en',isPartOf:{'@id':SITE_URL+'/#website'},about:{'@id':software['@id']},mainEntity:{'@id':software['@id']}};}

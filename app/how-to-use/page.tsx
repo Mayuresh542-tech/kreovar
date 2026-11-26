@@ -19,7 +19,7 @@ const guides = [
       "Arrange, trim or split clips. Add text, captions and audio as needed.",
       "For AI assistance, describe the desired change and what should stay unchanged. The editor plans, applies, validates and saves supported changes in stages.",
       "Review the saved timeline in the preview. Use Undo for applied edits, or continue manually. If a stage fails, retry resumes from the unfinished step.",
-      "Preview the full timeline and export. The final video must be 60 seconds or less.",
+      "Preview the full timeline and export. The final video must be 5 minutes (300 seconds) or less.",
     ],
   },
   {
@@ -27,7 +27,7 @@ const guides = [
     title: "Create and style captions",
     href: "/caption-generator",
     steps: [
-      "Open Caption Studio and select a video containing speech, up to 60 seconds and 100 MB.",
+      "Open Caption Studio and select a video containing speech, up to 5 minutes (300 seconds) and 100 MB.",
       "Generate captions, then correct transcript and timing errors.",
       "Choose a template and adjust position, size and words per line in the preview.",
       "Download SRT or TXT for text output, or export a video with captions baked in. SRT does not preserve visual styling.",

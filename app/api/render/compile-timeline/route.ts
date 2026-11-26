@@ -42,7 +42,7 @@ async function postHandler(req: NextRequest) {
       aspectRatio: body.aspectRatio || "9:16",
     });
 
-    try{assertVideoDuration(timeline.duration);}catch{return NextResponse.json({error:"Videos up to 60 seconds are supported. Use a shorter script or footage."},{status:400});}
+    try{assertVideoDuration(timeline.duration);}catch{return NextResponse.json({error:"Videos up to 300 seconds (5 minutes) are supported. Use a shorter script or footage."},{status:400});}
     return NextResponse.json({
       success: true,
       timeline,

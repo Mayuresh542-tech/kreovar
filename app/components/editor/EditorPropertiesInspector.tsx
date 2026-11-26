@@ -34,6 +34,7 @@ import {
   AspectRatio,
   TransitionType,
 } from "@/app/lib/timeline/types";
+import { TRANSITION_CATALOG, TRANSITION_CATEGORIES } from "@/app/lib/editor/transitions";
 import { CaptionPosition } from "@/app/lib/captions/presets";
 import { DEFAULT_CAPTION_TEMPLATES } from "@/app/lib/captions/templates";
 import {
@@ -47,13 +48,15 @@ import {
   decibelsToLinearGain,
   formatDecibels,
 } from "@/app/lib/editor/speedCurves";
-import GraphicControls from "./workspace/GraphicControls";
+import type { GraphicTheme, MotionGraphic } from "@/app/lib/editor/motionGraphics";
+import { PlaybackStore, usePlayback } from "@/app/lib/editor/store";
 
 interface EditorPropertiesInspectorProps {
   timeline: VeeloxTimelineProject;
   selectedClip: TimelineItem | null;
   selectedClipIds?: string[];
   currentTime?: number;
+  playback?: PlaybackStore;
   width?: number;
   onUpdateClip: (item: TimelineItem) => void;
   onUpdateMultipleClips?: (clipIds: string[], updates: Partial<TimelineItem>) => void;
@@ -81,17 +84,9 @@ const GOOGLE_FONTS = [
 
 const SPEED_PRESETS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4];
 
-const TRANSITION_PRESETS: Array<{ id: TransitionType; label: string }> = [
-  { id: "cut", label: "Cut" },
-  { id: "fade", label: "Fade" },
-  { id: "dissolve", label: "Dissolve" },
-  { id: "dip_black", label: "Dip Black" },
-  { id: "dip_white", label: "Dip White" },
-  { id: "zoom", label: "Zoom" },
-  { id: "slide", label: "Slide" },
-  { id: "push", label: "Push" },
-  { id: "wipe", label: "Wipe" },
-  { id: "blur", label: "Blur" },
+const TRANSITION_PRESETS: Array<{ id: TransitionType; label: string; category: string }> = [
+  { id: "cut", label: "None (Cut)", category: "basic" },
+  ...TRANSITION_CATALOG.map((t) => ({ id: t.id as TransitionType, label: t.name, category: t.category })),
 ];
 
 /**
@@ -161,7 +156,22 @@ function StepperBox({
   );
 }
 
-export default function EditorPropertiesInspector({
+function EditorPropertiesInspectorPlayback(
+  props: EditorPropertiesInspectorProps & { playback: PlaybackStore }
+) {
+  const { time } = usePlayback(props.playback);
+  return <EditorPropertiesInspectorInner {...props} currentTime={time} />;
+}
+
+export default function EditorPropertiesInspector(props: EditorPropertiesInspectorProps) {
+  if (props.playback && props.isOpen !== false && props.selectedClip) {
+    return <EditorPropertiesInspectorPlayback {...props} playback={props.playback} />;
+  }
+  const snapshotTime = props.currentTime ?? props.playback?.getSnapshot().time ?? 0;
+  return <EditorPropertiesInspectorInner {...props} currentTime={snapshotTime} />;
+}
+
+function EditorPropertiesInspectorInner({
   timeline,
   selectedClip,
   selectedClipIds = [],
@@ -443,8 +453,9 @@ export default function EditorPropertiesInspector({
                       }}
                     />
                     <KeyframeDiamond
-                      title="Fade in Keyframe"
-                      onClick={() => {}}
+                      title="Toggle Volume Keyframe at Playhead"
+                      active={hasKeyframeAtPlayhead("volume")}
+                      onClick={() => handleToggleKeyframeAtPlayhead("volume", volLinear)}
                     />
                   </div>
                 </div>
@@ -483,8 +494,9 @@ export default function EditorPropertiesInspector({
                       }}
                     />
                     <KeyframeDiamond
-                      title="Fade out Keyframe"
-                      onClick={() => {}}
+                      title="Toggle Volume Keyframe at Playhead"
+                      active={hasKeyframeAtPlayhead("volume")}
+                      onClick={() => handleToggleKeyframeAtPlayhead("volume", volLinear)}
                     />
                   </div>
                 </div>
@@ -925,11 +937,11 @@ export default function EditorPropertiesInspector({
         </div>
 
         {/* CapCut Inspector Top Tabs (Image 5 Parity: Video | Audio | Speed | Animation | Adjust) - Always Visible */}
-        <div className="flex items-center px-2 gap-1 border-t border-slate-100 bg-slate-50/60 text-xs">
+        <div className="flex items-center px-1.5 gap-0.5 border-t border-slate-100 bg-slate-50/60 text-xs overflow-x-auto scrollbar-none">
           <button
             type="button"
             onClick={() => setActiveInspectorTab("video")}
-            className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+            className={`py-2 px-2 shrink-0 font-medium border-b-2 transition-colors cursor-pointer ${
               activeInspectorTab === "video"
                 ? "border-sky-500 text-sky-600 font-bold bg-white"
                 : "border-transparent text-slate-500 hover:text-slate-900"
@@ -940,7 +952,7 @@ export default function EditorPropertiesInspector({
           <button
             type="button"
             onClick={() => setActiveInspectorTab("audio")}
-            className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+            className={`py-2 px-2 shrink-0 font-medium border-b-2 transition-colors cursor-pointer ${
               activeInspectorTab === "audio"
                 ? "border-sky-500 text-sky-600 font-bold bg-white"
                 : "border-transparent text-slate-500 hover:text-slate-900"
@@ -951,7 +963,7 @@ export default function EditorPropertiesInspector({
           <button
             type="button"
             onClick={() => setActiveInspectorTab("speed")}
-            className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+            className={`py-2 px-2 shrink-0 font-medium border-b-2 transition-colors cursor-pointer ${
               activeInspectorTab === "speed"
                 ? "border-sky-500 text-sky-600 font-bold bg-white"
                 : "border-transparent text-slate-500 hover:text-slate-900"
@@ -962,7 +974,7 @@ export default function EditorPropertiesInspector({
           <button
             type="button"
             onClick={() => setActiveInspectorTab("animation")}
-            className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+            className={`py-2 px-2 shrink-0 font-medium border-b-2 transition-colors cursor-pointer ${
               activeInspectorTab === "animation"
                 ? "border-sky-500 text-sky-600 font-bold bg-white"
                 : "border-transparent text-slate-500 hover:text-slate-900"
@@ -973,7 +985,7 @@ export default function EditorPropertiesInspector({
           <button
             type="button"
             onClick={() => setActiveInspectorTab("adjust")}
-            className={`py-2 px-2.5 font-medium border-b-2 transition-colors cursor-pointer ${
+            className={`py-2 px-2 shrink-0 font-medium border-b-2 transition-colors cursor-pointer ${
               activeInspectorTab === "adjust"
                 ? "border-sky-500 text-sky-600 font-bold bg-white"
                 : "border-transparent text-slate-500 hover:text-slate-900"
@@ -1111,10 +1123,10 @@ export default function EditorPropertiesInspector({
                 </button>
               </div>
 
-              {/* Numeric Position X & Y */}
+              {/* Numeric Position X & Y (%) */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[11px] text-slate-600 font-mono">Position (px)</label>
+                  <label className="text-[11px] text-slate-600 font-mono">Position (%)</label>
                   <button
                     type="button"
                     onClick={() => handleToggleKeyframeAtPlayhead("position", 0)}
@@ -1580,26 +1592,70 @@ export default function EditorPropertiesInspector({
 
       {/* SUB-TAB 4: ANIMATION (Transitions) */}
       {activeInspectorTab === "animation" && (
-        <div className="space-y-2">
-          <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
-            Clip Transition
-          </span>
-          <div className="grid grid-cols-2 gap-1.5">
-            {TRANSITION_PRESETS.map((t) => {
-              const isCurrent = (targetClip.transition || "cut") === t.id;
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">
+              CapCut Cut Transitions ({TRANSITION_CATALOG.length})
+            </span>
+            {targetClip.transition && targetClip.transition !== "cut" && (
+              <button
+                type="button"
+                onClick={() => onUpdateClip({ ...targetClip, transition: "cut" })}
+                className="text-[10px] font-medium text-rose-600 hover:underline cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {targetClip.transition && targetClip.transition !== "cut" && (
+            <div className="space-y-1 p-2 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="flex justify-between text-[10px] font-mono text-slate-700">
+                <span>Transition Duration</span>
+                <span className="font-bold">{(targetClip.transitionDuration ?? 0.45).toFixed(2)}s</span>
+              </div>
+              <input
+                type="range"
+                min="0.1"
+                max={Math.min(2, targetClip.duration).toFixed(2)}
+                step="0.05"
+                value={targetClip.transitionDuration ?? 0.45}
+                onChange={(e) =>
+                  onUpdateClip({
+                    ...targetClip,
+                    transitionDuration: parseFloat(e.target.value),
+                  })
+                }
+                className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
+              />
+            </div>
+          )}
+          <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+            {TRANSITION_CATEGORIES.map((cat) => {
+              const items = TRANSITION_PRESETS.filter((t) => t.id === "cut" ? cat.id === "basic" : t.category === cat.id);
+              if (!items.length) return null;
               return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => onUpdateClip({ ...targetClip, transition: t.id })}
-                  className={`py-1.5 px-2 rounded-lg text-left text-[11px] font-medium transition-colors cursor-pointer border ${
-                    isCurrent
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "bg-white border-slate-200 hover:border-slate-300 text-slate-800"
-                  }`}
-                >
-                  {t.label}
-                </button>
+                <div key={cat.id} className="space-y-1">
+                  <div className="text-[9px] font-mono uppercase font-bold text-slate-400">{cat.label}</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {items.map((t) => {
+                      const isCurrent = (targetClip.transition || "cut") === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => onUpdateClip({ ...targetClip, transition: t.id })}
+                          className={`py-1.5 px-2 rounded-lg text-left text-[11px] font-medium transition-colors cursor-pointer border truncate ${
+                            isCurrent
+                              ? "bg-slate-900 text-white border-slate-900"
+                              : "bg-white border-slate-200 hover:border-slate-300 text-slate-800"
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -1689,11 +1745,293 @@ export default function EditorPropertiesInspector({
         )}
 
         {/* ========================================================= */}
-        {/* CASE B: TEXT LAYER INSPECTOR                             */}
+        {/* CASE B: TEXT & MOTION GRAPHICS LAYER INSPECTOR            */}
         {/* ========================================================= */}
         {inspectorType === "text" && selectedClip && (
           <>
-            <GraphicControls clipId={selectedClip.id} />
+            {(selectedClip as any).graphic && (() => {
+              const g = (selectedClip as any).graphic as MotionGraphic;
+              const patchGraphic = (patch: Partial<MotionGraphic> | null) => {
+                onUpdateClip({
+                  ...selectedClip,
+                  graphic: patch === null ? null : { ...g, ...patch },
+                } as any);
+              };
+              const themes: Array<{ id: GraphicTheme; label: string }> = [
+                { id: "clean-light", label: "Light" },
+                { id: "frosted-glass", label: "Glass" },
+                { id: "editorial-paper", label: "Paper" },
+                { id: "dark-slate", label: "Dark" },
+              ];
+              const accents = ["#0284c7", "#7c3aed", "#059669", "#e11d48", "#f59e0b", "#0f172a"];
+
+              return (
+                <div className="space-y-3 rounded-xl border border-sky-200/80 bg-sky-50/40 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-sky-700 uppercase font-bold tracking-wider">
+                      <Sparkles size={12} />
+                      {g.kind === "custom" ? "Custom AI Graphic" : g.kind}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => patchGraphic(null)}
+                      title="Convert to plain text (detach motion graphic card)"
+                      className="text-[10px] font-semibold text-rose-600 hover:underline cursor-pointer"
+                    >
+                      Remove Graphic
+                    </button>
+                  </div>
+
+                  {/* Surface Theme Swatches */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono text-slate-500 uppercase font-semibold">
+                      Surface Theme
+                    </span>
+                    <div className="grid grid-cols-4 gap-1">
+                      {themes.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => patchGraphic({ theme: t.id })}
+                          className={`py-1 px-1.5 rounded-md border text-[10px] font-semibold cursor-pointer transition-colors ${
+                            (g.theme ?? "clean-light") === t.id
+                              ? "bg-slate-900 text-white border-slate-900"
+                              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Accent Swatches */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono text-slate-500 uppercase font-semibold">
+                      Accent
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {accents.map((col) => (
+                        <button
+                          key={col}
+                          type="button"
+                          onClick={() => patchGraphic({ accent: col })}
+                          aria-label={`Set accent color ${col}`}
+                          className={`w-4 h-4 rounded-full border cursor-pointer ${
+                            g.accent.toLowerCase() === col.toLowerCase()
+                              ? "ring-2 ring-sky-500 ring-offset-1 border-white"
+                              : "border-slate-300"
+                          }`}
+                          style={{ backgroundColor: col }}
+                        />
+                      ))}
+                      <input
+                        type="color"
+                        aria-label="Custom graphic accent"
+                        value={g.accent}
+                        onChange={(e) => patchGraphic({ accent: e.target.value })}
+                        className="w-5 h-5 rounded cursor-pointer border border-slate-200 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Editable Subtitle */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono text-slate-500 uppercase font-semibold">
+                      Subtitle / Attribution
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={120}
+                      value={g.subtitle ?? ""}
+                      placeholder="Optional supporting line..."
+                      onChange={(e) => patchGraphic({ subtitle: e.target.value })}
+                      className="w-full p-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+
+                  {/* Numeric Prefix / Value / Suffix */}
+                  {(g.value !== undefined ||
+                    ["stat-counter", "progress-ring", "line-chart", "offer-tag", "stat"].includes(g.kind)) && (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <label className="space-y-0.5">
+                        <span className="text-[10px] text-slate-500">Prefix</span>
+                        <input
+                          type="text"
+                          maxLength={12}
+                          value={g.prefix ?? ""}
+                          onChange={(e) => patchGraphic({ prefix: e.target.value })}
+                          className="w-full p-1.5 rounded-md border border-slate-200 bg-white text-xs text-slate-800"
+                        />
+                      </label>
+                      <label className="space-y-0.5">
+                        <span className="text-[10px] text-slate-500">Value</span>
+                        <input
+                          type="number"
+                          value={g.value ?? 0}
+                          onChange={(e) => {
+                            const v = e.target.valueAsNumber;
+                            if (Number.isFinite(v)) patchGraphic({ value: v });
+                          }}
+                          className="w-full p-1.5 rounded-md border border-slate-200 bg-white text-xs font-mono font-semibold text-slate-800"
+                        />
+                      </label>
+                      <label className="space-y-0.5">
+                        <span className="text-[10px] text-slate-500">Suffix</span>
+                        <input
+                          type="text"
+                          maxLength={16}
+                          value={g.suffix ?? ""}
+                          onChange={(e) => patchGraphic({ suffix: e.target.value })}
+                          className="w-full p-1.5 rounded-md border border-slate-200 bg-white text-xs text-slate-800"
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Editable Checklist / Step-Flow / Timeline Items */}
+                  {Array.isArray(g.items) && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono text-slate-500 uppercase font-semibold">
+                          Items ({g.items.length})
+                        </span>
+                        {g.items.length < 6 && (
+                          <button
+                            type="button"
+                            onClick={() => patchGraphic({ items: [...g.items!, `Step ${g.items!.length + 1}`] })}
+                            className="text-[10px] font-semibold text-sky-600 hover:underline cursor-pointer"
+                          >
+                            + Add item
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {g.items.map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              maxLength={80}
+                              value={item}
+                              onChange={(e) => {
+                                const next = [...g.items!];
+                                next[idx] = e.target.value || "Item";
+                                patchGraphic({ items: next });
+                              }}
+                              className="flex-1 min-w-0 p-1 rounded border border-slate-200 bg-white text-[11px] text-slate-800"
+                            />
+                            {g.items!.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  patchGraphic({ items: g.items!.filter((_, i) => i !== idx) })
+                                }
+                                aria-label="Remove item"
+                                className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Editable Chart Bars / Poll Options / KPI Grid */}
+                  {Array.isArray(g.bars) && (
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-mono text-slate-500 uppercase font-semibold">
+                        Data Rows
+                      </span>
+                      <div className="space-y-1">
+                        {g.bars.map((bar, idx) => (
+                          <div key={idx} className="grid grid-cols-5 gap-1">
+                            <input
+                              type="text"
+                              maxLength={40}
+                              value={bar.label}
+                              onChange={(e) => {
+                                const next = [...g.bars!];
+                                next[idx] = { ...next[idx], label: e.target.value || "Metric" };
+                                patchGraphic({ bars: next });
+                              }}
+                              className="col-span-3 p-1 rounded border border-slate-200 bg-white text-[11px] text-slate-800"
+                            />
+                            <input
+                              type="number"
+                              value={bar.value}
+                              onChange={(e) => {
+                                const val = e.target.valueAsNumber;
+                                if (!Number.isFinite(val)) return;
+                                const next = [...g.bars!];
+                                next[idx] = { ...next[idx], value: Math.max(0, val), displayValue: undefined };
+                                patchGraphic({ bars: next });
+                              }}
+                              className="col-span-2 p-1 rounded border border-slate-200 bg-white text-[11px] font-mono text-slate-800"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Editable Comparison Split */}
+                  {g.comparison && (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <input
+                        type="text"
+                        value={g.comparison.leftTitle}
+                        onChange={(e) =>
+                          patchGraphic({
+                            comparison: { ...g.comparison!, leftTitle: e.target.value || "Before" },
+                          })
+                        }
+                        className="p-1 rounded border border-slate-200 bg-white text-[11px]"
+                        placeholder="Left title"
+                      />
+                      <input
+                        type="text"
+                        value={g.comparison.rightTitle}
+                        onChange={(e) =>
+                          patchGraphic({
+                            comparison: { ...g.comparison!, rightTitle: e.target.value || "After" },
+                          })
+                        }
+                        className="p-1 rounded border border-slate-200 bg-white text-[11px]"
+                        placeholder="Right title"
+                      />
+                      <input
+                        type="text"
+                        value={g.comparison.leftValue}
+                        onChange={(e) =>
+                          patchGraphic({
+                            comparison: { ...g.comparison!, leftValue: e.target.value || "-" },
+                          })
+                        }
+                        className="p-1 rounded border border-slate-200 bg-white text-[11px] font-semibold"
+                        placeholder="Left value"
+                      />
+                      <input
+                        type="text"
+                        value={g.comparison.rightValue}
+                        onChange={(e) =>
+                          patchGraphic({
+                            comparison: { ...g.comparison!, rightValue: e.target.value || "-" },
+                          })
+                        }
+                        className="p-1 rounded border border-slate-200 bg-white text-[11px] font-semibold"
+                        placeholder="Right value"
+                      />
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-sky-700/80">
+                    Tip: Drag the graphic directly on the video preview to move it.
+                  </p>
+                </div>
+              );
+            })()}
             {/* Text Content */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider">

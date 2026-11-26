@@ -1,5 +1,5 @@
 import type {Clip,EditorProject} from './model';
-import {readVisualMask,applyVisualMask,type VisualMask} from './visualMasks';
+import {readVisualMask,drawMaskedMedia,type VisualMask} from './visualMasks';
 import {drawChromaticMedia,type RgbOffset} from './chromatic';
 
 export interface MediaCard {width:number;height?:number;radius?:number;shadow?:number;fit?:'cover'|'contain';background?:string}
@@ -11,7 +11,7 @@ export interface VisualEdge extends VisualEffect {sourceDuration:number;sourceTi
 export interface VisualTreatment {card?:MediaCard;mask?:VisualMask;effects?:VisualEffectRange[];entrance?:VisualEdge;exit?:VisualEdge}
 const clamp=(v:number,min:number,max:number)=>Math.max(min,Math.min(max,v));
 const smooth=(v:number)=>{const p=clamp(v,0,1);return p*p*(3-2*p);};
-function record(value:unknown){if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Invalid visual treatment.');return value as Record<string,unknown>;}
+function record(value:unknown){if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Invalid visual treatment.');if(['__proto__','prototype','constructor'].some(k=>Object.prototype.hasOwnProperty.call(value,k)))throw Error('Unsupported visual treatment property.');return value as Record<string,unknown>;}
 function fields(raw:Record<string,unknown>,allowed:readonly string[]){if(Object.keys(raw).some(k=>!allowed.includes(k)))throw Error('Unsupported visual treatment field.');}
 function number(value:unknown,min:number,max:number){if(typeof value!=='number'||!Number.isFinite(value)||value<min||value>max)throw Error('Visual treatment number is outside its supported range.');return value;}
 const effectFields=['blur','scale','opacity','rgbOffset'];
@@ -65,18 +65,20 @@ function rounded(ctx:CanvasRenderingContext2D,x:number,y:number,width:number,hei
 /** Draws actual source media. Preview and offline MP4 export use this same canvas operation and source clock. */
 export function drawVisualMedia(ctx:CanvasRenderingContext2D,image:CanvasImageSource,sourceWidth:number,sourceHeight:number,width:number,height:number,treatment?:VisualTreatment,sourceTime=0,rgbOffset?:RgbOffset){
  const card=treatment?.card,unit=Math.min(width,height)/720;
- const draw=(x:number,y:number,w:number,h:number)=>{if(rgbOffset)drawChromaticMedia(ctx,image,x,y,w,h,{x:rgbOffset.x*unit,y:rgbOffset.y*unit});else ctx.drawImage(image,x,y,w,h);};
+ const draw=(targetCtx:CanvasRenderingContext2D,x:number,y:number,w:number,h:number)=>{if(rgbOffset)drawChromaticMedia(targetCtx,image,x,y,w,h,{x:rgbOffset.x*unit,y:rgbOffset.y*unit});else targetCtx.drawImage(image,x,y,w,h);};
  if(!card){
   const ratio=Math.min(width/sourceWidth,height/sourceHeight),w=sourceWidth*ratio,h=sourceHeight*ratio;
-  if(treatment?.mask){ctx.save();applyVisualMask(ctx,treatment.mask,w,h,sourceTime);draw(-w/2,-h/2,w,h);ctx.restore();}else draw(-w/2,-h/2,w,h);
+  if(treatment?.mask){drawMaskedMedia(ctx,treatment.mask,w,h,sourceTime,(targetCtx)=>draw(targetCtx,-w/2,-h/2,w,h));}else draw(ctx,-w/2,-h/2,w,h);
   return {width:w,height:h};
  }
  const w=width*card.width,h=card.height?height*card.height:Math.min(height*.85,w*sourceHeight/sourceWidth),radius=(card.radius??12)*unit,shadow=(card.shadow??0)*unit;
- if(treatment?.mask){ctx.save();applyVisualMask(ctx,treatment.mask,w,h,sourceTime);}
- ctx.save();ctx.fillStyle=card.background||'#10151b';ctx.shadowColor='rgba(0,0,0,.4)';ctx.shadowBlur=shadow;ctx.shadowOffsetY=shadow*.3;rounded(ctx,-w/2,-h/2,w,h,radius);ctx.fill();ctx.restore();
- ctx.save();rounded(ctx,-w/2,-h/2,w,h,radius);ctx.clip();ctx.fillStyle=card.background||'#10151b';ctx.fillRect(-w/2,-h/2,w,h);
- const ratio=(card.fit||'cover')==='cover'?Math.max(w/sourceWidth,h/sourceHeight):Math.min(w/sourceWidth,h/sourceHeight),drawWidth=sourceWidth*ratio,drawHeight=sourceHeight*ratio;draw(-drawWidth/2,-drawHeight/2,drawWidth,drawHeight);ctx.restore();
- if(treatment?.mask)ctx.restore();return {width:w,height:h};
+ const renderCard=(targetCtx:CanvasRenderingContext2D)=>{
+  targetCtx.save();targetCtx.fillStyle=card.background||'#10151b';targetCtx.shadowColor='rgba(0,0,0,.4)';targetCtx.shadowBlur=shadow;targetCtx.shadowOffsetY=shadow*.3;rounded(targetCtx,-w/2,-h/2,w,h,radius);targetCtx.fill();targetCtx.restore();
+  targetCtx.save();rounded(targetCtx,-w/2,-h/2,w,h,radius);targetCtx.clip();targetCtx.fillStyle=card.background||'#10151b';targetCtx.fillRect(-w/2,-h/2,w,h);
+  const ratio=(card.fit||'cover')==='cover'?Math.max(w/sourceWidth,h/sourceHeight):Math.min(w/sourceWidth,h/sourceHeight),drawWidth=sourceWidth*ratio,drawHeight=sourceHeight*ratio;draw(targetCtx,-drawWidth/2,-drawHeight/2,drawWidth,drawHeight);targetCtx.restore();
+ };
+ if(treatment?.mask){drawMaskedMedia(ctx,treatment.mask,w,h,sourceTime,renderCard);}else renderCard(ctx);
+ return {width:w,height:h};
 }
 
 /** Source-authored curves may extend beyond a trimmed/split visible interval, but never beyond the original video. */

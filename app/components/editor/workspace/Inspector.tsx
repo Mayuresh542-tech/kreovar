@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import MediaAnimationControls from "./MediaAnimationControls";
+import MaskControls from "./MaskControls";
 import ShapeControls from "./ShapeControls";
 import { STYLE_SURFACES, type StyleSurface } from "@/app/lib/editor/styleSurface";
 import KeyframeControls from "./KeyframeControls";
@@ -52,12 +53,21 @@ import {
   splitClip,
   duplicateClip,
   removeClip,
+  removeTransition,
+  updateTransition,
   frameClip,
   addAsset,
   replaceClipAsset,
   resetClipTransform,
   changeCaptionProperty,
 } from "@/app/lib/editor/operations";
+import {
+  TRANSITION_CATALOG,
+  TRANSITION_CATEGORIES,
+  getTransitionSpec,
+  type TransitionDirection,
+  type TransitionEasing,
+} from "@/app/lib/editor/transitions";
 import {
   SPEED_CURVE_PRESETS,
   getSpeedCurvePreset,
@@ -845,6 +855,9 @@ export default function Inspector() {
 
                   {/* Vector Shape Controls */}
                   {c.shape && <ShapeControls clipId={c.id} />}
+
+                  {/* Clip Masking, Feather, Opacity & Keyframes */}
+                  <MaskControls clipId={c.id} theme="dark" />
 
                   {/* Embedded CapCut Keyframe Controls Section */}
                   <KeyframeControls clipId={c.id} />
@@ -1765,39 +1778,129 @@ export default function Inspector() {
 
               {/* Transition Info */}
               {transition && (
-                <div className="capcut-card">
+                <div className="capcut-card space-y-2">
                   <div className="capcut-card-heading">
-                    <span>Transition · {transition.kind}</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        run((project) => {
-                          const transitions = { ...project.transitions };
-                          delete transitions[transition.id];
-                          return { ...project, transitions };
-                        })
+                    <span>Transition · {getTransitionSpec(transition.kind).name}</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          playback.set(Math.max(0, c.startTime - 0.5), true)
+                        }
+                        title="Preview across cut seam"
+                        className="px-1.5 py-0.5 rounded bg-[#18181C] border border-[#2E2E33] text-[10px] text-[#00E5FF] hover:bg-[#2A2A30]"
+                      >
+                        <Play size={10} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          run((project) => removeTransition(project, transition.id))
+                        }
+                        className="text-[#A0A0A8] hover:text-red-400 p-1"
+                        title="Remove transition"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-[#A0A0A8] mb-1">Preset Style</label>
+                    <select
+                      aria-label="Transition preset"
+                      value={transition.kind}
+                      onChange={(e) =>
+                        run((project) =>
+                          updateTransition(project, transition.id, {
+                            kind: e.target.value as typeof transition.kind,
+                          })
+                        )
                       }
-                      className="text-[#A0A0A8] hover:text-red-400 p-1"
+                      className="capcut-input w-full"
                     >
-                      <Trash2 size={12} />
-                    </button>
+                      {TRANSITION_CATEGORIES.map((cat) => (
+                        <optgroup key={cat.id} label={cat.label}>
+                          {TRANSITION_CATALOG.filter((item) => item.category === cat.id).map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
                   </div>
                   <NumberField
                     label="Duration (s)"
                     value={transition.duration}
                     min={1 / fps}
-                    max={c.duration}
-                    edit={(v) => (project) => ({
-                      ...project,
-                      transitions: {
-                        ...project.transitions,
-                        [transition.id]: {
-                          ...transition,
-                          duration: Math.max(1 / fps, Math.min(v, c.duration)),
-                        },
-                      },
-                    })}
+                    max={Math.min(5, c.duration)}
+                    edit={(v) => (project) =>
+                      updateTransition(project, transition.id, { duration: v })
+                    }
                   />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-[#A0A0A8] mb-1">Intensity</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.25"
+                        max="2"
+                        value={transition.intensity ?? 1}
+                        onChange={(e) =>
+                          run((project) =>
+                            updateTransition(project, transition.id, {
+                              intensity: Math.max(0.25, Math.min(2, Number(e.target.value) || 1)),
+                            })
+                          )
+                        }
+                        className="capcut-input w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-[#A0A0A8] mb-1">Easing</label>
+                      <select
+                        aria-label="Transition easing"
+                        value={transition.easing ?? getTransitionSpec(transition.kind).defaultEasing}
+                        onChange={(e) =>
+                          run((project) =>
+                            updateTransition(project, transition.id, {
+                              easing: e.target.value as TransitionEasing,
+                            })
+                          )
+                        }
+                        className="capcut-input w-full"
+                      >
+                        <option value="snap">Snap (CapCut)</option>
+                        <option value="easeInOut">Smooth</option>
+                        <option value="expoOut">Expo Out</option>
+                        <option value="easeOut">Ease Out</option>
+                        <option value="easeIn">Ease In</option>
+                        <option value="linear">Linear</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-[#A0A0A8] mb-1">Direction Override</label>
+                    <select
+                      aria-label="Transition direction"
+                      value={transition.direction ?? "auto"}
+                      onChange={(e) =>
+                        run((project) =>
+                          updateTransition(project, transition.id, {
+                            direction: e.target.value as TransitionDirection,
+                          })
+                        )
+                      }
+                      className="capcut-input w-full"
+                    >
+                      <option value="auto">Auto (Preset default)</option>
+                      <option value="left">Left</option>
+                      <option value="right">Right</option>
+                      <option value="up">Up</option>
+                      <option value="down">Down</option>
+                    </select>
+                  </div>
                 </div>
               )}
             </fieldset>

@@ -54,22 +54,23 @@ function loadModule(file, mocks = {}) {
   return moduleObj.exports;
 }
 
-test('limits: exports MAX_VIDEO_SECONDS (60) and EXTENDED_MAX_VIDEO_SECONDS (180)', () => {
+test('limits: exports MAX_VIDEO_SECONDS (300) and EXTENDED_MAX_VIDEO_SECONDS (300)', () => {
   const limits = loadModule('app/lib/editor/limits.ts');
-  assert.equal(limits.MAX_VIDEO_SECONDS, 60);
-  assert.equal(limits.EXTENDED_MAX_VIDEO_SECONDS, 180);
+  assert.equal(limits.MAX_VIDEO_SECONDS, 300);
+  assert.equal(limits.EXTENDED_MAX_VIDEO_SECONDS, 300);
 });
 
-test('limits: assertVideoDuration defaults to 60s and accepts custom ceiling', () => {
+test('limits: assertVideoDuration defaults to 300s (5 minutes) and accepts custom ceiling', () => {
   const { assertVideoDuration, EXTENDED_MAX_VIDEO_SECONDS } = loadModule('app/lib/editor/limits.ts');
-  // Default 60s
-  assert.doesNotThrow(() => assertVideoDuration(60));
-  assert.throws(() => assertVideoDuration(60.1), /60 seconds/);
+  // Default 300s (5 minutes)
+  assert.doesNotThrow(() => assertVideoDuration(240));
+  assert.doesNotThrow(() => assertVideoDuration(300));
+  assert.throws(() => assertVideoDuration(300.1), /300 seconds/);
 
-  // Extended 180s
+  // Extended 300s
   assert.doesNotThrow(() => assertVideoDuration(120, EXTENDED_MAX_VIDEO_SECONDS));
-  assert.doesNotThrow(() => assertVideoDuration(180, EXTENDED_MAX_VIDEO_SECONDS));
-  assert.throws(() => assertVideoDuration(180.1, EXTENDED_MAX_VIDEO_SECONDS), /180 seconds/);
+  assert.doesNotThrow(() => assertVideoDuration(300, EXTENDED_MAX_VIDEO_SECONDS));
+  assert.throws(() => assertVideoDuration(300.1, EXTENDED_MAX_VIDEO_SECONDS), /300 seconds/);
 
   // Rejects invalid numbers regardless of ceiling
   for (const invalid of [0, -5, NaN, Infinity, -Infinity]) {
@@ -77,7 +78,7 @@ test('limits: assertVideoDuration defaults to 60s and accepts custom ceiling', (
   }
 });
 
-test('offlineExport: frameSchedule defaults to 60s and accepts extended max up to 180s', () => {
+test('offlineExport: frameSchedule defaults to 300s (5 minutes) and accepts extended max', () => {
   const { frameSchedule } = loadModule('app/lib/editor/offlineExport.ts', {
     mediabunny: {
       ALL_FORMATS: [],
@@ -86,17 +87,17 @@ test('offlineExport: frameSchedule defaults to 60s and accepts extended max up t
       canEncodeAudio: async () => true,
     }
   });
-  // Default 60s
-  const schedule60 = frameSchedule(60, 30);
-  assert.equal(schedule60.length, 1800);
-  assert.throws(() => frameSchedule(61, 30));
+  // Default 300s (5 minutes)
+  const schedule240 = frameSchedule(240, 30);
+  assert.equal(schedule240.length, 7200);
+  const schedule300 = frameSchedule(300, 30);
+  assert.equal(schedule300.length, 9000);
+  assert.throws(() => frameSchedule(301, 30));
 
-  // Extended up to 180s
-  const schedule120 = frameSchedule(120, 30, 180);
-  assert.equal(schedule120.length, 3600);
-  const schedule180 = frameSchedule(180, 30, 180);
+  // Extended up to 300s
+  const schedule180 = frameSchedule(180, 30, 300);
   assert.equal(schedule180.length, 5400);
-  assert.throws(() => frameSchedule(181, 30, 180));
+  assert.throws(() => frameSchedule(301, 30, 300));
 });
 
 test('offlineExport: source code removes the 250 MB memory ceiling and allows up to 1.5 GB output', () => {

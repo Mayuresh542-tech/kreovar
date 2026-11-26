@@ -1,4 +1,6 @@
-import {VALID_CAPTION_PRESETS,type CaptionPresetId} from './model';
+import {VALID_CAPTION_PRESETS,type CaptionPresetId,type TransitionKind} from './model';
+import {resolveTransitionKind} from './transitions';
+import {resolveMediaMotion,type MediaMotion} from './mediaAnimation';
 
 export interface CaptionStylingDirective {
  textColor?: string;
@@ -23,6 +25,7 @@ export interface EditingConstraints {
  disallowedCuts: boolean;
  disallowedBroll: boolean;
  disallowedZooms: boolean;
+ disallowedTransitions: boolean;
  removeZooms: boolean;
  removeSfx: boolean;
  removeBroll: boolean;
@@ -38,6 +41,9 @@ export interface EditingConstraints {
  requestedReframeMode?: import('./reframing').ReframeMode;
  requestedHookHighlight?: boolean;
  requestedKenBurns?: boolean | 'push' | 'pull' | 'pan-left' | 'pan-right';
+ requestedTransitionKind?: TransitionKind;
+ requestedAllCutTransitions?: boolean;
+ requestedClipAnimation?: MediaMotion;
  requestedKineticStickers?: boolean;
  requestedSpeed?: SpeedDirective;
  requestedVolume?: VolumeDirective;
@@ -103,6 +109,7 @@ export function extractEditingConstraints(instruction = '', preserveList: string
  const noCuts = /\b(?:(?:do\s+not|don'?t)\s+cut|no\s+cuts?|without\s+cutting|(?:do\s+not|don'?t)\s+trim\s+(?:any\s+)?speech|(?:do\s+not|don'?t)\s+remove\s+(?:any\s+)?speech|cut\s+mat\b|mat\s+katna\b)/i.test(text);
  const noBroll = /\b(?:no\s+b[ -]?roll|without\s+b[ -]?roll|without\s+stock|no\s+stock|(?:do\s+not|don'?t)\s+(?:add\s+(?:any\s+)?|use\s+(?:any\s+)?)(?:b[ -]?roll|stock)|broll\s+mat\b)/i.test(text);
  const noZooms = /\b(?:no\s+zooms?|without\s+zooms?|(?:do\s+not|don'?t)\s+zoom|zoom\s+mat\b)/i.test(text);
+ const noTransitions = /\b(?:no\s+transitions?|without\s+transitions?|(?:do\s+not|don'?t)\s+(?:add\s+|use\s+)?transitions?|hard\s+cuts?\s+only|transitions?\s+mat\b|bina\s+transitions?\b)/i.test(text);
  const removeZooms = /\b(?:remove\s+(?:the\s+)?zooms?|clear\s+(?:all\s+)?zooms?|delete\s+(?:the\s+)?zooms?|zoom\s+hata)\b/i.test(text);
  const removeSfx = /\b(?:remove\s+(?:all\s+)?(?:sound\s+effects?|sfx)|delete\s+(?:all\s+)?(?:sound\s+effects?|sfx)|clear\s+(?:all\s+)?(?:sound\s+effects?|sfx)|sfx\s+hata|sound\s+effects?\s+hata)\b/i.test(text);
  const removeBroll = /\b(?:remove\s+(?:all\s+)?(?:b[ -]?roll|stock\s+footage)|delete\s+(?:all\s+)?(?:b[ -]?roll|stock\s+footage)|clear\s+(?:all\s+)?(?:b[ -]?roll|stock\s+footage)|broll\s+hata)\b/i.test(text);
@@ -283,12 +290,28 @@ export function extractEditingConstraints(instruction = '', preserveList: string
  const splitMatch = text.match(/(?:split|cut)\s*(?:clip\s*)?at\s*(\d+(?:\.\d+)?)\s*(?:s|sec|seconds?)/i);
  if (splitMatch) requestedSplit = { time: parseFloat(splitMatch[1]) };
 
+ const requestedKenBurnsVal = requestedKenBurns;
+ let requestedTransitionKind: TransitionKind | undefined;
+ if (!noTransitions) {
+  const trPhrase = text.match(/\b(whip\s*pan(?:\s+(?:left|right|up|down))?|whip[\s-]?(?:left|right|up|down)|zoom[\s-]?blur|pull[\s-]?in|pull[\s-]?out|lens[\s-]?zoom|s[\s-]?shake|camera[\s-]?shake|impact[\s-]?punch|rgb[\s-]?glitch|glitch[\s-]?(?:rgb|slice)|pixelate|ghost[\s-]?echo|light[\s-]?leak|film[\s-]?burn|luma[\s-]?(?:fade|dissolve)|exposure[\s-]?flash|flash[\s-]?(?:white|black)|gaussian[\s-]?blur|directional[\s-]?blur|radial[\s-]?blur|dream[\s-]?glow|spin[\s-]?(?:left|right)|flip[\s-]?(?:x|y|horizontal|vertical)|tilt[\s-]?whip|wipe[\s-]?(?:left|right|diagonal)|circle[\s-]?iris|clock[\s-]?wipe|barn[\s-]?door|diamond[\s-]?iris|split[\s-]?horizontal|blinds|cross[\s-]?dissolve|dip\s+to\s+black)\b/i);
+  if (trPhrase) {
+   requestedTransitionKind = resolveTransitionKind(trPhrase[1]) ?? undefined;
+  }
+ }
+ const requestedAllCutTransitions = !noTransitions && /\b(?:all\s+cuts?|every\s+cut|all\s+clips?|har\s+cut)\b/i.test(text) && Boolean(requestedTransitionKind || /\btransitions?\b/i.test(text));
+ let requestedClipAnimation: MediaMotion | undefined;
+ const animPhrase = text.match(/\b(rock[\s-]?vertical(?:ly)?|rock[\s-]?horizontal(?:ly)?|swing[\s-]?(?:top|bottom|left|right)|elastic[\s-]?pop|mini[\s-]?zoom|spin[\s-]?zoom|shake[\s-]?hit|blur[\s-]?rise|unfold[\s-]?(?:h|v)|drop[\s-]?in|skew[\s-]?slide|pixel[\s-]?in)\b/i);
+ if (animPhrase) {
+  requestedClipAnimation = resolveMediaMotion(animPhrase[1]) ?? undefined;
+ }
+
  return {
   disallowedAudio: noAudio,
   disallowedSfx: noSfx || noAudio,
   disallowedCuts: noCuts,
   disallowedBroll: noBroll,
   disallowedZooms: noZooms,
+  disallowedTransitions: noTransitions,
   removeZooms,
   removeSfx,
   removeBroll,
@@ -303,7 +326,10 @@ export function extractEditingConstraints(instruction = '', preserveList: string
   requestedAspectRatio,
   requestedReframeMode,
   requestedHookHighlight,
-  requestedKenBurns,
+  requestedKenBurns: requestedKenBurnsVal,
+  requestedTransitionKind,
+  requestedAllCutTransitions,
+  requestedClipAnimation,
   requestedKineticStickers,
   requestedSpeed,
   requestedVolume,

@@ -49,8 +49,10 @@ function clipMaxScale(clip:Clip){
  if(clip.zooms?.length)for(const z of clip.zooms)peak=Math.max(peak,clip.transform.scale*Math.max(z.fromScale,z.toScale));
  if(clip.mediaAnimation){
   if(clip.mediaAnimation.entrance==='zoom-out'||clip.mediaAnimation.exit==='zoom-in')peak*=1.3;
+  if(clip.mediaAnimation.entrance==='spin-zoom'||clip.mediaAnimation.exit==='spin-zoom')peak*=1.45;
+  if(clip.mediaAnimation.entrance==='mini-zoom'||clip.mediaAnimation.entrance==='shake-hit'||clip.mediaAnimation.entrance==='rock-vertical'||clip.mediaAnimation.entrance==='rock-horizontal')peak*=1.16;
   if(clip.mediaAnimation.entrance==='ken-burns-push'||clip.mediaAnimation.entrance==='ken-burns-pull'||clip.mediaAnimation.kenBurns)peak*=1.08;
-  if(clip.mediaAnimation.loop==='pulse')peak*=1.07;
+  if(clip.mediaAnimation.loop==='pulse'||clip.mediaAnimation.loop==='heartbeat'||clip.mediaAnimation.loop==='zoom-drift')peak*=1.08;
  }
  return clamp(peak,1,4);
 }

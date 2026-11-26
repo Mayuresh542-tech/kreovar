@@ -29,7 +29,7 @@ import {
   projectDuration,
   Ratio,
 } from "@/app/lib/editor/model";
-import { usePlayback, useProject } from "@/app/lib/editor/store";
+import { PlaybackStore, usePlayback, useProject } from "@/app/lib/editor/store";
 import { changeClipProperty } from "@/app/lib/editor/operations";
 import { pointerEdit } from "@/app/lib/editor/interaction";
 import { useEditor } from "./workspace/EditorContext";
@@ -53,14 +53,100 @@ export function getRotatedCursor(baseAngleDeg: number, clipRotationDeg: number):
   return "ew-resize";
 }
 
+const StageExpandedSeekBar = React.memo(function StageExpandedSeekBar({
+  playback,
+  duration,
+  fps,
+}: {
+  playback: PlaybackStore;
+  duration: number;
+  fps: number;
+}) {
+  const { time } = usePlayback(playback);
+  return (
+    <input
+      type="range"
+      min={0}
+      max={Math.max(duration, 0.1)}
+      step={1 / Math.max(fps, 1)}
+      value={Math.min(time, Math.max(duration, 0.1))}
+      disabled={!duration}
+      onChange={(e) => playback.set(Number(e.target.value), false)}
+      aria-label="Seek maximized preview"
+      className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500 disabled:opacity-40"
+    />
+  );
+});
+
+const StagePlayPauseButton = React.memo(function StagePlayPauseButton({
+  playback,
+  duration,
+  isExpanded,
+  onTogglePlay,
+}: {
+  playback: PlaybackStore;
+  duration: number;
+  isExpanded: boolean;
+  onTogglePlay: () => Promise<void> | void;
+}) {
+  const { playing } = usePlayback(playback);
+  return (
+    <button
+      type="button"
+      onClick={() => void onTogglePlay()}
+      disabled={!duration}
+      title="Play / Pause (Space)"
+      aria-label={playing ? "Pause" : "Play"}
+      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105 disabled:opacity-40 cursor-pointer shadow-xs ${
+        isExpanded
+          ? "bg-sky-500 hover:bg-sky-400 text-white"
+          : "bg-slate-900 hover:bg-slate-800 text-white"
+      }`}
+    >
+      {playing ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
+    </button>
+  );
+});
+
+const StageTimecode = React.memo(function StageTimecode({
+  playback,
+  duration,
+  fps,
+  isExpanded,
+}: {
+  playback: PlaybackStore;
+  duration: number;
+  fps: number;
+  isExpanded: boolean;
+}) {
+  const { time } = usePlayback(playback);
+  return (
+    <div
+      className={`flex items-center font-mono text-xs border px-2 py-1 rounded-md ${
+        isExpanded
+          ? "bg-slate-800 border-slate-700 text-slate-100"
+          : "bg-slate-50 border-slate-200 text-slate-800"
+      }`}
+    >
+      <span className={isExpanded ? "text-white font-semibold" : "text-slate-900 font-semibold"}>
+        {formatTime(time, fps)}
+      </span>
+      <span className="text-slate-400 mx-1">/</span>
+      <span className={isExpanded ? "text-slate-400" : "text-slate-500"}>
+        {formatTime(duration, fps)}
+      </span>
+    </div>
+  );
+});
+
 export default function CanvasStage({
   quality = 720,
   readOnly = false,
 }: CanvasStageProps) {
   const { store, playback, repository, selection, select, run, notify } = useEditor();
   const project = useProject(store);
-  const { time, playing } = usePlayback(playback);
 
+  const sectionRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -79,6 +165,8 @@ export default function CanvasStage({
   const [showSafeAreas, setShowSafeAreas] = useState(false);
   const [showCrosshair, setShowCrosshair] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const isExpanded = isMaximized || isFullscreen;
   const [snapGuides, setSnapGuides] = useState<{ x: boolean; y: boolean }>({ x: false, y: false });
   const snapGuidesRef = useRef({ x: false, y: false });
 
@@ -269,14 +357,57 @@ export default function CanvasStage({
     observer.observe(stage);
     resize();
     return () => observer.disconnect();
-  }, [aspectRatio, aspectW, aspectH, zoom]);
+  }, [aspectRatio, aspectW, aspectH, zoom, isExpanded]);
 
-  // Fullscreen listener
+  // Fullscreen & Maximize theater listener
   useEffect(() => {
-    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    const handleFsChange = () => {
+      const fsActive = !!document.fullscreenElement;
+      setIsFullscreen(fsActive);
+      if (!fsActive) {
+        setIsMaximized(false);
+      }
+    };
+    const handleEscMaximize = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isMaximized && !document.fullscreenElement) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsMaximized(false);
+      }
+    };
     document.addEventListener("fullscreenchange", handleFsChange);
-    return () => document.removeEventListener("fullscreenchange", handleFsChange);
-  }, []);
+    window.addEventListener("keydown", handleEscMaximize, true);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFsChange);
+      window.removeEventListener("keydown", handleEscMaximize, true);
+    };
+  }, [isMaximized]);
+
+  const toggleMaximizePreview = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+      setIsMaximized(false);
+      return;
+    }
+    setIsMaximized((prev) => !prev);
+  };
+
+  const toggleBrowserFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        setIsMaximized(false);
+      } else if (sectionRef.current?.requestFullscreen) {
+        setIsMaximized(true);
+        await sectionRef.current.requestFullscreen();
+      } else {
+        setIsMaximized((prev) => !prev);
+      }
+    } catch {
+      // Fallback gracefully to in-window theater maximize when browser fullscreen is restricted
+      setIsMaximized((prev) => !prev);
+    }
+  };
 
   const togglePlay = async () => {
     const state = playback.getSnapshot();
@@ -294,7 +425,8 @@ export default function CanvasStage({
 
   // Step Frame
   const stepFrame = (frames: number) => {
-    const next = Math.max(0, Math.min(duration, time + frames / fps));
+    const cur = playback.getSnapshot().time;
+    const next = Math.max(0, Math.min(duration, cur + frames / fps));
     playback.set(next, false);
   };
 
@@ -461,22 +593,32 @@ export default function CanvasStage({
     );
   };
 
-  // Pick layer from canvas click
-  const handleCanvasPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (readOnly) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * aspectW;
-    const y = ((event.clientY - rect.top) / rect.height) * aspectH;
+  // Shared hit-test in frame coordinates (reverse draw order: topmost overlay/graphic/caption/text first)
+  const pickLayerAtPoint = (clientX: number, clientY: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return undefined;
+    const x = ((clientX - rect.left) / rect.width) * aspectW;
+    const y = ((clientY - rect.top) / rect.height) * aspectH;
+    const padX = (14 / rect.width) * aspectW;
+    const padY = (14 / rect.height) * aspectH;
 
-    const hit = [...boundsRef.current].reverse().find((b) => {
+    return [...boundsRef.current].reverse().find((b) => {
       const radians = (-b.rotation * Math.PI) / 180;
       const dx = x - b.x;
       const dy = y - b.y;
+      const hitW = Math.max(b.width, 48) / 2 + padX;
+      const hitH = Math.max(b.height, 36) / 2 + padY;
       return (
-        Math.abs(dx * Math.cos(radians) - dy * Math.sin(radians)) < b.width / 2 &&
-        Math.abs(dx * Math.sin(radians) + dy * Math.cos(radians)) < b.height / 2
+        Math.abs(dx * Math.cos(radians) - dy * Math.sin(radians)) < hitW &&
+        Math.abs(dx * Math.sin(radians) + dy * Math.cos(radians)) < hitH
       );
     });
+  };
+
+  // Pick layer from canvas click
+  const handleCanvasPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (readOnly) return;
+    const hit = pickLayerAtPoint(event.clientX, event.clientY);
 
     select(hit ? [hit.id] : []);
     if (hit) handleGesture(event, "move", hit.id);
@@ -489,27 +631,56 @@ export default function CanvasStage({
 
   return (
     <section
-      className="vx-stage flex-1 bg-slate-100 flex flex-col items-center justify-between relative min-w-0 h-full !overflow-hidden overflow-x-hidden select-none"
+      ref={sectionRef}
+      className={
+        isExpanded
+          ? "fixed inset-0 z-50 w-screen h-[100dvh] bg-slate-950 text-slate-100 flex flex-col items-center justify-between !overflow-hidden overflow-x-hidden select-none"
+          : "vx-stage flex-1 bg-slate-100 flex flex-col items-center justify-between relative min-w-0 h-full !overflow-hidden overflow-x-hidden select-none"
+      }
       aria-label="Central Video Preview Stage"
     >
       {/* Top Preview Header (CapCut Desktop Parity: "Previewing — video") */}
-      <div className="w-full flex items-center justify-between z-20 px-4 py-2 text-xs bg-white border-b border-slate-200 text-slate-800">
-        <div className="flex items-center gap-2 font-medium">
-          <span className="text-[13px] font-semibold text-slate-900 tracking-tight">Previewing — video</span>
+      <div
+        className={`w-full flex flex-wrap items-center justify-between gap-2 z-20 px-3 py-1.5 text-xs border-b ${
+          isExpanded
+            ? "bg-slate-900 border-slate-800 text-slate-100"
+            : "bg-white border-slate-200 text-slate-800"
+        }`}
+      >
+        <div className="flex items-center gap-2 font-medium min-w-0">
+          <span
+            className={`text-[13px] font-semibold tracking-tight truncate ${
+              isExpanded ? "text-white" : "text-slate-900"
+            }`}
+          >
+            {isExpanded ? "Maximized Preview" : "Previewing — video"}
+          </span>
         </div>
 
-        {/* Right HUD: Safe Area Overlays & Alignment Guides (Single Ratio selector kept in Top Bar) */}
-        <div className="flex items-center gap-2">
+        {/* Right HUD: Safe Area Overlays, Alignment Guides & Maximize Preview */}
+        <div className="flex items-center gap-1.5 flex-wrap">
           {/* Framing & Safe Area Overlays */}
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg text-slate-600">
+          <div
+            className={`flex items-center gap-1 border px-1.5 py-0.5 rounded-lg ${
+              isExpanded
+                ? "bg-slate-800 border-slate-700 text-slate-200"
+                : "bg-slate-50 border-slate-200 text-slate-600"
+            }`}
+          >
             {/* Safe Areas Guide */}
             <button
+              type="button"
               onClick={() => setShowSafeAreas(!showSafeAreas)}
               title="Toggle TikTok / Reels UI Safe Areas"
+              aria-label="Toggle Safe Areas"
               aria-pressed={showSafeAreas}
-              className={`p-1 rounded transition-colors ${
+              className={`p-1 rounded transition-colors cursor-pointer ${
                 showSafeAreas
-                  ? "bg-slate-200 text-slate-900"
+                  ? isExpanded
+                    ? "bg-sky-500/20 text-sky-300"
+                    : "bg-slate-200 text-slate-900"
+                  : isExpanded
+                  ? "hover:bg-slate-700 text-slate-300"
                   : "hover:bg-slate-100 text-slate-600"
               }`}
             >
@@ -518,46 +689,74 @@ export default function CanvasStage({
 
             {/* Center Crosshair */}
             <button
+              type="button"
               onClick={() => setShowCrosshair(!showCrosshair)}
               title="Toggle Center Alignment Guides"
+              aria-label="Toggle Center Alignment Guides"
               aria-pressed={showCrosshair}
-              className={`p-1 rounded transition-colors ${
+              className={`p-1 rounded transition-colors cursor-pointer ${
                 showCrosshair
-                  ? "bg-slate-200 text-slate-900"
+                  ? isExpanded
+                    ? "bg-sky-500/20 text-sky-300"
+                    : "bg-slate-200 text-slate-900"
+                  : isExpanded
+                  ? "hover:bg-slate-700 text-slate-300"
                   : "hover:bg-slate-100 text-slate-600"
               }`}
             >
               <Crosshair size={13} />
             </button>
 
-            <div className="h-3 w-[1px] bg-slate-200 mx-0.5" />
+            <div className={`h-3 w-[1px] mx-0.5 ${isExpanded ? "bg-slate-700" : "bg-slate-200"}`} />
 
             {/* Quality Badge */}
-            <span className="text-[10px] font-mono text-slate-500">
+            <span className={`text-[10px] font-mono px-1 ${isExpanded ? "text-slate-300" : "text-slate-500"}`}>
               {buffering ? "Buffering…" : `${quality}p`}
             </span>
           </div>
+
+          {/* Dedicated Maximize / Exit Maximize Preview Button */}
+          <button
+            type="button"
+            onClick={toggleMaximizePreview}
+            title={isExpanded ? "Exit Maximized Preview (Esc)" : "Maximize Preview Video"}
+            aria-label={isExpanded ? "Exit Maximize Preview" : "Maximize Preview"}
+            aria-pressed={isExpanded}
+            data-testid="preview-maximize-btn"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer shrink-0 ${
+              isExpanded
+                ? "bg-sky-500 hover:bg-sky-600 border-sky-400 text-white shadow-xs"
+                : "bg-slate-50 hover:bg-sky-50 border-slate-200 hover:border-sky-300 text-slate-700 hover:text-sky-700"
+            }`}
+          >
+            {isExpanded ? <Minimize size={13} /> : <Maximize size={13} />}
+            <span>{isExpanded ? "Exit Maximize" : "Maximize"}</span>
+          </button>
         </div>
       </div>
 
       {/* Main Preview Container */}
       <div
         ref={stageRef}
-        className={`flex-1 w-full flex items-center justify-center relative min-h-0 bg-slate-100 ${zoom !== "fit" && zoom > 1 ? "overflow-auto p-4" : "overflow-hidden"}`}
+        className={`flex-1 w-full flex items-center justify-center relative min-h-0 ${
+          isExpanded ? "bg-slate-950" : "bg-slate-100"
+        } ${zoom !== "fit" && zoom > 1 ? "overflow-auto p-4" : "overflow-hidden"}`}
       >
         <div
           ref={frameRef}
-          className="relative bg-black rounded-lg shadow-xs overflow-hidden border border-slate-200 will-change-transform"
+          className="relative bg-black rounded-lg shadow-xs border border-slate-200 will-change-transform"
         >
-          {/* Video Canvas */}
-          <canvas
-            ref={canvasRef}
-            width={renderWidth}
-            height={renderHeight}
-            onPointerDown={handleCanvasPointerDown}
-            className="w-full h-full object-contain cursor-crosshair"
-            aria-label="Video Player Canvas"
-          />
+          {/* Clipped Media & Safe-Area Viewport (keeps resize/rotate handles visible outside edges) */}
+          <div className="relative w-full h-full overflow-hidden rounded-lg">
+            {/* Video Canvas */}
+            <canvas
+              ref={canvasRef}
+              width={renderWidth}
+              height={renderHeight}
+              onPointerDown={handleCanvasPointerDown}
+              className="w-full h-full object-contain cursor-crosshair touch-none"
+              aria-label="Video Player Canvas"
+            />
 
           {/* Center Crosshair Overlay */}
           {showCrosshair && (
@@ -620,12 +819,34 @@ export default function CanvasStage({
             />
           )}
 
+          {/* Empty State Overlay */}
+          {Object.keys(project.clips).length === 0 && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-950/75 pointer-events-none">
+              <Film size={32} className="text-slate-400 mb-2" />
+              <strong className="text-white text-sm font-semibold">
+                Your Next Story Starts Here
+              </strong>
+              <p className="text-slate-300 text-xs mt-1 max-w-xs">
+                Import raw A-roll footage from the Media tab or ask Kreovar AI Editor to generate your video.
+              </p>
+            </div>
+          )}
+          </div>
+
           {/* Interactive Bounding Box around Selected Clip */}
           <div
             ref={outlineRef}
             style={{ display: "none" }}
-            className="absolute border border-sky-500 pointer-events-auto cursor-move z-30"
+            className="absolute border border-sky-500 pointer-events-auto cursor-move touch-none z-30"
             onPointerDown={(e) => {
+              // If user clicked a topmost overlay (motion graphic / caption / text) sitting inside
+              // a larger selected layer (e.g., full-frame video), switch selection and drag it directly.
+              const topmost = pickLayerAtPoint(e.clientX, e.clientY);
+              if (topmost && topmost.id !== selection[0]) {
+                select([topmost.id]);
+                handleGesture(e, "move", topmost.id);
+                return;
+              }
               if (selection[0]) handleGesture(e, "move", selection[0]);
             }}
           >
@@ -677,82 +898,90 @@ export default function CanvasStage({
               className="absolute -top-[31px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white cursor-grab active:cursor-grabbing shadow hover:scale-110 transition-transform"
             />
           </div>
-
-          {/* Empty State Overlay */}
-          {Object.keys(project.clips).length === 0 && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-950/75 pointer-events-none">
-              <Film size={32} className="text-slate-400 mb-2" />
-              <strong className="text-white text-sm font-semibold">
-                Your Next Story Starts Here
-              </strong>
-              <p className="text-slate-300 text-xs mt-1 max-w-xs">
-                Import raw A-roll footage from the Media tab or ask Kreovar AI Editor to generate your video.
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Transport Control Bar (CapCut Desktop Parity: Integrated Light Player Bar) */}
-      <div className="w-full max-w-full bg-white border-t border-slate-200 px-3 py-1.5 flex items-center justify-between z-20 text-slate-700 overflow-x-hidden min-w-0 flex-wrap sm:flex-nowrap gap-1">
+      {/* Interactive Seek Bar (always available in Maximized/Fullscreen preview) */}
+      {isExpanded && (
+        <div className="w-full px-4 pt-2 pb-1 bg-slate-900/95 border-t border-slate-800 flex items-center gap-3 z-20">
+          <StageExpandedSeekBar playback={playback} duration={duration} fps={fps} />
+        </div>
+      )}
+
+      {/* Transport Control Bar (CapCut Desktop Parity: Responsive Light Player Bar — Never Clipped) */}
+      <div
+        className={`w-full max-w-full border-t px-3 py-1.5 flex items-center justify-between z-20 min-w-0 flex-wrap gap-1.5 ${
+          isExpanded
+            ? "bg-slate-900 border-slate-800 text-slate-200"
+            : "bg-white border-slate-200 text-slate-700"
+        }`}
+      >
         {/* Left: Step Frame & Go to Start */}
-        <div className="flex items-center gap-1.5 text-slate-500">
+        <div className={`flex items-center gap-1 shrink-0 ${isExpanded ? "text-slate-300" : "text-slate-500"}`}>
           <button
+            type="button"
             onClick={() => playback.set(0, false)}
             title="Go to Start (Home)"
             aria-label="Go to Start"
-            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+              isExpanded ? "hover:text-white hover:bg-slate-800" : "hover:text-slate-900 hover:bg-slate-100"
+            }`}
           >
             <RotateCcw size={14} />
           </button>
           <button
+            type="button"
             onClick={() => stepFrame(-1)}
             title="Step 1 Frame Back (←)"
             aria-label="Previous Frame"
-            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+              isExpanded ? "hover:text-white hover:bg-slate-800" : "hover:text-slate-900 hover:bg-slate-100"
+            }`}
           >
             <SkipBack size={15} />
           </button>
           <button
+            type="button"
             onClick={() => stepFrame(1)}
             title="Step 1 Frame Forward (→)"
             aria-label="Next Frame"
-            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+              isExpanded ? "hover:text-white hover:bg-slate-800" : "hover:text-slate-900 hover:bg-slate-100"
+            }`}
           >
             <SkipForward size={15} />
           </button>
         </div>
 
         {/* Center: Play / Pause & Timecode */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => void togglePlay()}
-            disabled={!duration}
-            title="Play / Pause (Space)"
-            aria-label={playing ? "Pause" : "Play"}
-            className="w-8 h-8 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition-all hover:scale-105 disabled:opacity-40 cursor-pointer shadow-xs"
-          >
-            {playing ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
-          </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <StagePlayPauseButton
+            playback={playback}
+            duration={duration}
+            isExpanded={isExpanded}
+            onTogglePlay={togglePlay}
+          />
 
           {/* Timecode Display (CapCut Format: 00:00:00 / 00:00:00) */}
-          <div className="flex items-center font-mono text-xs bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-md text-slate-800">
-            <span className="text-slate-900 font-semibold">{formatTime(time, fps)}</span>
-            <span className="text-slate-400 mx-1">/</span>
-            <span className="text-slate-500">{formatTime(duration, fps)}</span>
-          </div>
+          <StageTimecode playback={playback} duration={duration} fps={fps} isExpanded={isExpanded} />
         </div>
 
-        {/* Right: Loop, Zoom, Fullscreen, Quick AI Editor Launcher */}
-        <div className="flex items-center gap-1.5 text-slate-500">
+        {/* Right: Loop, Zoom, Fullscreen / Maximize, Quick AI Editor Launcher */}
+        <div className={`flex items-center gap-1 shrink-0 ${isExpanded ? "text-slate-300" : "text-slate-500"}`}>
           {/* Loop Toggle */}
           <button
+            type="button"
             onClick={() => setIsLooping(!isLooping)}
             title={isLooping ? "Loop Playback (Active)" : "Loop Playback (Off)"}
+            aria-label={isLooping ? "Disable Loop Playback" : "Enable Loop Playback"}
             aria-pressed={isLooping}
             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
               isLooping
-                ? "text-sky-600 bg-sky-50 border border-sky-200"
+                ? isExpanded
+                  ? "text-sky-300 bg-sky-500/20 border border-sky-500/40"
+                  : "text-sky-600 bg-sky-50 border border-sky-200"
+                : isExpanded
+                ? "hover:text-white hover:bg-slate-800"
                 : "hover:text-slate-900 hover:bg-slate-100"
             }`}
           >
@@ -766,7 +995,11 @@ export default function CanvasStage({
               setZoom(e.target.value === "fit" ? "fit" : Number(e.target.value))
             }
             aria-label="Stage Scale"
-            className="bg-slate-50 border border-slate-200 text-[11px] text-slate-800 rounded-md px-2 py-1 focus:outline-none focus:border-sky-500 ml-1 cursor-pointer"
+            className={`border text-[11px] rounded-md px-2 py-1 focus:outline-none focus:border-sky-500 cursor-pointer ${
+              isExpanded
+                ? "bg-slate-800 border-slate-700 text-slate-100"
+                : "bg-slate-50 border-slate-200 text-slate-800"
+            }`}
           >
             <option value="fit">Fit</option>
             <option value={0.5}>50%</option>
@@ -775,32 +1008,34 @@ export default function CanvasStage({
             <option value={1.5}>150%</option>
           </select>
 
-          {/* Fullscreen Button */}
+          {/* Maximize / Browser Fullscreen Button */}
           <button
-            onClick={() => {
-              if (document.fullscreenElement) {
-                document.exitFullscreen().catch(() => {});
-              } else {
-                stageRef.current?.requestFullscreen().catch((e) => notify(e.message));
-              }
-            }}
-            title="Fullscreen Canvas"
-            aria-label="Fullscreen"
-            className="p-1.5 rounded-lg hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            type="button"
+            onClick={() => void toggleBrowserFullscreen()}
+            title={isFullscreen ? "Exit Fullscreen (Esc)" : "Fullscreen Preview"}
+            aria-label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+              isExpanded
+                ? "text-sky-300 bg-slate-800 hover:bg-slate-700"
+                : "hover:text-slate-900 hover:bg-slate-100"
+            }`}
           >
-            {isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+            {isExpanded ? <Minimize size={14} /> : <Maximize size={14} />}
           </button>
 
           {/* Quick AI Editor Launcher (CapCut EditPilot Parity) */}
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent("veelox:toggle-ai-chat"))}
-            title="Open AI Editor"
-            aria-label="Open AI Editor"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-semibold transition-colors ml-1 cursor-pointer shadow-2xs"
-          >
-            <Sparkles size={12} className="text-sky-600" />
-            <span className="hidden sm:inline">AI Editor</span>
-          </button>
+          {!isExpanded && (
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("veelox:toggle-ai-chat"))}
+              title="Open AI Editor"
+              aria-label="Open AI Editor"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+            >
+              <Sparkles size={12} className="text-sky-600" />
+              <span className="hidden lg:inline">AI Editor</span>
+            </button>
+          )}
         </div>
       </div>
     </section>

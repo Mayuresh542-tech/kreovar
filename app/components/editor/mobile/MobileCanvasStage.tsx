@@ -73,6 +73,7 @@ export default function MobileCanvasStage({
   const pinchStartScaleRef = useRef<number>(1);
   const lastTapTimeRef = useRef<number>(0);
   const panStartRef = useRef<{ x: number; y: number; origX: number; origY: number } | null>(null);
+  const dragClipRef = useRef<{ id: string; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const touchMovedRef = useRef(false);
 
   const aspectRatio = project.settings.aspectRatio;
@@ -288,25 +289,64 @@ export default function MobileCanvasStage({
   const getDistance = (t1: React.Touch, t2: React.Touch) =>
     Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
 
+  const hitTestPoint = (clientX: number, clientY: number) => {
+    const cvs = canvasRef.current;
+    if (!cvs) return undefined;
+    const rect = cvs.getBoundingClientRect();
+    if (!rect.width || !rect.height) return undefined;
+    const x = ((clientX - rect.left) / rect.width) * aspectW;
+    const y = ((clientY - rect.top) / rect.height) * aspectH;
+    const pad = (14 / rect.width) * aspectW;
+    return [...boundsRef.current].reverse().find((b) => {
+      const rad = (-b.rotation * Math.PI) / 180;
+      const dx = x - b.x;
+      const dy = y - b.y;
+      return (
+        Math.abs(dx * Math.cos(rad) - dy * Math.sin(rad)) < Math.max(b.width, 48) / 2 + pad &&
+        Math.abs(dx * Math.sin(rad) + dy * Math.cos(rad)) < Math.max(b.height, 36) / 2 + pad
+      );
+    });
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
     touchMovedRef.current = false;
+    dragClipRef.current = null;
     if (e.touches.length === 2) {
       pinchStartDistRef.current = getDistance(e.touches[0], e.touches[1]);
       pinchStartScaleRef.current = previewScale;
       panStartRef.current = null;
-    } else if (e.touches.length === 1 && previewScale > 1.02) {
-      panStartRef.current = {
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY,
-        origX: panOffset.x,
-        origY: panOffset.y,
-      };
+    } else if (e.touches.length === 1) {
+      const hit = hitTestPoint(e.touches[0].clientX, e.touches[0].clientY);
+      const hitClip = hit ? store.getSnapshot().clips[hit.id] : undefined;
+      const hitTrack = hitClip ? store.getSnapshot().tracks[hitClip.trackId] : undefined;
+      if (hit && hitClip && hitTrack && !hitTrack.locked && hitTrack.kind !== "video") {
+        select([hit.id]);
+        store.begin();
+        dragClipRef.current = {
+          id: hit.id,
+          startX: e.touches[0].clientX,
+          startY: e.touches[0].clientY,
+          origX: hitClip.transform.x,
+          origY: hitClip.transform.y,
+        };
+        panStartRef.current = null;
+        return;
+      }
+      if (previewScale > 1.02) {
+        panStartRef.current = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY,
+          origX: panOffset.x,
+          origY: panOffset.y,
+        };
+      }
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (e.touches.length === 2 && pinchStartDistRef.current) {
       touchMovedRef.current = true;
+      dragClipRef.current = null;
       const dist = getDistance(e.touches[0], e.touches[1]);
       const nextScale = clamp(
         pinchStartScaleRef.current * (dist / pinchStartDistRef.current),
@@ -315,6 +355,28 @@ export default function MobileCanvasStage({
       );
       setPreviewScale(nextScale);
       if (nextScale <= 1.02) setPanOffset({ x: 0, y: 0 });
+    } else if (e.touches.length === 1 && dragClipRef.current) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect || !rect.width || !rect.height) return;
+      const dx = e.touches[0].clientX - dragClipRef.current.startX;
+      const dy = e.touches[0].clientY - dragClipRef.current.startY;
+      if (Math.hypot(dx, dy) > 4) {
+        touchMovedRef.current = true;
+        const nextX = clamp(dragClipRef.current.origX + dx / rect.width, -1.5, 1.5);
+        const nextY = clamp(dragClipRef.current.origY + dy / rect.height, -1.5, 1.5);
+        const targetId = dragClipRef.current.id;
+        try {
+          store.preview((p) => {
+            const cur = p.clips[targetId];
+            if (!cur) return p;
+            return changeClipProperty(p, targetId, {
+              transform: { ...cur.transform, x: nextX, y: nextY },
+            });
+          });
+        } catch {
+          // Ignore preview error if locked
+        }
+      }
     } else if (e.touches.length === 1 && panStartRef.current) {
       const dx = e.touches[0].clientX - panStartRef.current.x;
       const dy = e.touches[0].clientY - panStartRef.current.y;
@@ -333,6 +395,14 @@ export default function MobileCanvasStage({
       pinchStartDistRef.current = null;
     }
     if (e.touches.length === 0) {
+      if (dragClipRef.current) {
+        if (touchMovedRef.current) {
+          store.commit();
+        } else {
+          store.cancel();
+        }
+      }
+      dragClipRef.current = null;
       panStartRef.current = null;
       if (!touchMovedRef.current && e.changedTouches.length === 1) {
         const now = Date.now();
@@ -553,28 +623,29 @@ export default function MobileCanvasStage({
         </div>
       </div>
 
-      {/* Floating Exit Fullscreen Button when isFullscreen is active */}
-      {isFullscreen && (
+      {/* Top-Right Floating Exit Fullscreen + Resolution & FPS Chip */}
+      <div className="absolute top-2.5 right-3 z-30 flex items-center gap-1.5">
+        {isFullscreen && onToggleFullscreen && (
+          <button
+            type="button"
+            onClick={onToggleFullscreen}
+            aria-label="Exit Fullscreen Preview"
+            className="min-h-[34px] px-3 py-1 rounded-full bg-sky-500 hover:bg-sky-600 border border-sky-400 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xl active:scale-95 transition-all"
+          >
+            <span>Exit Maximize</span>
+          </button>
+        )}
+
         <button
           type="button"
-          onClick={onToggleFullscreen}
-          aria-label="Exit Fullscreen Preview"
-          className="absolute top-3 right-3 z-30 px-3 py-1.5 rounded-full bg-[#16161C]/90 backdrop-blur-md border border-[#2E2E38] text-white text-xs font-semibold flex items-center gap-1.5 shadow-xl active:scale-95"
+          onClick={cycleQuality}
+          aria-label={`Preview quality ${quality}p at ${fps} FPS, tap to change`}
+          className="min-h-[34px] px-2.5 py-1 rounded-full bg-[#16161C]/85 backdrop-blur-md border border-[#2E2E38] text-[10px] font-mono text-white/90 flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
         >
-          <span>Exit Fullscreen</span>
+          <span className={`w-1.5 h-1.5 rounded-full ${buffering ? "bg-amber-400 animate-ping" : "bg-[#00E5FF]"}`} />
+          <span>{buffering ? "Buffering…" : `${quality}p · ${fps}fps`}</span>
         </button>
-      )}
-
-      {/* Top-Right Floating Resolution & FPS Chip */}
-      <button
-        type="button"
-        onClick={cycleQuality}
-        aria-label={`Preview quality ${quality}p at ${fps} FPS, tap to change`}
-        className="absolute top-2.5 right-3 z-20 min-h-[34px] px-2.5 py-1 rounded-full bg-[#16161C]/85 backdrop-blur-md border border-[#2E2E38] text-[10px] font-mono text-white/90 flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
-      >
-        <span className={`w-1.5 h-1.5 rounded-full ${buffering ? "bg-amber-400 animate-ping" : "bg-[#00E5FF]"}`} />
-        <span>{buffering ? "Buffering…" : `${quality}p · ${fps}fps`}</span>
-      </button>
+      </div>
 
       {/* Zoom Reset Badge when pinched */}
       {Math.abs(previewScale - 1) > 0.04 && (

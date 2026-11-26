@@ -1,5 +1,6 @@
 "use client";
 import {captureFootageFrames} from '@/app/lib/editor/footageFramesClient';
+import {captureVideoFileForAi,type UploadedAiVideoFile} from '@/app/lib/editor/videoPerceptionClient';
 import type {FootageFrame} from '@/app/lib/editor/footageContext';
 import type {EditorialAnalysis} from '@/app/lib/editor/editorialAnalysis';
 import AutoEditControls from './AutoEditControls';
@@ -39,6 +40,8 @@ function describe(d: EditDecision, project: EditorProject): string {
     case 'animate':return `Animate ${name} using ${d.preset}`;
     case 'addShape':return "Add "+d.kind+" shape at "+seconds(d.startTime)+"s for "+seconds(d.duration)+"s";
     case 'addGraphic':return `Add ${d.kind} “${d.text}” at ${seconds(d.startTime)}s for ${seconds(d.duration)}s`;
+    case 'changeGraphic':return `Update graphic ${name}${d.text ? ` “${d.text}”` : ''}`;
+    case 'removeGraphic':return `Remove graphic ${name}`;
     case 'addOverlay':return `Animate image overlay ${project.assets[d.assetId]?.name||'image'} at ${seconds(d.startTime)}s for ${seconds(d.duration)}s`;
     case "addZoom":return "Zoom "+name+" from "+d.fromScale+"× to "+d.toScale+"× at "+seconds(d.startTime)+"–"+seconds(d.endTime)+"s"+(d.returnToStart?" and return to the starting framing":" (hold final framing)");
     case "clearZooms":return "Clear timed zooms on "+name;
@@ -86,6 +89,7 @@ export default function AiEditDialog({ close, authToken }: { close: () => void; 
   const [plan, setPlan] = useState<AiPlan>();
   const [prepared,setPrepared]=useState<ReturnType<typeof combinePreparedEdit>>(),[previews,setPreviews]=useState<PreparedTool[]>([]),[progress,setProgress]=useState("");
   const frameCache=useRef<{key:string;frames:FootageFrame[]}|undefined>(undefined);
+  const videoCache=useRef(new Map<string,UploadedAiVideoFile|null>());
   async function readFrames(project:EditorProject,ids:string[],controller:AbortController){const key=JSON.stringify([ids,Object.values(project.clips).filter(c=>c.assetId).map(c=>[c.id,c.assetId,c.startTime,c.duration,c.sourceStart,c.sourceEnd])]);if(frameCache.current?.key===key)return frameCache.current.frames;setProgress('Reading your video and framing…');const frames=await captureFootageFrames(project,ids,a=>repository.resolve(a),controller.signal);frameCache.current={key,frames};return frames;}
   const linked=useRef(new Set<string>());
   const completed=useRef<Map<number,PreparedTool>>(new Map());
@@ -98,8 +102,8 @@ export default function AiEditDialog({ close, authToken }: { close: () => void; 
     if(!active.auto)throw Error('Choose an edit direction.');
     const augmented=assets.reduce((p,a)=>addAsset(p,a),active.snapshot),base=preparedBase||applyEditDecisionList(augmented,{...active.list,decisions:[...active.list.decisions,...decisions]});
     const token=(await supabase.auth.getSession()).data.session?.access_token||authToken;if(!token)throw Error('Sign in so the AI can plan your edit.');
-    const footageFrames=await readFrames(base,active.auto.selection,controller);setProgress('AI is choosing captions, supporting footage and motion…');
-    const response=await fetch('/api/editor/ai-edit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({instruction:directorBrief(active.auto.options),footageFrames,completeEdit:true,project:aiProjectSnapshot(base),selectedClipIds:active.auto.selection.filter(id=>!!base.clips[id]),playheadTime:playback.getSnapshot().time}),signal:AbortSignal.any([controller.signal,AbortSignal.timeout(85000)])});
+    const [footageFrames,videoFile]=await Promise.all([readFrames(base,active.auto.selection,controller),captureVideoFileForAi(base,active.auto.selection,a=>repository.resolve(a),token,controller.signal,videoCache.current).catch(()=>undefined)]);setProgress('AI is choosing captions, supporting footage and motion…');
+    const response=await fetch('/api/editor/ai-edit',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({instruction:directorBrief(active.auto.options),footageFrames,videoFile,completeEdit:true,project:aiProjectSnapshot(base),selectedClipIds:active.auto.selection.filter(id=>!!base.clips[id]),playheadTime:playback.getSnapshot().time}),signal:AbortSignal.any([controller.signal,AbortSignal.timeout(115000)])});
     const result=await response.json();if(!response.ok)throw Error(result.error||'AI planning failed. Your timeline is unchanged.');
     if(store.getSnapshot()!==active.snapshot||store.interacting)throw Error('The timeline changed while AI was planning. Request a fresh edit.');
     const {list,reviewed,candidates,catalog,requests,excludedCuts}=reviewDirectedPlan(base,result,active.auto.options,active.auto.selection);
@@ -132,8 +136,8 @@ export default function AiEditDialog({ close, authToken }: { close: () => void; 
       }
       const token = (await supabase.auth.getSession()).data.session?.access_token || authToken;
       if (!token) throw new Error("Sign in to use AI Edit.");
-      const footageFrames=await readFrames(snapshot,selection,controller);setProgress("AI is understanding your clip and planning the edit…");
-      const response = await fetch("/api/editor/ai-edit", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ instruction: instruction.trim(), footageFrames, project, playheadTime:playback.getSnapshot().time, selectedClipIds: selection.filter(id => !!project.clips[id]) }), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(85000)]) });
+      const [footageFrames,videoFile]=await Promise.all([readFrames(snapshot,selection,controller),captureVideoFileForAi(snapshot,selection,a=>repository.resolve(a),token,controller.signal,videoCache.current).catch(()=>undefined)]);setProgress("AI is understanding your clip and planning the edit…");
+      const response = await fetch("/api/editor/ai-edit", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ instruction: instruction.trim(), footageFrames, videoFile, project, playheadTime:playback.getSnapshot().time, selectedClipIds: selection.filter(id => !!project.clips[id]) }), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(115000)]) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not generate an AI edit.");
       if (result.list?.projectId !== snapshot.id || result.list?.baseRevision !== snapshot.revision) throw new Error("This plan targets a different project revision.");

@@ -27,7 +27,7 @@ import {
 
 // Infinite sliding marquee badges
 const TICKER_ITEMS_1 = [
-  "⚡ Short videos up to 60 seconds",
+  "⚡ Videos up to 5 minutes (300 seconds)",
   "📱 9:16 Portrait for Reels, Shorts & TikTok",
   "🔤 Kinetic Alex Hormozi Captions",
   "🎙️ Studio AI Voiceovers",
@@ -253,7 +253,7 @@ export default function Home() {
                   <span className="px-2 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-800/60 font-semibold">
                     9:16 (1080×1920)
                   </span>
-                  <span className="text-slate-400 hidden sm:inline-block">60s Max • 1080p Ready</span>
+                  <span className="text-slate-400 hidden sm:inline-block">5m Max • 1080p Ready</span>
                 </div>
               </div>
 
@@ -537,7 +537,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Export crisp 1080p MP4 videos up to 60 seconds</span>
+                    <span>Export crisp 1080p MP4 videos up to 5 minutes (300 seconds)</span>
                   </li>
                 </ul>
               </div>

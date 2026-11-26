@@ -2,7 +2,9 @@ import { MAX_DOWNLOAD_BYTES, attachmentHeader, mediaFilename, mediaType } from "
 
 export function allowedDownloadUrl(raw: string, storageUrl = process.env.NEXT_PUBLIC_SUPABASE_URL): URL {
   const url = new URL(raw);
-  if (raw.length > 4096 || url.protocol !== "https:" || url.username || url.password || url.port || url.hash) throw new Error("Unsupported B-roll URL.");
+  const rawPath = raw.replace(/^[a-z]+:\/\/[^/?#]*/i, "").split(/[?#]/)[0];
+  if (raw.length > 4096 || url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443") || url.hash) throw new Error("Unsupported B-roll URL.");
+  if (/%(?:2e|2f|5c)/i.test(raw) || /(?:^|[\\/])\.\.(?:[\\/]|$)/.test(rawPath) || url.pathname.includes("..")) throw new Error("Unsupported B-roll URL.");
   const stock =
     url.hostname === "videos.pexels.com" ||
     url.hostname === "images.pexels.com" ||
@@ -12,7 +14,7 @@ export function allowedDownloadUrl(raw: string, storageUrl = process.env.NEXT_PU
     url.hostname === "raw.githubusercontent.com" ||
     url.hostname === "archive.org";
   const storage = storageUrl ? new URL(storageUrl) : undefined;
-  const uploaded = storage && url.origin === storage.origin && url.pathname.startsWith("/storage/v1/object/public/videos/") && !/%2f|%5c/i.test(url.pathname);
+  const uploaded = storage && url.origin === storage.origin && url.pathname.startsWith("/storage/v1/object/public/videos/") && !/%(?:2e|2f|5c)/i.test(url.pathname);
   if (!stock && !uploaded) throw new Error("Downloads support Pexels videos and Kreovar uploaded footage.");
   return url;
 }

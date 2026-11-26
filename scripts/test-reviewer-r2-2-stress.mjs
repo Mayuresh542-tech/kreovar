@@ -116,8 +116,9 @@ test("R2 Stress Test 3: Transitions strictly restricted to TransitionKind", () =
   p = ops.addClip(p, asset.id, videoTrackId, 0, { id: "c1", duration: 5 });
   p = ops.addClip(p, asset.id, videoTrackId, 5, { id: "c2", duration: 5 });
 
-  const validKinds = ["dissolve", "fade", "slide", "zoom"];
-  for (const kind of validKinds) {
+  const { TRANSITION_KINDS } = load("app/lib/editor/transitions.ts");
+  assert.ok(TRANSITION_KINDS.length >= 30);
+  for (const kind of TRANSITION_KINDS) {
     const nextP = ops.addTransition(p, "c1", "c2", kind, 0.5);
     const trans = Object.values(nextP.transitions)[0];
     assert.equal(trans.kind, kind);

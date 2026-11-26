@@ -1,4 +1,5 @@
 import {type EditorProject,type Clip,type Caption,defaultTransform} from './model';
+import {MAX_VIDEO_SECONDS} from './limits';
 import {editorStyleFromStudio} from './captionStyleBridge';
 import {CAPTION_IN_OUT} from '../captions/studioDesign';
 import {addCaption,removeClip} from './operations';
@@ -42,7 +43,7 @@ export function replaceStudioCaptions(p:EditorProject,ids:string[],segments:Capt
  const originals=new Map(ids.map(id=>[id,p.clips[id]])),first=originals.values().next().value as Clip|undefined;
  if(!first)throw Error('Add captions first.');for(const c of originals.values())if(!c||!c.contentId||!p.captions[c.contentId]||p.tracks[c.trackId].locked)throw Error('Unlock the caption tracks before editing.');
  let next=p;for(const id of ids)next=removeClip(next,id);
- for(const s of segments){if(!s.text.trim()||!Number.isFinite(s.start)||!Number.isFinite(s.end)||s.start<0||s.end<=s.start||s.end>60||s.id.length>200||['__proto__','prototype','constructor'].includes(s.id)||next.clips[s.id])throw Error('Invalid caption timing or identifier.');
+ for(const s of segments){if(!s.text.trim()||!Number.isFinite(s.start)||!Number.isFinite(s.end)||s.start<0||s.end<=s.start||s.end>MAX_VIDEO_SECONDS||s.id.length>200||['__proto__','prototype','constructor'].includes(s.id)||next.clips[s.id])throw Error('Invalid caption timing or identifier.');
   const old=originals.get(s.id),oldCaption=old?.contentId?p.captions[old.contentId]:undefined,style=oldCaption?.studioStyle||fallback,sourceWords=s.words.map(w=>({word:w.word,start:w.start-s.start,end:w.end-s.start}));
   const before=next;next=addCaption(next,s.text,s.start,s.end-s.start,oldCaption?.style||{font:'Inter',size:48},sourceWords.length?sourceWords:undefined);const generated=Object.keys(next.clips).find(id=>!before.clips[id])!,c=next.clips[generated],contentId=c.contentId!,clips={...next.clips};delete clips[generated];
   const sourceKeys=old?.keyframes?.filter(k=>k.sourceTime>=old.sourceStart&&k.sourceTime<=old.sourceEnd).map(k=>({...k,sourceTime:(k.sourceTime-old.sourceStart)/old.speed}));

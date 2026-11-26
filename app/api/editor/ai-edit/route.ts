@@ -16,9 +16,9 @@ import {projectDuration} from "@/app/lib/editor/model";
 import type { EditorProject } from "@/app/lib/editor/model";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 90;
+export const maxDuration = 120;
 const requests = new Map<string, { since: number; count: number; busy: boolean }>();
-const MAX_BODY = 1024 * 1024;
+const MAX_BODY = 4 * 1024 * 1024;
 
 async function postHandler(req: NextRequest) {
   let release: (() => void) | undefined;
@@ -46,7 +46,7 @@ async function postHandler(req: NextRequest) {
       instruction = body.instruction.trim();
       project = aiProjectSnapshot(body.project);
       editingBudget=readEditingBudget(body.editingJobId,project.id);if(pipelineStage&&!editingBudget)throw Error("An editing job ID is required for the token budget.");
-      if (!Array.isArray(body.selectedClipIds) || body.selectedClipIds.length > 300 || body.selectedClipIds.some((id: unknown) => typeof id !== "string" || !Object.hasOwn(project.clips, id))) throw new Error("Invalid clip selection.");
+      if (!Array.isArray(body.selectedClipIds) || body.selectedClipIds.length > 600 || body.selectedClipIds.some((id: unknown) => typeof id !== "string" || !Object.hasOwn(project.clips, id))) throw new Error("Invalid clip selection.");
       selectedClipIds = body.selectedClipIds;
       if(body.conversationHistory!==undefined){
         if(!Array.isArray(body.conversationHistory)||body.conversationHistory.some((item:unknown)=>!item||typeof item!=="object"))throw new Error("Invalid conversation history.");
@@ -58,8 +58,9 @@ async function postHandler(req: NextRequest) {
       footageFrames=readFootageFrames(body.footageFrames,project,selectedClipIds);if(body.fallbackFootageFrames!==undefined){fallbackFootageFrames=readFootageFrames(body.fallbackFootageFrames,project,selectedClipIds);if(!fallbackFootageFrames.length&&footageFrames.length)throw Error("Fallback observations cannot omit the source footage.");}if(body.completeEdit!==undefined&&typeof body.completeEdit!=="boolean")throw Error("Invalid editing mode.");completeEdit=body.completeEdit===true;
       if (body.videoFile && typeof body.videoFile === "object") {
         const vf = body.videoFile as Record<string, unknown>;
-        const mimeType = typeof vf.mimeType === "string" && vf.mimeType ? vf.mimeType : "video/mp4";
-        if (typeof vf.uri === "string" && vf.uri) {
+        const rawMime = typeof vf.mimeType === "string" && vf.mimeType ? vf.mimeType.split(";")[0].trim().toLowerCase() : "video/mp4";
+        const mimeType = ["video/mp4", "video/webm", "video/quicktime"].includes(rawMime) ? rawMime : "video/mp4";
+        if (typeof vf.uri === "string" && /^https:\/\/generativelanguage\.googleapis\.com\//i.test(vf.uri)) {
           videoFile = { uri: vf.uri, mimeType };
         } else if (typeof vf.data === "string" && vf.data) {
           videoFile = { data: vf.data, mimeType };
@@ -70,7 +71,7 @@ async function postHandler(req: NextRequest) {
         if (!Array.isArray(body.detectedSilences)) throw new Error("Invalid detected silences format.");
         const dur = projectDuration(project);
         detectedSilences = body.detectedSilences
-          .slice(0, 100)
+          .slice(0, 300)
           .filter((s: unknown) => s && typeof s === 'object')
           .map((s: Record<string, unknown>) => {
             const start = typeof s.start === 'number' && Number.isFinite(s.start) ? Math.max(0, Math.min(dur, s.start)) : 0;
@@ -103,7 +104,7 @@ async function postHandler(req: NextRequest) {
     if (state.busy || state.count >= maxRequests) return NextResponse.json({ error: "Please wait a minute before requesting another AI edit." }, { status: 429, headers: { "Retry-After": "60" } });
     state.count++; state.busy = true;
     release = () => { state.busy = false; };
-    const plan = await planAiEdit(project, instruction, selectedClipIds, data.user.id, AbortSignal.any([req.signal, AbortSignal.timeout(80000)]),playheadTime,{footageFrames,fallbackFootageFrames,completeEdit,pipelineStage,editingBudget,conversationHistory,videoFile,detectedSilences});
+    const plan = await planAiEdit(project, instruction, selectedClipIds, data.user.id, AbortSignal.any([req.signal, AbortSignal.timeout(110000)]),playheadTime,{footageFrames,fallbackFootageFrames,completeEdit,pipelineStage,editingBudget,conversationHistory,videoFile,detectedSilences});
     return NextResponse.json(plan, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if(error instanceof EditTokenBudgetError)return NextResponse.json({error:error.message,code:error.code},{status:error.status,headers:{'Cache-Control':'no-store'}});

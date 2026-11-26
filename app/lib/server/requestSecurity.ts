@@ -23,6 +23,8 @@ export function isSafeMutation(req: NextRequest): boolean {
 }
 
 export function requestBodyLimit(path: string): number {
+  if (path === "/api/editor/ai-video") return 16 * 1024 * 1024;
+  if (path === "/api/editor/ai-edit") return 4 * 1024 * 1024;
   return ["/api/media/upload", "/api/transcribe", "/api/assets", "/api/editor/export-mp4"].includes(path) ? 101 * 1024 * 1024 : 1024 * 1024;
 }
 
@@ -34,7 +36,7 @@ export function ratePolicy(path: string, method: string) {
   if (path.startsWith("/api/voice") && method !== "GET") return { scope: "voice", limit: 4, seconds: 60 };
   if (["/api/assets", "/api/assets/upload", "/api/assets/text"].includes(path) && method === "POST") return {scope:"generation",limit:12,seconds:60};
   if (path === "/api/transcribe") return { scope: "transcribe", limit: 4, seconds: 60 };
-  if (["/api/ai/complete", "/api/editor/ai-edit", "/api/editor/broll-choice", "/api/editor/generate-image", "/api/content-kit", "/api/platform-kit", "/api/thumbnails/generate", "/api/competitors/analysis"].includes(path)) return { scope: "generation", limit: 12, seconds: 60 };
+  if (["/api/ai/complete", "/api/editor/ai-edit", "/api/editor/ai-video", "/api/editor/broll-choice", "/api/editor/generate-image", "/api/content-kit", "/api/platform-kit", "/api/thumbnails/generate", "/api/competitors/analysis"].includes(path)) return { scope: "generation", limit: 12, seconds: 60 };
   return { scope: "api", limit: 120, seconds: 60 };
 }
 

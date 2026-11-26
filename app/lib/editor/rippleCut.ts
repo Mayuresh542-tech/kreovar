@@ -1,7 +1,7 @@
 import {anchorVisualTreatment} from './visualTreatment';
 import {type Clip,type EditorProject,projectDuration,uid} from './model';
 
-export const MAX_RIPPLE_CUT_RANGES = 150;
+export const MAX_RIPPLE_CUT_RANGES = 300;
 
 export interface CutRange {
   start: number;

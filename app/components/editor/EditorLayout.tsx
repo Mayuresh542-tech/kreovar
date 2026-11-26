@@ -27,14 +27,34 @@ import EditorAIChat from "./EditorAIChat";
 import EditorPropertiesInspector from "./EditorPropertiesInspector";
 import TimelinePanel from "./TimelinePanel";
 import { useEditor } from "./workspace/EditorContext";
-import { usePlayback, useProject } from "@/app/lib/editor/store";
+import { useProject } from "@/app/lib/editor/store";
 import {
   Ratio,
   aspectRatios,
   dimensions,
   projectDuration,
+  textForClip,
+  defaultStyle,
+  type TextStyle,
+  type TransitionKind,
 } from "@/app/lib/editor/model";
-import { duplicateClip, removeClip, splitClip, pasteClips, reframeProject, trimToPlayhead, type ReframeMode } from "@/app/lib/editor/operations";
+import {
+  addTransition,
+  removeTransition,
+  changeClipProperty,
+  changeText,
+  duplicateClip,
+  removeClip,
+  splitClip,
+  pasteClips,
+  reframeProject,
+  trimToPlayhead,
+  type ReframeMode,
+} from "@/app/lib/editor/operations";
+import { setTransformKeyframes, type TransformKeyframe } from "@/app/lib/editor/keyframes";
+import { resolveTransitionKind } from "@/app/lib/editor/transitions";
+import { changeMotionGraphic, removeMotionGraphic } from "@/app/lib/editor/motionGraphics";
+import { applyStudioStyle, studioCaptions } from "@/app/lib/editor/editorCaptionStudio";
 import { nudgeClips } from "@/app/lib/editor/timelineNavigation";
 import {
   resolveShortcutAction,
@@ -99,15 +119,120 @@ export default function EditorLayout({
 
   const clipboard = useRef<{ project: typeof project; ids: string[] } | undefined>(undefined);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
-  const { time: currentTime } = usePlayback(playback);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(true);
+  const [isCompactDesktop, setIsCompactDesktop] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 1360 : false
+  );
 
   useEffect(() => {
-    const handleToggleAi = () => setIsAiChatOpen((prev) => !prev);
+    const mq = window.matchMedia("(max-width: 1359px)");
+    const update = () => setIsCompactDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const handleToggleAi = () => {
+      setIsAiChatOpen((prev) => {
+        const next = !prev;
+        // On compact laptop widths, collapse the asset drawer when opening AI Chat
+        // so the video preview stage and transport controls stay completely unclipped.
+        if (next && typeof window !== "undefined" && window.innerWidth < 1360) {
+          setIsDrawerOpen(false);
+        }
+        return next;
+      });
+    };
     window.addEventListener("veelox:toggle-ai-chat", handleToggleAi);
     return () => window.removeEventListener("veelox:toggle-ai-chat", handleToggleAi);
   }, []);
 
   const selectedClip = selection[0] ? project.clips[selection[0]] : null;
+
+  const toInspectorItem = useCallback((clip: (typeof project.clips)[string], proj: typeof project) => {
+    const track = proj.tracks[clip.trackId];
+    const layer = textForClip(proj, clip);
+    const kindTrack =
+      track?.kind === "caption"
+        ? "captions"
+        : track?.kind === "text"
+        ? "text"
+        : track?.kind === "audio"
+        ? "music"
+        : track?.kind === "overlay"
+        ? "overlays"
+        : "video";
+    const srcSpan = Math.max(0.05, clip.sourceEnd - clip.sourceStart);
+    const kfs = (clip.keyframes || []).map((kf, idx) => ({
+      id: `tf_${idx}_${kf.sourceTime.toFixed(3)}`,
+      time: Math.max(0, (kf.sourceTime - clip.sourceStart) / Math.max(clip.speed || 1, 0.1)),
+      property: "scale" as const,
+      value: kf.value.scale,
+      easing: (kf.easing === "ease-out"
+        ? "ease_out"
+        : kf.easing === "smooth" || kf.easing === "overshoot"
+        ? "ease_in_out"
+        : "linear") as "linear" | "ease_in" | "ease_out" | "ease_in_out",
+      _rawTransform: kf.value,
+      _sourceTime: kf.sourceTime,
+    }));
+
+    return {
+      ...clip,
+      track: kindTrack,
+      type:
+        track?.kind === "caption"
+          ? "caption"
+          : track?.kind === "text"
+          ? "text"
+          : track?.kind === "audio"
+          ? "music"
+          : track?.kind === "overlay"
+          ? "broll"
+          : "raw",
+      endTime: clip.startTime + clip.duration,
+      position: {
+        x: Math.round((clip.transform?.x ?? 0) * 100),
+        y: Math.round((clip.transform?.y ?? 0) * 100),
+      },
+      scale: clip.transform?.scale ?? 1,
+      rotation: clip.transform?.rotation ?? 0,
+      opacity: clip.transform?.opacity ?? 1,
+      preservePitch: clip.preservePitch ?? true,
+      speedCurvePreset: clip.speedCurveId,
+      colorAdjustments: {
+        brightness: clip.effects?.brightness ?? 0,
+        contrast: clip.effects?.contrast ?? 0,
+        saturation: clip.effects?.saturation ?? 0,
+        exposure: 0,
+        temperature: 0,
+        tint: 0,
+        highlights: 0,
+        shadows: 0,
+        vignette: clip.effects?.blur ?? 0,
+      },
+      source: layer?.text ?? clip.name,
+      textStyle: layer
+        ? {
+            fontFamily: layer.style.font,
+            fontSize: layer.style.size,
+            fontWeight: layer.style.weight,
+            color: layer.style.color,
+            textAlign: layer.style.align,
+            outlineWidth: layer.style.strokeWidth,
+            outlineColor: layer.style.stroke,
+          }
+        : undefined,
+      metadata: { sourceDuration: srcSpan },
+      keyframes: kfs,
+    } as any;
+  }, []);
+
+  const inspectorSelectedClip = useMemo(
+    () => (selectedClip ? toInspectorItem(selectedClip, project) : null),
+    [selectedClip, project, toInspectorItem]
+  );
 
   const timelineForInspector = useMemo(() => ({
     id: project.id,
@@ -131,36 +256,200 @@ export default function EditorLayout({
       captionTemplateId: (project.settings as any)?.captionTemplateId,
       captionPosition: (project.settings as any)?.captionPosition,
     },
-    tracks: Object.values(project.tracks) as any,
-  } as any), [project]);
+    tracks: Object.values(project.tracks).map((t) => ({
+      ...t,
+      clips: t.clipIds
+        .map((id) => project.clips[id])
+        .filter(Boolean)
+        .map((c) => toInspectorItem(c, project)),
+    })) as any,
+  } as any), [project, toInspectorItem]);
 
   const handleUpdateClip = useCallback((updated: any) => {
     run((p) => {
       const existing = p.clips[updated.id];
       if (!existing) return p;
-      return {
-        ...p,
-        clips: {
-          ...p.clips,
-          [updated.id]: {
-            ...existing,
-            ...updated,
-            transform: {
-              ...existing.transform,
-              ...(updated.scale !== undefined ? { scale: updated.scale } : {}),
-              ...(updated.rotation !== undefined ? { rotation: updated.rotation } : {}),
-              ...(updated.position ? { x: updated.position.x, y: updated.position.y } : {}),
-            },
-            volume: updated.volume !== undefined ? updated.volume : existing.volume,
-            fadeIn: updated.fadeIn !== undefined ? updated.fadeIn : existing.fadeIn,
-            fadeOut: updated.fadeOut !== undefined ? updated.fadeOut : existing.fadeOut,
-            speed: updated.speed !== undefined ? updated.speed : existing.speed,
-            speedCurveId: updated.speedCurveId !== undefined ? updated.speedCurveId : (existing as any).speedCurveId,
-          },
-        },
+
+      let next = p;
+      const nextTransform = {
+        ...existing.transform,
+        ...(updated.scale !== undefined ? { scale: updated.scale } : {}),
+        ...(updated.rotation !== undefined ? { rotation: updated.rotation } : {}),
+        ...(updated.opacity !== undefined ? { opacity: updated.opacity } : {}),
+        ...(updated.position
+          ? { x: Number(updated.position.x) / 100, y: Number(updated.position.y) / 100 }
+          : {}),
       };
+
+      const nextEffects = updated.colorAdjustments
+        ? {
+            brightness: Number(updated.colorAdjustments.brightness ?? existing.effects.brightness ?? 0),
+            contrast: Number(updated.colorAdjustments.contrast ?? existing.effects.contrast ?? 0),
+            saturation: Number(updated.colorAdjustments.saturation ?? existing.effects.saturation ?? 0),
+            blur: Number(updated.colorAdjustments.vignette ?? existing.effects.blur ?? 0),
+          }
+        : existing.effects;
+
+      const rawCurve =
+        typeof updated.speedCurvePreset === "string"
+          ? updated.speedCurvePreset.toLowerCase().replace(/\s+/g, "_")
+          : updated.speedCurveId;
+      const normalizedCurve =
+        rawCurve && ["hero", "bullet", "montage", "jump_cut", "flash_in", "flash_out", "standard"].includes(rawCurve)
+          ? (rawCurve as typeof existing.speedCurveId)
+          : undefined;
+
+      next = changeClipProperty(next, existing.id, {
+        transform: nextTransform,
+        effects: nextEffects,
+        volume: updated.volume !== undefined ? updated.volume : existing.volume,
+        fadeIn: updated.fadeIn !== undefined ? updated.fadeIn : existing.fadeIn,
+        fadeOut: updated.fadeOut !== undefined ? updated.fadeOut : existing.fadeOut,
+        preservePitch: updated.preservePitch !== undefined ? updated.preservePitch : existing.preservePitch,
+        speed: updated.speed !== undefined ? updated.speed : existing.speed,
+        speedCurveId: normalizedCurve,
+      });
+
+      // Handle Inspector keyframe additions/deletions into real TransformKeyframes
+      if (Array.isArray(updated.keyframes) && next.tracks[existing.trackId]?.kind !== "audio") {
+        const mergedByTime = new Map<number, TransformKeyframe>();
+        for (const kf of updated.keyframes as any[]) {
+          const srcTime =
+            typeof kf._sourceTime === "number"
+              ? kf._sourceTime
+              : existing.sourceStart + Math.max(0, Number(kf.time || 0)) * Math.max(existing.speed || 1, 0.1);
+          const timeKey = Math.round(srcTime * 10000);
+          const prevEntry = mergedByTime.get(timeKey);
+          const baseTf = prevEntry
+            ? { ...prevEntry.value }
+            : kf._rawTransform
+            ? { ...kf._rawTransform }
+            : { ...nextTransform };
+          if (kf.property === "scale") baseTf.scale = Number(kf.value ?? baseTf.scale);
+          else if (kf.property === "rotation") baseTf.rotation = Number(kf.value ?? baseTf.rotation);
+          else if (kf.property === "opacity") baseTf.opacity = Number(kf.value ?? baseTf.opacity);
+          else if (kf.property === "position_x") baseTf.x = Number(kf.value ?? 0) / 100;
+          else if (kf.property === "position_y") baseTf.y = Number(kf.value ?? 0) / 100;
+
+          const easing: TransformKeyframe["easing"] =
+            kf.easing === "ease_out"
+              ? "ease-out"
+              : kf.easing === "ease_in_out" || kf.easing === "ease_in"
+              ? "smooth"
+              : "linear";
+          mergedByTime.set(timeKey, { sourceTime: srcTime, value: baseTf, easing });
+        }
+        next = setTransformKeyframes(next, existing.id, Array.from(mergedByTime.values()));
+      }
+
+      // Sync text / caption edits from Inspector
+      if (existing.contentId && (updated.source !== undefined || updated.textStyle !== undefined)) {
+        const layer = textForClip(next, existing);
+        if (layer) {
+          const ts = updated.textStyle;
+          const stylePatch: Partial<TextStyle> | undefined = ts
+            ? {
+                ...(ts.fontFamily ? { font: ts.fontFamily } : {}),
+                ...(ts.fontSize ? { size: Number(ts.fontSize) } : {}),
+                ...(ts.fontWeight ? { weight: Number(ts.fontWeight) } : {}),
+                ...(ts.color ? { color: ts.color } : {}),
+                ...(ts.textAlign ? { align: ts.textAlign } : {}),
+                ...(ts.outlineWidth !== undefined ? { strokeWidth: Number(ts.outlineWidth) } : {}),
+                ...(ts.outlineColor ? { stroke: ts.outlineColor } : {}),
+              }
+            : undefined;
+          const nextText = typeof updated.source === "string" ? updated.source : layer.text;
+          next = changeText(next, existing.id, nextText, stylePatch || defaultStyle);
+        }
+      }
+
+      // Sync editable Motion Graphic properties from Inspector
+      if (updated.graphic === null && next.clips[existing.id]?.graphic) {
+        next = removeMotionGraphic(next, existing.id);
+      } else if (updated.graphic && next.clips[existing.id]?.graphic) {
+        next = changeMotionGraphic(next, existing.id, updated.graphic);
+      }
+
+      // Apply or clear selected transition when changed in Animation tab
+      if (updated.transition === "cut") {
+        const existingTransition = Object.values(next.transitions).find((t) => t.toClipId === existing.id);
+        if (existingTransition) {
+          next = removeTransition(next, existingTransition.id);
+        }
+      } else if (updated.transition) {
+        const mappedKind: TransitionKind = resolveTransitionKind(updated.transition) || "dissolve";
+        const track = next.tracks[existing.trackId];
+        if (track) {
+          const sorted = track.clipIds
+            .map((id) => next.clips[id])
+            .filter(Boolean)
+            .sort((a, b) => a.startTime - b.startTime);
+          const idx = sorted.findIndex((c) => c.id === existing.id);
+          const adjacent = sorted[idx - 1] || sorted[idx + 1];
+          if (adjacent) {
+            const [from, to] = idx > 0 && sorted[idx - 1] === adjacent ? [adjacent, existing] : [existing, adjacent];
+            try {
+              next = addTransition(next, from.id, to.id, mappedKind, updated.transitionDuration || 0.45);
+            } catch {
+              // Ignore if transition cannot be placed on non-adjacent clips
+            }
+          }
+        }
+      }
+
+      return next;
     });
   }, [run]);
+
+  const handleUpdateMultipleClips = useCallback(
+    (clipIds: string[], updates: any) => {
+      if (!clipIds.length) return;
+      run((p) => {
+        let next = p;
+        for (const id of clipIds) {
+          const clip = next.clips[id];
+          if (!clip || next.tracks[clip.trackId]?.locked) continue;
+          next = changeClipProperty(next, id, {
+            ...(updates.speed !== undefined ? { speed: updates.speed } : {}),
+            ...(updates.volume !== undefined ? { volume: updates.volume } : {}),
+            ...(updates.opacity !== undefined
+              ? { transform: { ...clip.transform, opacity: updates.opacity } }
+              : {}),
+          });
+        }
+        return next;
+      });
+    },
+    [run]
+  );
+
+  const handleDeleteMultipleClips = useCallback(
+    (clipIds: string[]) => {
+      if (!clipIds.length) return;
+      run((p) => deleteOrRippleDeleteClips(p, clipIds, { ripple: false }));
+      select([]);
+      notify(`Deleted ${clipIds.length} clip(s).`);
+    },
+    [run, select, notify]
+  );
+
+  const handleApplyStyleToAllCaptions = useCallback(() => {
+    const captions = studioCaptions(project).filter(
+      (s) => !project.tracks[project.clips[s.id]?.trackId]?.locked
+    );
+    const activeClip = selection[0] ? project.clips[selection[0]] : undefined;
+    const activeCap = activeClip?.contentId ? project.captions[activeClip.contentId] : undefined;
+    if (!captions.length) {
+      notify("No unlocked captions found on timeline.");
+      return;
+    }
+    if (activeCap?.studioStyle) {
+      run((p) => applyStudioStyle(p, captions.map((c) => c.id), activeCap.studioStyle!));
+      notify(`Applied caption style to all ${captions.length} caption(s).`);
+    } else {
+      notify("Choose a caption template style first.");
+    }
+  }, [project, selection, run, notify]);
 
   const handleUpdateSettings = useCallback((settings: any) => {
     run((p) => ({
@@ -483,23 +772,23 @@ export default function EditorLayout({
       {/* ========================================================================= */}
       {/* 1. TOP NAVIGATION BAR (CapCut Desktop Studio UI - Clean White Theme)     */}
       {/* ========================================================================= */}
-      <header className="h-14 bg-white border-b border-slate-200 px-3 flex items-center justify-between flex-shrink-0 z-30 select-none text-slate-900">
+      <header className="h-14 bg-white border-b border-slate-200 px-3 flex items-center justify-between gap-2 flex-shrink-0 z-30 select-none text-slate-900 overflow-x-auto overflow-y-hidden scrollbar-none">
         {/* Left: Back, Brand, Export (Upper Left Corner), Project Title, Save State */}
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
           {onExit && (
             <button
               onClick={onExit}
               title="Back to Projects"
               aria-label="Back to Projects"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
             >
               <ArrowLeft size={16} />
             </button>
           )}
 
-          <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
+          <div className="flex items-center gap-2 font-bold text-sm text-slate-900 shrink-0">
             <BrandMark size={26} />
-            <span className="tracking-tight hidden sm:inline">Kreovar</span>
+            <span className="tracking-tight hidden lg:inline">Kreovar</span>
           </div>
 
           {/* Prominent Light Blue Export Button on Upper Left Corner */}
@@ -507,13 +796,13 @@ export default function EditorLayout({
             onClick={() => setExportOpen(true)}
             disabled={!projectDuration(project)}
             title="Export Video"
-            className="bg-sky-500 hover:bg-sky-600 text-white font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-40 active:scale-95 text-xs cursor-pointer ml-1"
+            className="bg-sky-500 hover:bg-sky-600 text-white font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-40 active:scale-95 text-xs cursor-pointer ml-1 shrink-0"
           >
             <Download size={14} className="stroke-[2.5]" />
             <span>Export</span>
           </button>
 
-          <div className="h-4 w-[1px] bg-slate-200" />
+          <div className="h-4 w-[1px] bg-slate-200 shrink-0" />
 
           {/* Editable Project Title Input */}
           <input
@@ -532,14 +821,14 @@ export default function EditorLayout({
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
             }}
-            className="bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-900 outline-none w-44 sm:w-56 truncate transition-colors placeholder-slate-400"
+            className="bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 focus:border-sky-500 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-900 outline-none w-28 lg:w-44 xl:w-56 truncate transition-colors placeholder-slate-400"
           />
 
           {/* Cloud Auto-Save Status Indicator */}
           <button
             onClick={retrySave}
             title="Save status / Click to sync with cloud"
-            className="flex items-center gap-1.5 text-[11px] font-mono text-slate-600 hover:text-slate-900 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 text-[11px] font-mono text-slate-600 hover:text-slate-900 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer shrink-0"
           >
             {persistenceState === "saving" || persistenceState === "loading" ? (
               <LoaderCircle size={12} className="animate-spin text-sky-500" />
@@ -548,7 +837,7 @@ export default function EditorLayout({
             ) : (
               <Check size={12} className="text-sky-600" />
             )}
-            <span className="hidden md:inline">
+            <span className="hidden lg:inline">
               {
                 {
                   saved: "Saved",
@@ -564,7 +853,7 @@ export default function EditorLayout({
         </div>
 
         {/* Right: Keyboard Shortcuts Help, Undo/Redo, Single Aspect Ratio Selector, Preview Quality */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
           {/* Keyboard Shortcuts Help Button */}
           <button
             onClick={() => setShortcutsOpen(true)}
@@ -701,16 +990,31 @@ export default function EditorLayout({
         )}
 
         {/* Center-Left: CapCut Properties Inspector (Video | Audio | Speed | Animation | Adjust) */}
-        <div className="w-[340px] flex-shrink-0 h-full bg-white border-r border-slate-200 overflow-hidden z-10 flex flex-col">
+        <div
+          className={`${
+            isInspectorOpen ? "w-[276px] xl:w-[320px]" : "w-12"
+          } flex-shrink-0 h-full bg-white border-r border-slate-200 overflow-hidden z-10 flex flex-col transition-all duration-150`}
+        >
           <EditorPropertiesInspector
             timeline={timelineForInspector}
-            selectedClip={selectedClip as any}
+            selectedClip={inspectorSelectedClip}
             selectedClipIds={selection}
-            currentTime={currentTime}
-            width={340}
+            playback={playback}
+            width={isInspectorOpen ? (isCompactDesktop ? 276 : 320) : 48}
+            isOpen={isInspectorOpen}
+            onToggleOpen={() => setIsInspectorOpen((prev) => !prev)}
             onUpdateClip={handleUpdateClip}
+            onUpdateMultipleClips={handleUpdateMultipleClips}
+            onDeleteMultipleClips={handleDeleteMultipleClips}
             onUpdateSettings={handleUpdateSettings}
             onUpdateAspectRatio={handleUpdateAspectRatio}
+            onApplyStyleToAllCaptions={handleApplyStyleToAllCaptions}
+            onSeek={(t) =>
+              playback.set(
+                Math.max(0, Math.min(projectDuration(store.getSnapshot()), t)),
+                false
+              )
+            }
           />
         </div>
 

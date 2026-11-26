@@ -47,9 +47,19 @@ export interface Clip {
   transform: Transform; volume: number; speed: number; fadeIn: number; fadeOut: number;
   effects: { brightness: number; contrast: number; saturation: number; blur: number };
 }
+import type { TransitionKind, TransitionEasing, TransitionDirection } from "./transitions";
+export type { TransitionKind, TransitionEasing, TransitionDirection };
 export interface Track { id: string; name: string; kind: TrackKind; clipIds: string[]; hidden: boolean; muted: boolean; locked: boolean }
-export type TransitionKind = "fade" | "dissolve" | "slide" | "zoom";
-export interface Transition { id: string; fromClipId: string; toClipId: string; kind: TransitionKind; duration: number }
+export interface Transition {
+  id: string;
+  fromClipId: string;
+  toClipId: string;
+  kind: TransitionKind;
+  duration: number;
+  intensity?: number;
+  easing?: TransitionEasing;
+  direction?: TransitionDirection;
+}
 export interface EditorProject {
   /** Editor-only removals remain excluded when legacy project sources are merged. */
   removedProjectAssetIds?:string[];
@@ -67,7 +77,15 @@ export const defaultTransform: Transform = { x: 0, y: 0, scale: 1, rotation: 0, 
 export const defaultStyle: TextStyle = { font: "Inter", size: 72, weight: 700, align: "center", color: "#ffffff", background: "transparent", stroke: "#000000", strokeWidth: 0, shadow: 0, letterSpacing: 0, lineHeight: 1.2 };
 export const uid = () => crypto.randomUUID();
 export const clamp = (v: number, min: number, max: number) => !Number.isFinite(v) ? min : Math.max(min, Math.min(max, v));
-export const projectDuration = (p: EditorProject) => Object.values(p.clips).reduce((end,c) => Math.max(end,c.startTime+c.duration),0);
+export const projectDuration = (p: EditorProject) => {
+  let end = 0;
+  for (const key in p.clips) {
+    const c = p.clips[key];
+    const t = c.startTime + c.duration;
+    if (t > end) end = t;
+  }
+  return end;
+};
 export const isVisual = (kind: TrackKind) => kind !== "audio";
 export const canPlace = (kind: TrackKind, asset: AssetKind) => asset === "audio" ? kind === "audio" : kind === "video" || kind === "overlay" || (asset === "image" && kind === "image");
 export function createProject(id: string, title = "Untitled video"): EditorProject {

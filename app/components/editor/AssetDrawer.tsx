@@ -54,6 +54,9 @@ import {
   addText,
   addTrack,
   addTransition,
+  applyTransitionToAllCuts,
+  clearAllTransitions,
+  findAdjacentClipPairs,
   changeClipProperty,
   changeTrack,
   changeText,
@@ -68,6 +71,12 @@ import {
   resetClipTransform,
   changeCaptionProperty,
 } from "@/app/lib/editor/operations";
+import {
+  TRANSITION_CATALOG,
+  TRANSITION_CATEGORIES,
+  getTransitionSpec,
+  type TransitionCategory,
+} from "@/app/lib/editor/transitions";
 import { importMedia, visualDimensions } from "@/app/lib/editor/media";
 import { audioRole } from "@/app/lib/editor/audioMix";
 import { BUILTIN_SFX } from "@/app/lib/assets/builtinSfx";
@@ -82,8 +91,16 @@ import { supabase } from "@/app/lib/supabase";
 import type { StockVideo } from "@/app/lib/server/stockSearch";
 import { BROLL_CATEGORIES, type BrollNiche, searchCuratedBroll } from "@/app/lib/assets/curatedBrollCatalog";
 import MediaAnimationControls from "./workspace/MediaAnimationControls";
+import MaskControls from "./workspace/MaskControls";
 import TextFillControls from "./workspace/TextFillControls";
 import SilenceTrimmerControls from "./workspace/SilenceTrimmerControls";
+import { addMotionGraphic } from "@/app/lib/editor/motionGraphics";
+import {
+  KREOVAR_MOTION_TEMPLATES,
+  MOTION_TEMPLATE_CATEGORIES,
+  type KreovarMotionTemplate,
+  type MotionTemplateCategory,
+} from "@/app/lib/editor/kreovarMotionTemplates";
 
 interface AssetDrawerProps {
   activeTab: EditorToolTab;
@@ -122,6 +139,18 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
   const [brollQuery, setBrollQuery] = useState("");
   const [isSearchingBroll, setIsSearchingBroll] = useState(false);
   const [brollResults, setBrollResults] = useState<StockVideo[]>([]);
+
+  // Motion Graphics Template Gallery State
+  const [graphicCategory, setGraphicCategory] = useState<MotionTemplateCategory>("All");
+  const [graphicQuery, setGraphicQuery] = useState("");
+
+  // CapCut Transitions Studio State
+  const [transitionCategory, setTransitionCategory] = useState<"all" | TransitionCategory>("all");
+  const [transitionQuery, setTransitionQuery] = useState("");
+  const [transitionDuration, setTransitionDuration] = useState<number>(0); // 0 = preset default
+  const [transitionIntensity, setTransitionIntensity] = useState<number>(1.0);
+  const [pairTransitionSfx, setPairTransitionSfx] = useState<boolean>(false);
+  const [lastTransitionKind, setLastTransitionKind] = useState<TransitionKind>("whip-left");
 
   // Framing State
   const [framing, setFraming] = useState(false);
@@ -346,7 +375,52 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
     notify(`Added "${v.title}" B-roll to overlay track.`);
   };
 
-  // Add Transition between selected adjacent clips
+  // Add Transition between selected or playhead-adjacent clips (with optional matching SFX)
+  const applyTransitionPair = (fromId: string, toId: string, kind: TransitionKind) => {
+    const spec = getTransitionSpec(kind);
+    const chosenDuration = transitionDuration > 0 ? transitionDuration : spec.defaultDuration;
+    const from = project.clips[fromId];
+    const to = project.clips[toId];
+    if (!from || !to) return;
+    setLastTransitionKind(kind);
+    run((p) => {
+      let next =
+        chosenDuration === 0.5 && transitionIntensity === 1
+          ? addTransition(p, from.id, to.id, kind, 0.5)
+          : addTransition(p, from.id, to.id, kind, chosenDuration, { intensity: transitionIntensity });
+      if (pairTransitionSfx && spec.recommendedSfx) {
+        const sfxDef = BUILTIN_SFX.find((s) => s.id === spec.recommendedSfx);
+        const audioTrack = next.trackOrder.map((id) => next.tracks[id]).find((t) => t && t.kind === "audio" && !t.locked);
+        if (sfxDef && audioTrack) {
+          const sfxAssetId = `sfx-${sfxDef.id}`;
+          if (!next.assets[sfxAssetId]) {
+            next = addAsset(next, {
+              id: sfxAssetId,
+              name: sfxDef.name,
+              kind: "audio",
+              mime: "audio/wav",
+              size: 1024 * 64,
+              duration: sfxDef.duration,
+              width: 0,
+              height: 0,
+              url: sfxDef.url,
+            });
+          }
+          const seamTime = next.clips[from.id].startTime + next.clips[from.id].duration;
+          const sfxStart = Math.max(0, seamTime + spec.sfxOffsetSec);
+          next = addClip(next, sfxAssetId, audioTrack.id, sfxStart, {
+            name: sfxDef.name,
+            duration: sfxDef.duration,
+            volume: 0.14,
+            audioRole: "sfx",
+          });
+        }
+      }
+      return next;
+    });
+    notify(`Applied ${spec.name} transition${pairTransitionSfx && spec.recommendedSfx ? " + SFX" : ""}.`);
+  };
+
   const handleAddTransition = (kind: TransitionKind) => {
     if (selection.length === 2) {
       const c1 = project.clips[selection[0]];
@@ -357,49 +431,61 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
       }
       const [from, to] = c1.startTime <= c2.startTime ? [c1, c2] : [c2, c1];
       try {
-        run((p) => addTransition(p, from.id, to.id, kind, 0.5));
-        notify(`Added ${kind} transition.`);
+        applyTransitionPair(from.id, to.id, kind);
       } catch (e) {
         notify(e instanceof Error ? e.message : "Could not add transition.");
       }
-    } else if (selection.length === 1) {
+      return;
+    }
+    if (selection.length === 1) {
       const c = project.clips[selection[0]];
       const track = c ? project.tracks[c.trackId] : undefined;
-      if (!c || !track) {
-        notify("Select a clip to add a transition.");
+      if (c && track) {
+        const trackClips = track.clipIds
+          .map((id) => project.clips[id])
+          .filter(Boolean)
+          .sort((a, b) => a.startTime - b.startTime);
+        const idx = trackClips.findIndex((clip) => clip.id === c.id);
+        const nextClip = trackClips[idx + 1];
+        const prevClip = trackClips[idx - 1];
+        if (nextClip && Math.abs(c.startTime + c.duration - nextClip.startTime) <= 1 / project.settings.fps) {
+          try {
+            applyTransitionPair(c.id, nextClip.id, kind);
+            return;
+          } catch (e) {
+            notify(e instanceof Error ? e.message : "Could not add transition.");
+            return;
+          }
+        }
+        if (prevClip && Math.abs(prevClip.startTime + prevClip.duration - c.startTime) <= 1 / project.settings.fps) {
+          try {
+            applyTransitionPair(prevClip.id, c.id, kind);
+            return;
+          } catch (e) {
+            notify(e instanceof Error ? e.message : "Could not add transition.");
+            return;
+          }
+        }
+      }
+    }
+    // Fallback: pick adjacent cut closest to the playhead
+    const pairs = findAdjacentClipPairs(project);
+    if (pairs.length > 0) {
+      const curTime = playback.getSnapshot().time;
+      const nearest = pairs.reduce((best, item) => {
+        const tBest = Math.abs(best.to.startTime - curTime);
+        const tItem = Math.abs(item.to.startTime - curTime);
+        return tItem < tBest ? item : best;
+      }, pairs[0]);
+      try {
+        applyTransitionPair(nearest.from.id, nearest.to.id, kind);
+        return;
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Could not add transition.");
         return;
       }
-      const trackClips = track.clipIds
-        .map((id) => project.clips[id])
-        .filter(Boolean)
-        .sort((a, b) => a.startTime - b.startTime);
-      const idx = trackClips.findIndex((clip) => clip.id === c.id);
-      const nextClip = trackClips[idx + 1];
-      const prevClip = trackClips[idx - 1];
-      if (nextClip && Math.abs(c.startTime + c.duration - nextClip.startTime) <= 1 / project.settings.fps) {
-        try {
-          run((p) => addTransition(p, c.id, nextClip.id, kind, 0.5));
-          notify(`Added ${kind} transition.`);
-          return;
-        } catch (e) {
-          notify(e instanceof Error ? e.message : "Could not add transition.");
-          return;
-        }
-      }
-      if (prevClip && Math.abs(prevClip.startTime + prevClip.duration - c.startTime) <= 1 / project.settings.fps) {
-        try {
-          run((p) => addTransition(p, prevClip.id, c.id, kind, 0.5));
-          notify(`Added ${kind} transition.`);
-          return;
-        } catch (e) {
-          notify(e instanceof Error ? e.message : "Could not add transition.");
-          return;
-        }
-      }
-      notify("Select two adjacent visual clips on the same track to add a transition.");
-    } else {
-      notify("Select two adjacent visual clips on the same track to add a transition.");
     }
+    notify("Place two adjacent visual clips side-by-side on one track to add a transition.");
   };
 
   // Framing (Fit / Fill)
@@ -463,11 +549,46 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
     run((p) => changeText(p, selectedClip.id, selectedLayer.text, changes));
   };
 
+  const handleInsertMotionTemplate = (tpl: KreovarMotionTemplate) => {
+    const startTime = playback.getSnapshot().time;
+    let addedId: string | undefined;
+    run((p) => {
+      const next = addMotionGraphic(
+        p,
+        tpl.kind,
+        tpl.text,
+        startTime,
+        3.5,
+        tpl.accent,
+        tpl.motion,
+        {
+          theme: tpl.theme,
+          subtitle: tpl.subtitle,
+          icon: tpl.icon,
+          value: tpl.value,
+          prefix: tpl.prefix,
+          suffix: tpl.suffix,
+          items: tpl.items,
+          bars: tpl.bars,
+          comparison: tpl.comparison,
+          targetX: tpl.targetX,
+          targetY: tpl.targetY,
+          allowNewTrack: true,
+        }
+      );
+      addedId = Object.keys(next.clips).find((id) => !p.clips[id]);
+      return next;
+    });
+    if (addedId) select([addedId]);
+    notify(`Inserted editable "${tpl.name}" at ${startTime.toFixed(1)}s. Drag on video to reposition.`);
+  };
+
   const titles: Record<EditorToolTab, string> = {
     media: "Project Media",
     audio: "Audio & SFX Library",
     text: "Titles & Typography",
     captions: "Caption Studio",
+    graphics: "Motion Graphics",
     broll: "B-Roll Stock Footage",
     transitions: "Transitions Studio",
     filters: "Filters & Visual Effects",
@@ -479,20 +600,22 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
 
   return (
     <aside
-      className="w-80 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden text-slate-800 z-20 select-none shadow-xs"
+      className="w-[280px] sm:w-[296px] xl:w-80 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden text-slate-800 z-20 select-none shadow-xs"
       aria-label="Secondary Asset & Tool Drawer"
     >
       {/* Drawer Header */}
-      <header className="h-12 px-4 flex items-center justify-between border-b border-slate-200 bg-white flex-shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
+      <header className="h-12 px-3 flex items-center justify-between gap-2 border-b border-slate-200 bg-white flex-shrink-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="font-semibold text-sm text-slate-900 truncate">
             {titles[activeTab] || "Library"}
           </span>
-          <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded font-mono">
+          <span className="shrink-0 text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded font-mono whitespace-nowrap">
             {activeTab === "media"
               ? `${Object.keys(project.assets).length} assets`
               : activeTab === "captions"
               ? "47+ styles"
+              : activeTab === "graphics"
+              ? `${KREOVAR_MOTION_TEMPLATES.length} templates`
               : activeTab === "silence"
               ? "Acoustic & Gap"
               : activeTab === "audio"
@@ -501,16 +624,18 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
           </span>
         </div>
         <button
+          type="button"
           onClick={onClose}
+          title="Close panel"
           aria-label="Close panel"
-          className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+          className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
         >
           <X size={16} />
         </button>
       </header>
 
       {/* Drawer Body */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent bg-white text-slate-800">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent bg-white text-slate-800">
         {/* ======================= TAB: CAPTIONS ======================= */}
         {activeTab === "captions" && (
           <div className="space-y-4">
@@ -650,7 +775,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
               </div>
             </details>
             {/* Category Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
               {["All", "Transitions", "Impacts", "UI", "Accents"].map((cat) => (
                 <button
                   key={cat}
@@ -907,25 +1032,27 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                 e.preventDefault();
                 void handleSearchBroll(brollQuery);
               }}
-              className="relative"
+              className="flex items-center gap-1.5"
             >
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                type="text"
-                placeholder="Search stock footage across 10 niches..."
-                value={brollQuery}
-                onChange={(e) => setBrollQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-16 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-600 focus:bg-white"
-              />
+              <div className="relative flex-1 min-w-0">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  type="text"
+                  placeholder="Search stock footage..."
+                  value={brollQuery}
+                  onChange={(e) => setBrollQuery(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-2.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-cyan-600 focus:bg-white"
+                />
+              </div>
               <button
                 type="submit"
                 disabled={isSearchingBroll}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-[10px] font-medium disabled:opacity-50 transition-colors"
+                className="shrink-0 px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors cursor-pointer"
               >
-                {isSearchingBroll ? "Searching…" : "Search"}
+                {isSearchingBroll ? "…" : "Search"}
               </button>
             </form>
 
@@ -933,15 +1060,15 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-slate-500 uppercase">
-                  Categories & Niches
+                  Categories &amp; Niches
                 </span>
                 <span className="text-[10px] text-cyan-600 font-medium">10 Niches</span>
               </div>
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setBrollCategory("all")}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
                     brollCategory === "all"
                       ? "bg-blue-600 text-white shadow-2xs"
                       : "bg-slate-100 text-slate-800 hover:text-black hover:bg-slate-200"
@@ -954,7 +1081,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                     key={cat.id}
                     type="button"
                     onClick={() => setBrollCategory(cat.id)}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
                       brollCategory === cat.id
                         ? "bg-blue-600 text-white shadow-2xs"
                         : "bg-slate-100 text-slate-800 hover:text-black hover:bg-slate-200"
@@ -977,23 +1104,23 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                     {brollCategory === "all" ? "All Niches" : brollCategory}
                   </span>
                 </div>
-                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                <div className="space-y-2">
                   {brollResults.map((v) => (
                     <div
                       key={v.id}
-                      className="p-2 rounded-xl bg-white border border-slate-200 flex items-center justify-between hover:border-cyan-400 transition-colors group"
+                      className="p-2 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 hover:border-cyan-400 transition-colors group"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-12 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="w-11 h-9 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0">
                           {v.thumbnail ? (
                             <img src={v.thumbnail} alt="" className="w-full h-full object-cover" />
                           ) : (
                             <Film size={16} className="text-cyan-600" />
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-slate-900 truncate">{v.title}</p>
-                          <p className="text-[10px] text-slate-500 font-mono">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-slate-900 truncate" title={v.title}>{v.title}</p>
+                          <p className="text-[10px] text-slate-500 font-mono truncate">
                             {v.duration.toFixed(1)}s · {v.width}×{v.height}
                           </p>
                         </div>
@@ -1002,9 +1129,9 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                         type="button"
                         onClick={() => handleAddBrollToTimeline(v)}
                         title="Add to timeline"
-                        className="p-1.5 rounded-lg bg-cyan-50 hover:bg-cyan-600 text-cyan-600 hover:text-white border border-cyan-200 hover:border-cyan-600 transition-colors flex items-center gap-1 text-[11px] font-medium cursor-pointer"
+                        className="shrink-0 px-2 py-1.5 rounded-lg bg-cyan-50 hover:bg-cyan-600 text-cyan-600 hover:text-white border border-cyan-200 hover:border-cyan-600 transition-colors flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
                       >
-                        <Plus size={13} />
+                        <Plus size={12} />
                         <span>Add</span>
                       </button>
                     </div>
@@ -1032,29 +1159,162 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
               ].map((item, i) => (
                 <div
                   key={i}
-                  className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-center justify-between hover:border-cyan-400 transition-colors group"
+                  className="p-2 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 hover:border-cyan-400 transition-colors group"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded bg-cyan-50 border border-cyan-200 flex items-center justify-center text-cyan-600">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="w-8 h-8 shrink-0 rounded bg-cyan-50 border border-cyan-200 flex items-center justify-center text-cyan-600">
                       <Film size={14} />
                     </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-900">{item.title}</p>
-                      <span className="text-[10px] text-slate-500">{item.category} · {item.duration}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-slate-900 truncate" title={item.title}>{item.title}</p>
+                      <span className="text-[10px] text-slate-500 block truncate">{item.category} · {item.duration}</span>
                     </div>
                   </div>
                   <button
                     type="button"
+                    aria-label={`Search ${item.title}`}
                     onClick={() => {
                       setBrollQuery(item.title);
                       void handleSearchBroll(item.title);
                     }}
-                    className="p-1 rounded bg-slate-100 hover:bg-cyan-600 text-slate-600 hover:text-white transition-colors cursor-pointer"
+                    className="shrink-0 p-1.5 rounded-lg bg-slate-100 hover:bg-cyan-600 text-slate-600 hover:text-white transition-colors cursor-pointer"
                   >
                     <Plus size={13} />
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ======================= TAB: MOTION GRAPHICS (18 Editable Templates) ======================= */}
+        {activeTab === "graphics" && (
+          <div className="space-y-3.5">
+            <div className="relative">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              />
+              <input
+                type="text"
+                placeholder="Search 18 motion templates..."
+                value={graphicQuery}
+                onChange={(e) => setGraphicQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {MOTION_TEMPLATE_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setGraphicCategory(cat)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors cursor-pointer ${
+                    graphicCategory === cat
+                      ? "bg-sky-600 text-white shadow-2xs"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5">
+              {KREOVAR_MOTION_TEMPLATES.filter(
+                (t) =>
+                  (graphicCategory === "All" || t.category === graphicCategory) &&
+                  `${t.name} ${t.description} ${t.category}`
+                    .toLowerCase()
+                    .includes(graphicQuery.toLowerCase())
+              ).map((tpl) => {
+                const isDarkCard = tpl.theme === "dark-slate";
+                return (
+                  <div
+                    key={tpl.id}
+                    className="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-sky-400 transition-all shadow-2xs space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: tpl.accent }}
+                          />
+                          <p className="text-xs font-bold text-slate-900 truncate">{tpl.name}</p>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                          {tpl.description}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleInsertMotionTemplate(tpl)}
+                        title={`Insert ${tpl.name} at playhead`}
+                        className="shrink-0 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-sky-600 text-white text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <Plus size={12} />
+                        <span>Insert</span>
+                      </button>
+                    </div>
+
+                    {/* Visual Mini Card Preview */}
+                    <div
+                      className={`rounded-lg px-2.5 py-2 border text-left ${
+                        isDarkCard
+                          ? "bg-slate-900 border-slate-800 text-white"
+                          : tpl.theme === "editorial-paper"
+                          ? "bg-[#FAF8F2] border-stone-200 text-stone-900"
+                          : "bg-slate-50 border-slate-200 text-slate-900"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className="text-[11px] font-bold truncate"
+                          style={{ color: isDarkCard ? "#F8FAFC" : "#0F172A" }}
+                        >
+                          {tpl.prefix ?? ""}
+                          {tpl.value !== undefined ? tpl.value : tpl.text}
+                          {tpl.suffix ?? ""}
+                        </span>
+                        <span
+                          className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded uppercase shrink-0"
+                          style={{
+                            backgroundColor: `${tpl.accent}22`,
+                            color: tpl.accent,
+                          }}
+                        >
+                          {tpl.kind}
+                        </span>
+                      </div>
+                      {(tpl.subtitle || tpl.items?.[0] || tpl.bars?.[0]?.label) && (
+                        <p
+                          className={`text-[10px] truncate mt-0.5 ${
+                            isDarkCard ? "text-slate-300" : "text-slate-500"
+                          }`}
+                        >
+                          {tpl.subtitle ||
+                            (tpl.items ? tpl.items.slice(0, 2).join(" · ") : undefined) ||
+                            (tpl.bars ? tpl.bars.map((b) => b.label).join(" vs ") : undefined)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-sky-50 border border-sky-200 text-[11px] text-sky-900 leading-relaxed">
+              <strong className="font-semibold">Need a custom animation?</strong> Open{" "}
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("veelox:toggle-ai-chat"))}
+                className="underline font-bold cursor-pointer hover:text-sky-700"
+              >
+                AI Editor
+              </button>{" "}
+              and describe any custom chart, callout, or motion card. Drag any graphic directly on the video to move it.
             </div>
           </div>
         )}
@@ -1121,36 +1381,186 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
         )}
 
         {/* ======================= TAB: TRANSITIONS ======================= */}
-        {activeTab === "transitions" && (
-          <div className="space-y-4">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              CapCut Video Transitions
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { name: "Cross Dissolve", kind: "dissolve" as TransitionKind, desc: "Smooth blend between scenes" },
-                { name: "Fade to Black", kind: "fade" as TransitionKind, desc: "Classic cinematic scene end" },
-                { name: "Whip Slide", kind: "slide" as TransitionKind, desc: "Fast dynamic side wipe" },
-                { name: "Zoom Cross", kind: "zoom" as TransitionKind, desc: "High-energy push zoom" },
-              ].map((tr) => (
+        {activeTab === "transitions" && (() => {
+          const q = transitionQuery.trim().toLowerCase();
+          const filtered = TRANSITION_CATALOG.filter((tr) => {
+            if (transitionCategory !== "all" && tr.category !== transitionCategory) return false;
+            if (!q) return true;
+            return (
+              tr.name.toLowerCase().includes(q) ||
+              tr.id.toLowerCase().includes(q) ||
+              tr.shortDesc.toLowerCase().includes(q) ||
+              tr.whenToUse.toLowerCase().includes(q)
+            );
+          });
+          const adjacentCount = findAdjacentClipPairs(project).length;
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  CapCut Video Transitions ({filtered.length})
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">
+                  {adjacentCount} cut{adjacentCount === 1 ? "" : "s"} found
+                </span>
+              </div>
+
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="search"
+                  value={transitionQuery}
+                  onChange={(e) => setTransitionQuery(e.target.value)}
+                  placeholder="Search whip, shake, glitch, iris, blur..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-1">
                 <button
-                  key={tr.kind}
                   type="button"
-                  onClick={() => handleAddTransition(tr.kind)}
-                  className="p-3 rounded-xl border border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100 text-left transition-all cursor-pointer group"
+                  onClick={() => setTransitionCategory("all")}
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-medium border cursor-pointer ${
+                    transitionCategory === "all"
+                      ? "bg-slate-900 text-white border-slate-900"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  }`}
                 >
-                  <p className="text-xs font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{tr.name}</p>
-                  <span className="text-[10px] text-slate-500 mt-1 block">
-                    {tr.desc}
-                  </span>
-                  <div className="mt-2 text-[9px] font-mono text-slate-700 bg-white border border-slate-200 px-1.5 py-0.5 rounded w-fit shadow-2xs">
-                    1-Click Apply
-                  </div>
+                  All
                 </button>
-              ))}
+                {TRANSITION_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setTransitionCategory(cat.id)}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-medium border cursor-pointer ${
+                      transitionCategory === cat.id
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Controls: Duration, Intensity, SFX Pair, Apply-All */}
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-[11px]">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="flex justify-between text-[10px] text-slate-600 mb-0.5">
+                      <span>Duration</span>
+                      <span className="font-mono font-bold text-slate-900">
+                        {transitionDuration === 0 ? "Auto" : `${transitionDuration.toFixed(2)}s`}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1.5"
+                      step="0.05"
+                      value={transitionDuration}
+                      onChange={(e) => setTransitionDuration(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-200 rounded appearance-none cursor-pointer accent-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[10px] text-slate-600 mb-0.5">
+                      <span>Intensity</span>
+                      <span className="font-mono font-bold text-slate-900">{transitionIntensity.toFixed(1)}×</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.4"
+                      max="1.8"
+                      step="0.1"
+                      value={transitionIntensity}
+                      onChange={(e) => setTransitionIntensity(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-200 rounded appearance-none cursor-pointer accent-slate-900"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/70">
+                  <label className="flex items-center gap-1.5 text-[10px] font-medium text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={pairTransitionSfx}
+                      onChange={(e) => setPairTransitionSfx(e.target.checked)}
+                      className="rounded accent-slate-900"
+                    />
+                    Pair matching SFX
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={adjacentCount === 0}
+                      onClick={() => {
+                        const kind = lastTransitionKind;
+                        run((p) =>
+                          applyTransitionToAllCuts(
+                            p,
+                            kind,
+                            transitionDuration > 0 ? transitionDuration : undefined,
+                            { intensity: transitionIntensity }
+                          )
+                        );
+                        notify(`Applied ${getTransitionSpec(kind).name} across ${adjacentCount} cut(s).`);
+                      }}
+                      className="px-2 py-1 rounded bg-slate-900 text-white text-[10px] font-semibold hover:bg-slate-800 disabled:opacity-40 cursor-pointer"
+                    >
+                      Apply to All
+                    </button>
+                    {Object.keys(project.transitions).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          run((p) => clearAllTransitions(p));
+                          notify("Cleared transitions on unlocked tracks.");
+                        }}
+                        className="px-2 py-1 rounded bg-white border border-slate-200 text-rose-600 text-[10px] font-semibold hover:bg-rose-50 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 max-h-[420px] overflow-y-auto pr-1">
+                {filtered.map((tr) => (
+                  <button
+                    key={tr.id}
+                    type="button"
+                    title={`${tr.whenToUse} — Avoid: ${tr.avoidWhen}`}
+                    onClick={() => handleAddTransition(tr.id)}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer group ${
+                      lastTransitionKind === tr.id
+                        ? "border-blue-500 bg-blue-50/40"
+                        : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100"
+                    }`}
+                  >
+                    <p className="text-xs font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                      {tr.name}
+                    </p>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block line-clamp-2">
+                      {tr.shortDesc}
+                    </span>
+                    <div className="mt-1.5 flex items-center justify-between gap-1">
+                      <span className="text-[9px] font-mono text-slate-600 bg-white border border-slate-200 px-1.5 py-0.5 rounded">
+                        {tr.defaultDuration.toFixed(2)}s
+                      </span>
+                      {tr.recommendedSfx && (
+                        <span className="text-[8px] font-mono text-sky-700 bg-sky-50 border border-sky-200 px-1 py-0.5 rounded truncate">
+                          +{tr.recommendedSfx}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ======================= TAB: FILTERS & ZOOMS ======================= */}
         {activeTab === "filters" && (
@@ -1235,14 +1645,16 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
             </div>
 
             <span className="text-[11px] font-semibold text-slate-500 uppercase mt-4 block">
-              Transitions
+              Quick CapCut Transitions
             </span>
             <div className="grid grid-cols-2 gap-2">
               {[
                 { name: "Cross Dissolve", kind: "dissolve" as TransitionKind, desc: "Smooth blend" },
                 { name: "Fade to Black", kind: "fade" as TransitionKind, desc: "Classic scene fade" },
-                { name: "Whip Slide", kind: "slide" as TransitionKind, desc: "Dynamic motion" },
-                { name: "Zoom Cross", kind: "zoom" as TransitionKind, desc: "Fast push zoom" },
+                { name: "Whip Pan Left", kind: "whip-left" as TransitionKind, desc: "Fast whip smear" },
+                { name: "Zoom Blur", kind: "zoom-blur" as TransitionKind, desc: "Hype radial zoom" },
+                { name: "S-Shake", kind: "camera-shake" as TransitionKind, desc: "Beat impact shake" },
+                { name: "RGB Glitch", kind: "glitch-rgb" as TransitionKind, desc: "Chromatic tear" },
               ].map((tr) => (
                 <button
                   key={tr.kind}
@@ -1869,6 +2281,9 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                         </div>
                       </div>
                     </div>
+
+                    {/* Mask & Feather Controls */}
+                    <MaskControls clipId={selectedClip.id} theme="light" />
 
                     {/* Media Animation Controls (Entrance, Exit, Loop) */}
                     <MediaAnimationControls clipId={selectedClip.id} />

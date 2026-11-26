@@ -396,8 +396,8 @@ describe('Kreovar Silence Trimming, Acoustic Detection & Ripple Removal Engine',
     assert.equal(slice2.zooms[0].style, 'punch-in');
   });
 
-  test('6. 150 Range Limit: MAX_RIPPLE_CUT_RANGES', () => {
-    assert.equal(rippleCutModule.MAX_RIPPLE_CUT_RANGES, 150);
+  test('6. 300 Range Limit: MAX_RIPPLE_CUT_RANGES', () => {
+    assert.equal(rippleCutModule.MAX_RIPPLE_CUT_RANGES, 300);
 
     const p = model.createProject('p-150', '150 Cuts Test');
     p.tracks['track-video'] = { id: 'track-video', kind: 'video', name: 'Video', clipIds: ['v1'], hidden: false, muted: false, locked: false };
@@ -433,11 +433,28 @@ describe('Kreovar Silence Trimming, Acoustic Detection & Ripple Removal Engine',
     }, p);
     assert.equal(planValidation.list.decisions[0].ranges.length, 150);
 
-    // Should throw when exceeding 150 ranges
-    const cuts151 = [...cuts150, { start: 58.0, end: 58.1 }];
+    // 5-minute (300s) project with 300 cut ranges
+    let p5 = model.createProject('test-300s');
+    p5.assets['asset-5m'] = { id: 'asset-5m', name: 'cam5m.mp4', kind: 'video', mime: 'video/mp4', size: 1000, duration: 300, width: 1080, height: 1920 };
+    p5.tracks['track-video'].clipIds.push('v5m');
+    p5.clips['v5m'] = {
+      id: 'v5m', assetId: 'asset-5m', trackId: 'track-video', name: 'A-Roll 5m',
+      startTime: 0, duration: 300, sourceStart: 0, sourceEnd: 300,
+      transform: model.defaultTransform, volume: 1, speed: 1, fadeIn: 0, fadeOut: 0,
+      effects: { brightness: 0, contrast: 0, saturation: 0, blur: 0 }
+    };
+    const cuts300 = Array.from({ length: 300 }, (_, i) => ({ start: i * 0.9 + 0.1, end: i * 0.9 + 0.3 }));
+    const plan300 = aiValidation.validateAiPlan({
+      summary: 'Applied 300 ripple cuts on 5m video',
+      decisions: [{ op: 'rippleCut', ranges: cuts300 }]
+    }, p5);
+    assert.equal(plan300.list.decisions[0].ranges.length, 300);
+
+    // Should throw when exceeding 300 ranges
+    const cuts301 = [...cuts300, { start: 298.0, end: 298.1 }];
     assert.throws(
-      () => rippleCutModule.normalizedCuts(p, cuts151),
-      /Choose between 1 and 150 cut ranges/
+      () => rippleCutModule.normalizedCuts(p5, cuts301),
+      /Choose between 1 and 300 cut ranges/
     );
   });
 

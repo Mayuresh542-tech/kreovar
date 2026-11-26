@@ -1,4 +1,4 @@
-import type {EditorProject,CaptionMotion,TextStyle,Ratio} from '../editor/model';
+import type {EditorProject,CaptionMotion,TextStyle,Ratio,TransitionKind} from '../editor/model';
 import type {GraphicKind} from '../editor/motionGraphics';
 import type {EditDecision} from '../editor/ai';
 import type {AiToolRequest} from '../editor/aiTools';
@@ -11,7 +11,7 @@ export interface StyleSpec {
  graphics:{enabled:boolean;kinds:GraphicKind[];accent:string;motion:'pop'|'slide-up'|'slide-left'|'float';maximumPerMinute:number;description:string};
  broll:{enabled:boolean;fit:'cover'|'contain';minimumDuration:number;maximumDuration:number;maxCoverage:number;description:string};
  zooms:{enabled:boolean;maximumScale:number;minimumInterval:number;description:string};
- transitions:{enabled:boolean;kind:'fade'|'dissolve'|'slide'|'zoom';duration:number};
+ transitions:{enabled:boolean;kind:TransitionKind;duration:number};
  sound:{enabled:boolean;soundIds:string[];gain:number;description:string};
 }
 export interface ReferencePreset {

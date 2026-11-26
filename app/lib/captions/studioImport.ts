@@ -1,4 +1,5 @@
 import {readSpeechLanguage} from "./speechLanguages";
+import {MAX_VIDEO_SECONDS} from "../editor/limits";
 /** The original stays local for preview/export. Transcription sends compact speech audio only. */
 export async function openCaptionVideo(file:File,signal:AbortSignal){
  signal.throwIfAborted();
@@ -15,7 +16,7 @@ export async function openCaptionVideo(file:File,signal:AbortSignal){
    signal.addEventListener("abort",abort,{once:true});probe.src=url;
   });
   signal.throwIfAborted();
-  if(!Number.isFinite(metadata.duration)||metadata.duration<=0||metadata.duration>60)throw new Error("Captions Studio supports videos up to 60 seconds.");
+  if(!Number.isFinite(metadata.duration)||metadata.duration<=0||metadata.duration>MAX_VIDEO_SECONDS)throw new Error(`Captions Studio supports videos up to ${MAX_VIDEO_SECONDS} seconds (5 minutes).`);
   if(!metadata.width||!metadata.height)throw new Error("This file has no playable video track.");
   return {url,...metadata};
  }catch(error){URL.revokeObjectURL(url);throw error;}

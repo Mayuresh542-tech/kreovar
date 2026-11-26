@@ -1,5 +1,6 @@
 import { BUILTIN_SFX } from '../assets/builtinSfx';
 import { type EditorProject, type Clip, type MediaAsset, projectDuration, uid, clamp } from './model';
+import { getTransitionSpec } from './transitions';
 import { addAsset, addClip } from './operations';
 import { speechContext } from './speechContext';
 import { editorialBeats } from './editorialSense';
@@ -81,14 +82,20 @@ export function suggestContextualSfx(
 
   // 1. Cuts and Transitions -> whoosh
   if (opts.includeTransitions) {
-    const cutPoints: Array<{ time: number; reason: string }> = [];
+    const cutPoints: Array<{ time: number; reason: string; preferredSfx?: string; preferredLead?: number }> = [];
 
-    // Explicit transitions
+    // Explicit transitions with style-matched SFX pairing
     for (const tr of Object.values(project.transitions)) {
       const fromClip = project.clips[tr.fromClipId];
       if (fromClip) {
         const time = fromClip.startTime + fromClip.duration;
-        cutPoints.push({ time, reason: `Visual ${tr.kind} transition` });
+        const spec = getTransitionSpec(tr.kind);
+        cutPoints.push({
+          time,
+          reason: `Visual ${spec.name} transition`,
+          preferredSfx: spec.recommendedSfx ?? undefined,
+          preferredLead: Math.max(0.02, -spec.sfxOffsetSec),
+        });
       }
     }
 
@@ -125,9 +132,10 @@ export function suggestContextualSfx(
       if (cut.time - lastWhooshTime < 2.0) continue;
 
       const isFast = opts.intensity === 'punchy';
-      const soundId = isFast ? 'fast-swish' : 'soft-whoosh';
+      const fallbackSoundId = isFast ? 'fast-swish' : 'soft-whoosh';
+      const soundId = cut.preferredSfx && BUILTIN_SFX.some((s) => s.id === cut.preferredSfx) ? cut.preferredSfx : fallbackSoundId;
       const sound = BUILTIN_SFX.find((s) => s.id === soundId)!;
-      const lead = isFast ? 0.15 : 0.25;
+      const lead = cut.preferredLead ?? (isFast ? 0.15 : 0.25);
       const startTime = Math.max(0, cut.time - lead);
 
       if (startTime + sound.duration > totalDuration + 0.1) continue;

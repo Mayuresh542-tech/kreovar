@@ -4,7 +4,8 @@ import {readStyleSurface} from "./styleSurface";
 import {studioStyleFromEditor} from './captionStyleBridge';
 import {readFontAccent} from "../captions/typography";
 import {readTextGradient} from "./textGradient";
-import { Clip, EditorProject, MediaAsset, TrackKind, TransitionKind, TextStyle, canPlace, clamp, defaultStyle, defaultTransform, uid, dimensions } from "./model";
+import { Clip, EditorProject, MediaAsset, TrackKind, Transition, TransitionKind, TransitionEasing, TransitionDirection, TextStyle, canPlace, clamp, defaultStyle, defaultTransform, uid, dimensions } from "./model";
+import { getTransitionSpec } from "./transitions";
 
 // All edits, including future AI EDLs, pass through these pure document operations.
 function editable(p: EditorProject, id: string): Clip {
@@ -64,6 +65,30 @@ function reindexStudioData(data: import("./editorCaptionStudio").StudioCaptionDa
   };
 }
 
+function sliceCaptionToRange(
+  orig: import("./model").Caption,
+  sStart: number,
+  sEnd: number,
+  id?: string
+): import("./model").Caption {
+  const base = id ? { ...orig, id } : orig;
+  if (!orig.words || orig.words.length === 0) return base;
+  const surviving = orig.words
+    .map((w, origIdx) => ({ w, origIdx }))
+    .filter(({ w }) => w.end > sStart && w.start < sEnd);
+  const words = surviving.map(({ w }) => ({
+    ...w,
+    start: Math.max(sStart, w.start),
+    end: Math.min(sEnd, w.end)
+  }));
+  return {
+    ...base,
+    text: words.map(w => w.word).join(" "),
+    words,
+    ...(orig.studioData ? { studioData: reindexStudioData(orig.studioData, surviving) } : {})
+  };
+}
+
 export function trimClip(p: EditorProject,id: string,edge: "left"|"right",time: number, options?: { ripple?: boolean }): EditorProject {
   if(!Number.isFinite(time)) return p;
   const c=editable(p,id), min=Math.max(1/p.settings.fps, 0.05), asset=c.assetId?p.assets[c.assetId]:undefined;
@@ -83,26 +108,11 @@ export function trimClip(p: EditorProject,id: string,edge: "left"|"right",time: 
   if (c.contentId && p.captions[c.contentId]) {
     const orig = p.captions[c.contentId];
     if (orig.words && orig.words.length > 0) {
-      const sStart = nextClip.sourceStart;
-      const sEnd = nextClip.sourceEnd;
-      const surviving = orig.words
-        .map((w, origIdx) => ({ w, origIdx }))
-        .filter(({ w }) => w.end > sStart && w.start < sEnd);
-      const words = surviving.map(({ w }) => ({
-        ...w,
-        start: Math.max(sStart, w.start),
-        end: Math.min(sEnd, w.end)
-      }));
       next = {
         ...next,
         captions: {
           ...next.captions,
-          [c.contentId]: {
-            ...orig,
-            text: words.map(w => w.word).join(" "),
-            words,
-            ...(orig.studioData ? { studioData: reindexStudioData(orig.studioData, surviving) } : {})
-          }
+          [c.contentId]: sliceCaptionToRange(orig, nextClip.sourceStart, nextClip.sourceEnd)
         }
       };
     }
@@ -145,6 +155,7 @@ export function splitClip(p: EditorProject,id: string,time: number): EditorProje
   const newId=uid(), contentId=c.contentId?uid():undefined, source=c.sourceStart+left*c.speed;
   const visual=anchorVisualTreatment(c),right: Clip={...c,...(visual?{visualTreatment:visual}:{}),id:newId,contentId,startTime:time,duration:c.duration-left,sourceStart:source,fadeIn:0};
   const next=put(put(p,{...c,...(visual?{visualTreatment:visual}:{}),duration:left,sourceEnd:source,fadeOut:0}),right);
+  const origCaption = c.contentId ? p.captions[c.contentId] : undefined;
   return cleanTransitions({
     ...next,
     tracks: {
@@ -154,8 +165,12 @@ export function splitClip(p: EditorProject,id: string,time: number): EditorProje
     textLayers: contentId && c.contentId && p.textLayers[c.contentId]
       ? { ...p.textLayers, [contentId]: { ...p.textLayers[c.contentId], id: contentId } }
       : p.textLayers,
-    captions: contentId && c.contentId && p.captions[c.contentId]
-      ? { ...p.captions, [contentId]: { ...p.captions[c.contentId], id: contentId } }
+    captions: contentId && c.contentId && origCaption
+      ? {
+          ...p.captions,
+          [c.contentId]: sliceCaptionToRange(origCaption, c.sourceStart, source),
+          [contentId]: sliceCaptionToRange(origCaption, source, c.sourceEnd, contentId)
+        }
       : p.captions
   });
 }
@@ -298,7 +313,7 @@ export function mergeCaptions(p:EditorProject,ids:string[]):EditorProject {
   next = put(next, { ...first, duration: end - first.startTime, sourceEnd: mergedSourceEnd });
 
   const allMergedWords: import("./model").CaptionWord[] = [];
-  let mergedEmphasized: number[] = [];
+  const mergedEmphasized: number[] = [];
   const mergedWordStyles: Record<string, any> = {};
   let wordOffset = 0;
 
@@ -353,11 +368,119 @@ export function mergeCaptions(p:EditorProject,ids:string[]):EditorProject {
   }
   return changeText(next, first.id, text);
 }
-export function addTransition(p:EditorProject,fromClipId:string,toClipId:string,kind:TransitionKind,duration:number):EditorProject {
-  const a=editable(p,fromClipId),b=editable(p,toClipId);
-  if(a.trackId!==b.trackId || !["video","overlay","image"].includes(p.tracks[a.trackId].kind) || Math.abs(a.startTime+a.duration-b.startTime)>1/p.settings.fps) throw new Error("Transitions need two adjacent visual clips on the same track.");
-  const id=`transition-${a.id}-${b.id}`;
-  return {...p,transitions:{...p.transitions,[id]:{id,fromClipId,toClipId,kind,duration:clamp(duration,1/p.settings.fps,Math.min(a.duration,b.duration,5))}}};
+export function addTransition(
+  p: EditorProject,
+  fromClipId: string,
+  toClipId: string,
+  kind: TransitionKind,
+  duration: number,
+  options?: { intensity?: number; easing?: TransitionEasing; direction?: TransitionDirection }
+): EditorProject {
+  const a = editable(p, fromClipId);
+  const b = editable(p, toClipId);
+  if (
+    a.trackId !== b.trackId ||
+    !["video", "overlay", "image"].includes(p.tracks[a.trackId].kind) ||
+    Math.abs(a.startTime + a.duration - b.startTime) > 1 / p.settings.fps
+  ) {
+    throw new Error("Transitions need two adjacent visual clips on the same track.");
+  }
+  const id = `transition-${a.id}-${b.id}`;
+  const spec = getTransitionSpec(kind);
+  const rawDuration = Number.isFinite(duration) && duration > 0 ? duration : spec.defaultDuration;
+  const clampedDuration = clamp(rawDuration, 1 / p.settings.fps, Math.min(a.duration, b.duration, 5));
+  const nextTransition: Transition = {
+    id,
+    fromClipId,
+    toClipId,
+    kind,
+    duration: clampedDuration,
+    ...(options?.intensity !== undefined ? { intensity: clamp(options.intensity, 0.25, 2) } : {}),
+    ...(options?.easing ? { easing: options.easing } : {}),
+    ...(options?.direction ? { direction: options.direction } : {}),
+  };
+  return { ...p, transitions: { ...p.transitions, [id]: nextTransition } };
+}
+
+export function updateTransition(
+  p: EditorProject,
+  transitionId: string,
+  changes: Partial<Pick<Transition, "kind" | "duration" | "intensity" | "easing" | "direction">>
+): EditorProject {
+  const existing = p.transitions[transitionId];
+  if (!existing) throw new Error("Transition not found.");
+  return addTransition(
+    p,
+    existing.fromClipId,
+    existing.toClipId,
+    changes.kind ?? existing.kind,
+    changes.duration ?? existing.duration,
+    {
+      intensity: changes.intensity ?? existing.intensity,
+      easing: changes.easing ?? existing.easing,
+      direction: changes.direction ?? existing.direction,
+    }
+  );
+}
+
+export function removeTransition(p: EditorProject, transitionId: string): EditorProject {
+  if (!p.transitions[transitionId]) return p;
+  const existing = p.transitions[transitionId];
+  const fromClip = p.clips[existing.fromClipId];
+  if (fromClip && p.tracks[fromClip.trackId]?.locked) {
+    throw new Error("Unlock this track before editing.");
+  }
+  const transitions = { ...p.transitions };
+  delete transitions[transitionId];
+  return { ...p, transitions };
+}
+
+export function findAdjacentClipPairs(p: EditorProject): Array<{ from: Clip; to: Clip }> {
+  const pairs: Array<{ from: Clip; to: Clip }> = [];
+  const gapTol = 1 / Math.max(1, p.settings.fps);
+  for (const trackId of p.trackOrder) {
+    const track = p.tracks[trackId];
+    if (!track || track.locked || track.hidden || !["video", "overlay", "image"].includes(track.kind)) continue;
+    const ordered = track.clipIds
+      .map((id) => p.clips[id])
+      .filter((c): c is Clip => Boolean(c))
+      .sort((a, b) => a.startTime - b.startTime);
+    for (let i = 0; i < ordered.length - 1; i++) {
+      const a = ordered[i];
+      const b = ordered[i + 1];
+      if (Math.abs(a.startTime + a.duration - b.startTime) <= gapTol) {
+        pairs.push({ from: a, to: b });
+      }
+    }
+  }
+  return pairs;
+}
+
+export function applyTransitionToAllCuts(
+  p: EditorProject,
+  kind: TransitionKind,
+  duration?: number,
+  options?: { intensity?: number; easing?: TransitionEasing; direction?: TransitionDirection }
+): EditorProject {
+  const spec = getTransitionSpec(kind);
+  let next = p;
+  for (const { from, to } of findAdjacentClipPairs(p)) {
+    const maxSafe = Math.min(from.duration * 0.45, to.duration * 0.45);
+    const chosen = clamp(duration ?? spec.defaultDuration, 1 / p.settings.fps, Math.max(1 / p.settings.fps, maxSafe));
+    next = addTransition(next, from.id, to.id, kind, chosen, options);
+  }
+  return next;
+}
+
+export function clearAllTransitions(p: EditorProject): EditorProject {
+  const nextTransitions: Record<string, Transition> = {};
+  for (const [id, t] of Object.entries(p.transitions)) {
+    const c = p.clips[t.fromClipId];
+    if (c && p.tracks[c.trackId]?.locked) {
+      nextTransitions[id] = t;
+    }
+  }
+  return { ...p, transitions: nextTransitions };
 }
 export function addTrack(p:EditorProject,kind:TrackKind):EditorProject {
   if (p.trackOrder.length >= 30 || Object.keys(p.tracks).length >= 30) throw new Error("A project can have up to 30 tracks.");

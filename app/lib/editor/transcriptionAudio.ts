@@ -1,4 +1,5 @@
 import {readOriginal} from './original';
+import {MAX_VIDEO_SECONDS} from './limits';
 import {Input,BlobSource,UrlSource,ALL_FORMATS,AudioBufferSink} from 'mediabunny';
 import {cacheRead} from './cache';
 import {assetHeaders} from '../assets/client';
@@ -6,7 +7,7 @@ import type {Clip,MediaAsset} from './model';
 
 /** Compact mono PCM; speech time is unchanged, independently of timeline speed. */
 export function speechWav(samples:Float32Array,rate=16000):Blob{
- if(!samples.length||samples.length>240*rate||rate!==16000)throw new Error('Speech audio is empty or exceeds the decoding budget.');
+ if(!samples.length||samples.length>MAX_VIDEO_SECONDS*rate||rate!==16000)throw new Error('Speech audio is empty or exceeds the decoding budget.');
  const bytes=new ArrayBuffer(44+samples.length*2),v=new DataView(bytes);
  const text=(offset:number,value:string)=>{for(let i=0;i<value.length;i++)v.setUint8(offset+i,value.charCodeAt(i));};
  text(0,'RIFF');v.setUint32(4,36+samples.length*2,true);text(8,'WAVE');text(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);text(36,'data');v.setUint32(40,samples.length*2,true);
@@ -18,7 +19,7 @@ export function speechWav(samples:Float32Array,rate=16000):Blob{
 export async function prepareSpeechAudio(asset:MediaAsset,clip:Pick<Clip,"sourceStart"|"sourceEnd">,resolve:(a:MediaAsset)=>Promise<string>,signal:AbortSignal,original?:Blob):Promise<{file:File;sourceOffset:number}|undefined>{
  if(typeof window==='undefined'||typeof AudioDecoder==='undefined'||typeof OfflineAudioContext==='undefined')return undefined;
  signal.throwIfAborted();const duration=clip.sourceEnd-clip.sourceStart;
- if(!Number.isFinite(duration)||duration<=0||duration>240)throw new Error('Choose a source range up to four minutes for transcription.');
+ if(!Number.isFinite(duration)||duration<=0||duration>MAX_VIDEO_SECONDS)throw new Error('Choose a source range up to five minutes for transcription.');
  const cached=original||(asset.libraryId?await readOriginal(asset,signal):asset.localKey?await cacheRead<Blob>('media',asset.localKey).catch(()=>undefined):undefined);
  const url=cached?undefined:asset.libraryId?'/api/assets/'+encodeURIComponent(asset.libraryId)+'/file':await resolve(asset);
  if(url?.startsWith('blob:'))throw new Error('Relink the original footage before generating captions.');

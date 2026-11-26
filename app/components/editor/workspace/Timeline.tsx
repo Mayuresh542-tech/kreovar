@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { zoomAnchor } from "@/app/lib/editor/timelineNavigation";
+import { getTransitionSpec } from "@/app/lib/editor/transitions";
 import { Clip, MediaAsset, Track, TrackKind, formatTime, projectDuration, clamp } from "@/app/lib/editor/model";
 import {
   addClip,
@@ -911,21 +912,23 @@ export default function Timeline() {
                   {/* Transitions */}
                   {Object.values(p.transitions)
                     .filter((t) => p.clips[t.toClipId]?.trackId === id)
-                    .map((t) => (
+                    .map((t) => {
+                      const spec = getTransitionSpec(t.kind);
+                      return (
                       <button
                         className="vx-transition"
                         key={t.id}
                         style={{
                           left: p.clips[t.toClipId].startTime * pps,
-                          width: Math.max(12, t.duration * pps),
+                          width: Math.max(18, t.duration * pps),
                         }}
-                        title={`${t.kind} · ${t.duration}s. Select incoming clip to edit.`}
+                        title={`${spec.name} · ${t.duration.toFixed(2)}s. Select incoming clip to edit.`}
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={() => select([t.toClipId])}
                       >
-                        {t.kind === "dissolve" ? "◇" : t.kind[0].toUpperCase()}
+                        {spec.id === "dissolve" ? "◇" : spec.name.slice(0, 2).toUpperCase()}
                       </button>
-                    ))}
+                    );})}
                 </div>
               );
             })}

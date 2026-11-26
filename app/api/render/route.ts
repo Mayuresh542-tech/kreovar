@@ -57,7 +57,10 @@ async function postHandler(req: NextRequest) {
 
     try {
       const resolve=async(raw:string)=>{const legacy=legacyStoragePath(raw);if(!legacy)return trustedRenderMediaUrl(raw).href;const scoped=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:{Authorization:"Bearer "+getAccessToken(req)}}});const signed=await scoped.storage.from(legacy.bucket).createSignedUrl(legacy.path,120);if(signed.error||!signed.data)throw new Error("Media unavailable.");return trustedRenderMediaUrl(signed.data.signedUrl).href;};
-      for (const track of timeline.tracks) for (const item of track.items ?? []) if (item.source) item.source=await resolve(item.source);
+      for (const track of timeline.tracks) {
+        if (track.type === "text" || track.type === "captions") continue;
+        for (const item of track.items ?? []) if (item.source) item.source = await resolve(item.source);
+      }
       if (timeline.settings?.watermark?.logoUrl) timeline.settings.watermark.logoUrl=await resolve(timeline.settings.watermark.logoUrl);
     } catch { return NextResponse.json({ error: "Use imported or supported stock media URLs for server rendering." }, { status: 400 }); }
 
@@ -77,7 +80,7 @@ async function postHandler(req: NextRequest) {
       }
     }
 
-    try { assertVideoDuration(timeline.duration); for(const track of timeline.tracks)for(const item of track.items??[])assertVideoDuration(Number(item.startTime)+Number(item.duration)); } catch {return NextResponse.json({error:"Videos up to 60 seconds are supported. Trim the timeline before rendering."},{status:400});}
+    try { assertVideoDuration(timeline.duration); for(const track of timeline.tracks)for(const item of track.items??[])assertVideoDuration(Number(item.startTime)+Number(item.duration)); } catch {return NextResponse.json({error:"Videos up to 300 seconds (5 minutes) are supported. Trim the timeline before rendering."},{status:400});}
     try{assertRenderResolution(timeline.resolution);}catch{return NextResponse.json({error:'Use a video resolution up to 1080p.'},{status:400});}
 
     // 3. Atomically reserve server export allowance.

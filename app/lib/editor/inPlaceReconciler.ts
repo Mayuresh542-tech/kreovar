@@ -4,6 +4,9 @@ import type { AiToolRequest } from './aiTools';
 import type { EditingConstraints } from './editingIntent';
 import { matchPhraseToSpeech, type SpeechSegmentLike } from './phraseMatcher';
 import { type KenBurnsPreset } from './kenBurns';
+import { DEFAULT_MEDIA_ANIMATION, resolveMediaLoop, resolveMediaMotion } from './mediaAnimation';
+import { getTransitionSpec, resolveTransitionKind } from './transitions';
+import { findAdjacentClipPairs } from './operations';
 import { detectKeywordMoments } from './kineticStickers';
 import type { GraphicIcon } from './motionGraphics';
 
@@ -84,13 +87,24 @@ export function reconcileMotionGraphicPlacements(
   let graphicCounter = Object.values(project.clips).filter((c) => Boolean(c.graphic)).length;
 
   return decisions.map((d) => {
+    if (d.op === 'changeGraphic') {
+      return {
+        ...d,
+        ...(d.x === undefined ? {} : { x: clampCoord(d.x, -0.45, 0.45) }),
+        ...(d.y === undefined ? {} : { y: clampCoord(d.y, -0.45, 0.45) }),
+        ...(d.scale === undefined ? {} : { scale: clampCoord(d.scale, 0.4, 1.8) }),
+      };
+    }
     if (d.op !== 'addGraphic') return d;
     const idx = graphicCounter++;
     const isCompactTopKind =
       d.kind === 'stat-counter' ||
       d.kind === 'progress-ring' ||
       d.kind === 'notification' ||
-      d.kind === 'kinetic-badge';
+      d.kind === 'kinetic-badge' ||
+      d.kind === 'social-follow' ||
+      d.kind === 'chapter-card' ||
+      d.kind === 'offer-tag';
 
     const curX = d.x ?? (isVertical ? 0 : d.kind === 'lower-third' ? -0.20 : idx % 2 === 0 ? 0.28 : -0.28);
     const curY =
@@ -353,6 +367,84 @@ export function reconcileEditingDecisions(
 
     if (constraints.disallowedZooms) {
       reconciledDecisions = reconciledDecisions.filter(d => d.op !== 'addZoom');
+    }
+
+    if (constraints.disallowedTransitions) {
+      reconciledDecisions = reconciledDecisions.filter(d => d.op !== 'addTransition');
+    }
+
+    // Explicit CapCut Transition Fulfillment & Normalization
+    if (!constraints.disallowedTransitions && constraints.requestedTransitionKind) {
+      const requestedKind = constraints.requestedTransitionKind;
+      const spec = getTransitionSpec(requestedKind);
+      for (const d of reconciledDecisions) {
+        if (d.op === 'addTransition' && d.kind === 'dissolve' && requestedKind !== 'dissolve') {
+          d.kind = requestedKind;
+        }
+      }
+      const existingTransitionOps = reconciledDecisions.filter(d => d.op === 'addTransition');
+      const adjacentPairs = findAdjacentClipPairs(project);
+      if (adjacentPairs.length > 0 && (constraints.requestedAllCutTransitions || existingTransitionOps.length === 0)) {
+        const pairsToApply = constraints.requestedAllCutTransitions ? adjacentPairs : adjacentPairs.slice(0, 4);
+        let added = 0;
+        for (const { from, to } of pairsToApply) {
+          const alreadyPlanned = reconciledDecisions.some(
+            d => d.op === 'addTransition' && d.fromClipId === from.id && d.toClipId === to.id
+          );
+          if (alreadyPlanned) continue;
+          const maxSafe = Math.min(from.duration * 0.45, to.duration * 0.45);
+          const dur = Math.max(1 / project.settings.fps, Math.min(spec.defaultDuration, maxSafe));
+          if (dur <= Math.min(from.duration, to.duration)) {
+            reconciledDecisions.push({
+              op: 'addTransition',
+              fromClipId: from.id,
+              toClipId: to.id,
+              kind: requestedKind,
+              duration: Number(dur.toFixed(2)),
+            });
+            added++;
+          }
+        }
+        if (added > 0) {
+          summaryNotes.push(`Applied ${spec.name} transitions across ${added} adjacent cut(s).`);
+        }
+      }
+    }
+
+    // Explicit CapCut Clip Animation Fulfillment
+    if (constraints.requestedClipAnimation) {
+      const animKind = constraints.requestedClipAnimation;
+      const targetClips = Object.values(project.clips).filter(c => {
+        const track = project.tracks[c.trackId];
+        if (!track || track.locked || track.hidden) return false;
+        const asset = c.assetId ? project.assets[c.assetId] : undefined;
+        return Boolean(asset && ['video', 'image'].includes(asset.kind) && ['overlay', 'image'].includes(track.kind));
+      });
+      const fallbackTargets = targetClips.length
+        ? targetClips
+        : Object.values(project.clips).filter(c => {
+            const track = project.tracks[c.trackId];
+            const asset = c.assetId ? project.assets[c.assetId] : undefined;
+            return Boolean(track && !track.locked && asset && ['video', 'image'].includes(asset.kind));
+          });
+      if (fallbackTargets.length > 0 && !reconciledDecisions.some(d => d.op === 'changeClipProperty' && d.changes.mediaAnimation)) {
+        for (const c of fallbackTargets.slice(0, 6)) {
+          reconciledDecisions.push({
+            op: 'changeClipProperty',
+            clipId: c.id,
+            changes: {
+              mediaAnimation: {
+                ...DEFAULT_MEDIA_ANIMATION,
+                entrance: animKind,
+                exit: animKind === 'mini-zoom' ? 'none' : 'fade',
+                entranceDuration: Math.min(0.4, c.duration * 0.35),
+                exitDuration: Math.min(0.3, c.duration * 0.3),
+              },
+            },
+          });
+        }
+        summaryNotes.push(`Applied ${animKind} clip animation to ${Math.min(6, fallbackTargets.length)} clip(s).`);
+      }
     }
 
     // Selective Zoom Removal
@@ -824,12 +916,32 @@ export function reconcileEditingDecisions(
         }
         return true;
       }
+      case 'changeClipProperty': {
+        const clip = project.clips[d.clipId];
+        if (clip && project.tracks[clip.trackId]?.locked) return false;
+        if (d.changes?.mediaAnimation) {
+          const anim = d.changes.mediaAnimation as unknown as Record<string, unknown>;
+          const entrance = resolveMediaMotion(anim.entrance) ?? anim.entrance;
+          const exit = resolveMediaMotion(anim.exit) ?? anim.exit;
+          const loop = resolveMediaLoop(anim.loop) ?? anim.loop;
+          d.changes = {
+            ...d.changes,
+            mediaAnimation: {
+              ...DEFAULT_MEDIA_ANIMATION,
+              ...(d.changes.mediaAnimation || {}),
+              entrance: entrance as typeof DEFAULT_MEDIA_ANIMATION.entrance,
+              exit: exit as typeof DEFAULT_MEDIA_ANIMATION.exit,
+              loop: loop as typeof DEFAULT_MEDIA_ANIMATION.loop,
+            },
+          };
+        }
+        return true;
+      }
       case 'clearZooms':
       case 'removeClip':
       case 'duplicateClip':
       case 'trimClip':
       case 'splitClip':
-      case 'changeClipProperty':
       case 'keyframes':
       case 'animate':
       case 'setVisualTreatment': {
@@ -875,6 +987,16 @@ export function reconcileEditingDecisions(
         const from = project.clips[d.fromClipId];
         const to = project.clips[d.toClipId];
         if (!from || !to || from.trackId !== to.trackId || project.tracks[from.trackId]?.locked) return false;
+        if (!['video', 'overlay', 'image'].includes(project.tracks[from.trackId]?.kind)) return false;
+        const fps = Math.max(1, project.settings.fps);
+        if (Math.abs(from.startTime + from.duration - to.startTime) > 1 / fps) return false;
+        const resolved = resolveTransitionKind(d.kind);
+        if (resolved) d.kind = resolved;
+        const maxAllowed = Math.min(from.duration * 0.45, to.duration * 0.45, 5);
+        if (!Number.isFinite(d.duration) || d.duration <= 0) {
+          d.duration = Math.min(getTransitionSpec(d.kind).defaultDuration, maxAllowed);
+        }
+        d.duration = Math.max(1 / fps, Math.min(d.duration, maxAllowed));
         return true;
       }
       case 'changeTrack': {

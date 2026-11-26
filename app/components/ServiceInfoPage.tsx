@@ -10,7 +10,7 @@ const content={
   {title:'Built for creators and short-form video',text:'Kreovar is engineered specifically for vertical short-form formats including TikTok, Instagram Reels, and YouTube Shorts. Our browser-based studio streamlines the tedious steps of video assembly, from word-level subtitle timing to multi-track clip sequencing, while ensuring creators maintain final creative authority.'},
   {title:'Creator ownership and media privacy',text:'You retain full ownership and commercial rights to your footage, audio recordings, and exported projects. Kreovar does not claim ownership over creator assets or utilize private user media for public model training.'},
   {title:'AI assistance with your review',text:'The AI editor plans and applies supported changes in saved stages. Review the resulting preview and use Undo when needed. Automatic captions and generated content can make mistakes. Check the wording, timing and final video before publishing.'},
-  {title:'Know the limits before starting',text:'Video exports are limited to 60 seconds. AI tools use plan allowances and depend on service availability. Check Pricing for current features and limits; image and video generation are not included unless explicitly offered.'},
+  {title:'Know the limits before starting',text:'Video exports are limited to 5 minutes (300 seconds). AI tools use plan allowances and depend on service availability. Check Pricing for current features and limits; image and video generation are not included unless explicitly offered.'},
  ]},
  contact:{title:'Contact Kreovar',intro:'Contact Kreovar about an account, project, subscription or privacy request using the support email below.',sections:[
   {title:'Account and project support',text:'Include the email associated with your account, the affected project ID if available, your browser, and a description of what happened. An error message or a screenshot can help us investigate.'},
@@ -24,7 +24,7 @@ const content={
   {title:'Plans and payments',text:'Kreovar offers Free and Pro plans. Review the current allowances, billing cycle and total at checkout before paying. Payments are processed through Whop; recurring plans renew unless cancelled before the next renewal.'},
   {title:'Cancellation and refunds',text:'Manage cancellation through your Whop account or purchase receipt. The Refund & Return Policy explains eligibility and how to request help; it is separate from cancellation of future renewals.'},
   {title:'Your media and AI results',text:'You retain rights in the content you upload, subject to the permissions and terms described in our policies. AI captions, scripts and editing suggestions need your review. Keep independent copies of important media and check your exported video.'},
-  {title:'Capabilities and availability',text:'Final video exports are limited to 60 seconds. Some tools use a plan allowance, and service or browser limitations can affect results. A feature described as unavailable or coming soon is not a promise of current access.'},
+  {title:'Capabilities and availability',text:'Final video exports are limited to 5 minutes (300 seconds). Some tools use a plan allowance, and service or browser limitations can affect results. A feature described as unavailable or coming soon is not a promise of current access.'},
  ]},
 };
 export default async function ServiceInfoPage({kind}:{kind:keyof typeof content}){

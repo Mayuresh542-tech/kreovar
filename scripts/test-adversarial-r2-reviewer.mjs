@@ -109,8 +109,9 @@ describe("Reviewer R2 Adversarial Verification Suite", () => {
     p = ops.addClip(p, "a1", trackId, 0, { id: "c1", duration: 4 });
     p = ops.addClip(p, "a2", trackId, 4, { id: "c2", duration: 4 });
 
-    const validKinds = ["fade", "dissolve", "slide", "zoom"];
-    for (const kind of validKinds) {
+    const { TRANSITION_KINDS } = load("app/lib/editor/transitions.ts");
+    assert.ok(TRANSITION_KINDS.length >= 30);
+    for (const kind of TRANSITION_KINDS) {
       const pWithTr = ops.addTransition(p, "c1", "c2", kind, 0.5);
       const trIds = Object.keys(pWithTr.transitions);
       assert.ok(trIds.length > 0, `Transition ${kind} should be recorded`);

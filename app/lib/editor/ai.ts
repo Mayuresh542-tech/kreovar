@@ -4,12 +4,12 @@ import {preserveCaptionAnchors} from './captionAnchors';
 import {addShape,type ShapeKind,type ShapeStyle} from "./shapes";
 import {addZoom,clearZooms} from "./zoom";
 import {setTransformKeyframes,type TransformKeyframe,type MotionPreset,applyMotionPreset} from './keyframes';
-import {addMotionGraphic,addAnimatedOverlay,type GraphicKind,type GraphicTheme,type GraphicIcon,type GraphicBar,type GraphicComparison} from './motionGraphics';
+import {addMotionGraphic,changeMotionGraphic,addAnimatedOverlay,type GraphicKind,type GraphicTheme,type GraphicIcon,type GraphicBar,type GraphicComparison,type CustomGraphicSpec} from './motionGraphics';
 import {rippleCut,type CutRange} from "./rippleCut";
 import {applyTextPlacement,type TextPlacementId} from "./textPlacement";
 import {MAX_VIDEO_SECONDS} from "./limits";
 import {projectDuration} from "./model";
-import { Clip, EditorProject, TransitionKind, TextStyle, Ratio, normalizeCaptionPresetId } from "./model";
+import { Clip, EditorProject, TransitionKind, TransitionEasing, TransitionDirection, TextStyle, Ratio, normalizeCaptionPresetId } from "./model";
 import * as edit from "./operations";
 import {appendSequence} from "./sequence";
 import {applyCaptionTemplate,addTemplatedCaption} from "./captionTemplates";
@@ -22,7 +22,9 @@ export type EditDecision =
   | {op:'addShape';kind:ShapeKind;startTime:number;duration:number;style?:Partial<ShapeStyle>;transform?:Partial<Clip["transform"]>;motion?:MotionPreset}
   | {op:'keyframes';clipId:string;frames:TransformKeyframe[]}
   | {op:'animate';clipId:string;preset:MotionPreset}
-  | {op:'addGraphic';kind:GraphicKind;text:string;startTime:number;duration:number;accent?:string;motion?:MotionPreset;theme?:GraphicTheme;subtitle?:string;icon?:GraphicIcon;value?:number;prefix?:string;suffix?:string;items?:string[];bars?:GraphicBar[];comparison?:GraphicComparison;targetX?:number;targetY?:number;x?:number;y?:number;scale?:number}
+  | {op:'addGraphic';kind:GraphicKind;text:string;startTime:number;duration:number;accent?:string;motion?:MotionPreset;theme?:GraphicTheme;subtitle?:string;icon?:GraphicIcon;value?:number;prefix?:string;suffix?:string;items?:string[];bars?:GraphicBar[];comparison?:GraphicComparison;targetX?:number;targetY?:number;customSpec?:CustomGraphicSpec;x?:number;y?:number;scale?:number}
+  | {op:'changeGraphic';clipId:string;kind?:GraphicKind;text?:string;startTime?:number;duration?:number;accent?:string;motion?:MotionPreset;theme?:GraphicTheme;subtitle?:string;icon?:GraphicIcon;value?:number;prefix?:string;suffix?:string;items?:string[];bars?:GraphicBar[];comparison?:GraphicComparison;targetX?:number;targetY?:number;customSpec?:CustomGraphicSpec;x?:number;y?:number;scale?:number}
+  | {op:'removeGraphic';clipId:string}
   | {op:'addOverlay';assetId:string;trackId:string;startTime:number;duration:number;motion?:MotionPreset}
   | {op:"addZoom";clipId:string;startTime:number;endTime:number;fromScale:number;toScale:number;returnToStart?:boolean;easing?:"linear"|"smooth";focusX?:number;focusY?:number;style?:import('./zoom').ZoomStyle}
   | {op:"clearZooms";clipId:string}
@@ -38,7 +40,7 @@ export type EditDecision =
   | {op:"splitClip";clipId:string;time:number}
   | {op:"addText";text:string;startTime:number;placementId?:TextPlacementId;style?:Partial<TextStyle>}
   | {op:"addCaption";text:string;startTime:number;duration:number;templateId?:string;placementId?:TextPlacementId;words?:import("./model").CaptionWord[]}
-  | {op:"addTransition";fromClipId:string;toClipId:string;kind:TransitionKind;duration:number}
+  | {op:"addTransition";fromClipId:string;toClipId:string;kind:TransitionKind;duration:number;intensity?:number;easing?:TransitionEasing;direction?:TransitionDirection}
   | {op:"duplicateClip";clipId:string;startTime?:number}
   | {op:"changeText";clipId:string;text:string;style?:Partial<TextStyle>}
   | {op:"mergeCaptions";clipIds:string[]}
@@ -51,7 +53,7 @@ export interface EditDecisionList {version:1;projectId:string;baseRevision:numbe
 /** Validate against a revision and apply atomically in one EditorStore.execute transaction. */
 export function applyEditDecisionList(p:EditorProject,list:EditDecisionList):EditorProject {
   if(list.version!==1||list.projectId!==p.id||list.baseRevision!==p.revision)throw new Error("This edit plan targets a different project revision.");
-  if(list.decisions.length>100)throw new Error("Edit plan exceeds the operation limit.");
+  if(list.decisions.length>400)throw new Error("Edit plan exceeds the operation limit.");
   const result=list.decisions.reduce((project,d)=>{
     switch(d.op){
       case 'composeCaption':return composeCaption(project,d.clipId,d.presentation);
@@ -59,7 +61,39 @@ export function applyEditDecisionList(p:EditorProject,list:EditDecisionList):Edi
       case'keyframes':return setTransformKeyframes(project,d.clipId,d.frames);
       case'animate':return applyMotionPreset(project,d.clipId,d.preset);
       case'addShape':{const next=addShape(project,d.kind,d.startTime,d.duration,d.style,d.transform);if(!d.motion)return next;const id=Object.keys(next.clips).find(id=>!project.clips[id])!;return applyMotionPreset(next,id,d.motion);}
-      case'addGraphic':return addMotionGraphic(project,d.kind,d.text,d.startTime,d.duration,d.accent,d.motion,{theme:d.theme,subtitle:d.subtitle,icon:d.icon,value:d.value,prefix:d.prefix,suffix:d.suffix,items:d.items,bars:d.bars,comparison:d.comparison,targetX:d.targetX,targetY:d.targetY,x:d.x,y:d.y,scale:d.scale,allowNewTrack:true});
+      case'addGraphic':return addMotionGraphic(project,d.kind,d.text,d.startTime,d.duration,d.accent,d.motion,{theme:d.theme,subtitle:d.subtitle,icon:d.icon,value:d.value,prefix:d.prefix,suffix:d.suffix,items:d.items,bars:d.bars,comparison:d.comparison,targetX:d.targetX,targetY:d.targetY,customSpec:d.customSpec,x:d.x,y:d.y,scale:d.scale,allowNewTrack:true});
+      case'changeGraphic':{
+        let next=changeMotionGraphic(project,d.clipId,{
+          ...(d.text===undefined?{}:{text:d.text}),
+          ...(d.kind===undefined?{}:{kind:d.kind}),
+          ...(d.accent===undefined?{}:{accent:d.accent}),
+          ...(d.theme===undefined?{}:{theme:d.theme}),
+          ...(d.subtitle===undefined?{}:{subtitle:d.subtitle}),
+          ...(d.icon===undefined?{}:{icon:d.icon}),
+          ...(d.value===undefined?{}:{value:d.value}),
+          ...(d.prefix===undefined?{}:{prefix:d.prefix}),
+          ...(d.suffix===undefined?{}:{suffix:d.suffix}),
+          ...(d.items===undefined?{}:{items:d.items}),
+          ...(d.bars===undefined?{}:{bars:d.bars}),
+          ...(d.comparison===undefined?{}:{comparison:d.comparison}),
+          ...(d.targetX===undefined?{}:{targetX:d.targetX}),
+          ...(d.targetY===undefined?{}:{targetY:d.targetY}),
+          ...(d.customSpec===undefined?{}:{customSpec:d.customSpec}),
+        });
+        if(d.startTime!==undefined)next=edit.moveClip(next,d.clipId,d.startTime);
+        if(d.duration!==undefined)next=edit.trimClip(next,d.clipId,'right',next.clips[d.clipId].startTime+d.duration);
+        if(d.x!==undefined||d.y!==undefined||d.scale!==undefined){
+          const clip=next.clips[d.clipId];
+          next=edit.changeClipProperty(next,d.clipId,{transform:{...clip.transform,...(d.x===undefined?{}:{x:d.x}),...(d.y===undefined?{}:{y:d.y}),...(d.scale===undefined?{}:{scale:d.scale})}});
+        }
+        if(d.motion!==undefined)next=applyMotionPreset(next,d.clipId,d.motion);
+        return next;
+      }
+      case'removeGraphic':{
+        const clip=project.clips[d.clipId];
+        if(!clip?.graphic||project.tracks[clip.trackId]?.locked)throw new Error("Select an unlocked motion graphic.");
+        return edit.removeClip(project,d.clipId);
+      }
       case'addOverlay':return addAnimatedOverlay(project,d.assetId,d.trackId,d.startTime,d.duration,d.motion);
       case"addZoom":return addZoom(project,d.clipId,d.startTime,d.endTime,d.fromScale,d.toScale,d.returnToStart,d.easing,d.focusX,d.focusY,d.style);
       case"clearZooms":return clearZooms(project,d.clipId);
@@ -79,7 +113,7 @@ export function applyEditDecisionList(p:EditorProject,list:EditDecisionList):Edi
       case"splitClip":return edit.splitClip(project,d.clipId,d.time);
       case"addText":{const next=edit.addText(project,d.text,d.startTime,d.style);return applyTextPlacement(next,Object.keys(next.clips).filter(id=>!project.clips[id]),d.placementId||"title-center",{fontSize:d.style?.size,align:d.style?.align});}
       case"addCaption":{const next=addTemplatedCaption(project,d.text,d.startTime,d.duration,d.templateId,d.words);return applyTextPlacement(next,Object.keys(next.clips).filter(id=>!project.clips[id]),d.placementId||"caption-safe");}
-      case"addTransition":return edit.addTransition(project,d.fromClipId,d.toClipId,d.kind,d.duration);
+      case"addTransition":return edit.addTransition(project,d.fromClipId,d.toClipId,d.kind,d.duration,{...(d.intensity!==undefined?{intensity:d.intensity}:{}),...(d.easing!==undefined?{easing:d.easing}:{}),...(d.direction!==undefined?{direction:d.direction}:{})});
       case"setAspectRatio":return {...project,settings:{...project.settings,aspectRatio:d.aspectRatio}};
       case"reframeProject":return reframeProject(project,d.mode,{focusX:d.focusX,focusY:d.focusY,blurAmount:d.blurAmount,backgroundScale:d.backgroundScale,topRatio:d.topRatio});
       case"applySpeedCurve":{
@@ -96,6 +130,6 @@ export function applyEditDecisionList(p:EditorProject,list:EditDecisionList):Edi
       default:throw new Error("Unsupported AI editing operation.");
     }
   },p);
-  if(projectDuration(result)>MAX_VIDEO_SECONDS)throw new Error("AI edits must fit within 60 seconds. Trim the timeline first.");
+  if(projectDuration(result)>MAX_VIDEO_SECONDS)throw new Error(`AI edits must fit within ${MAX_VIDEO_SECONDS} seconds (5 minutes). Trim the timeline first.`);
   return result;
 }

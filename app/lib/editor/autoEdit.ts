@@ -1,8 +1,10 @@
 import {applyEditDecisionList,type EditDecision,type EditDecisionList} from './ai';
+import {MAX_VIDEO_SECONDS} from './limits';
 import {validateAiPlan} from './aiValidation';
 import {validateAiTools,mainFootage,type AiToolRequest} from './aiTools';
 import {speechContext} from './speechContext';
-import {projectDuration,type EditorProject,type MediaAsset,type Clip} from './model';
+import {projectDuration,type EditorProject,type MediaAsset,type Clip,type TransitionKind} from './model';
+import {getTransitionSpec} from './transitions';
 import {addAsset} from './operations';
 import {editorialBeats} from './editorialSense';
 import {AI_EDIT_STYLE_RECIPES} from '../captions/aiEditStyles';
@@ -45,7 +47,7 @@ export function createAutoEditPlan(project:EditorProject,options:AutoEditOptions
   decisions.push({op:'appendSequence',assetIds:originals.map(a=>a.id)});
  }
  const list=listFor(project,decisions),base=applyEditDecisionList(project,list),footage=scopedFootage(base,selection);
- if(projectDuration(base)>60)throw Error('Trim the timeline to 60 seconds before Auto edit.');
+ if(projectDuration(base)>MAX_VIDEO_SECONDS)throw Error(`Trim the timeline to ${MAX_VIDEO_SECONDS} seconds (5 minutes) before Auto edit.`);
  const toolRequests:AiToolRequest[]=[];
  if(options.captions){
   for(const clip of footage){
@@ -133,12 +135,18 @@ export function finishAutoEditPlan(snapshot:EditorProject,baseList:EditDecisionL
    }
   }
  }
- if(options.transitions){for(let i=1;i<footage.length;i++){
-  const a=footage[i-1],b=footage[i];if(a.trackId!==b.trackId||Math.abs(a.startTime+a.duration-b.startTime)>1e-6)continue;
-  if(Object.values(staged.transitions).some(t=>t.fromClipId===a.id||t.toClipId===b.id))continue;
-  const duration=Math.min(.25,a.duration/3,b.duration/3);if(duration<1/fps)continue;
-  decisions.push({op:'addTransition',fromClipId:a.id,toClipId:b.id,kind:'dissolve',duration});
- }}
+ if(options.transitions){
+  const styleTransitionMap:Record<string,TransitionKind>={social:'whip-left','captions-impact':'zoom-blur','captions-prism':'light-leak','captions-prime':'gaussian-blur','captions-vista':'wipe-diagonal','captions-paper':'slide','captions-sketch':'wipe-right',cinema:'luma-dissolve',editorial:'gaussian-blur',clean:'dissolve'};
+  const kind:TransitionKind=styleTransitionMap[options.styleId]||(options.intensity==='punchy'?'zoom-blur':'dissolve');
+  const spec=getTransitionSpec(kind);
+  for(let i=1;i<footage.length;i++){
+   const a=footage[i-1],b=footage[i];if(a.trackId!==b.trackId||Math.abs(a.startTime+a.duration-b.startTime)>1e-6)continue;
+   if(Object.values(staged.transitions).some(t=>t.fromClipId===a.id||t.toClipId===b.id))continue;
+   const targetDur=options.styleId==='clean'||!styleTransitionMap[options.styleId]?Math.min(.25,spec.defaultDuration):spec.defaultDuration;
+   const duration=Math.min(targetDur,a.duration*.45,b.duration*.45);if(duration<1/fps)continue;
+   decisions.push({op:'addTransition',fromClipId:a.id,toClipId:b.id,kind,duration});
+  }
+ }
  const start=Math.min(...footage.map(c=>c.startTime)),end=Math.max(...footage.map(c=>c.startTime+c.duration));
  if(options.musicAssetId){
   const a=staged.assets[options.musicAssetId],track=staged.trackOrder.map(id=>staged.tracks[id]).find(t=>t.kind==='audio'&&!t.locked&&!t.hidden&&!t.muted);

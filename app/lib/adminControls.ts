@@ -4,7 +4,7 @@ export function controlledFeature(path:string,method:string):string|null {
  if (['/api/content-kit','/api/platform-kit'].includes(path)) return method==='POST'?'content':null;
  if (path.startsWith('/api/voice/') && method==='POST') return 'voice';
  if (path==='/api/transcribe'||(path.startsWith('/api/captions/')&&method==='POST')) return 'captions';
- if (['/api/editor/ai-edit','/api/ai/complete','/api/editor/generate-image','/api/thumbnails/generate'].includes(path)) return 'ai';
+ if (['/api/editor/ai-edit','/api/editor/ai-video','/api/ai/complete','/api/editor/generate-image','/api/thumbnails/generate'].includes(path)) return 'ai';
  if (['/api/render','/api/editor/export-mp4','/api/editor/export'].includes(path) && method==='POST') return 'export';
  if (/^\/api\/(broll|sfx|stock)(\/|$)/.test(path)) return 'stock';
  return null;

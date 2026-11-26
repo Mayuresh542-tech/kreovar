@@ -1,4 +1,5 @@
 import {type EditorProject,type Clip,type Transform,defaultTransform,uid,dimensions} from './model';
+import {MAX_VIDEO_SECONDS} from './limits';
 import {addTrack} from './operations';
 import {readStrokePath,drawStrokePath,type StrokePathStyle,type StrokeDrawContext} from './strokePath';
 export const SHAPE_KINDS=['rectangle','ellipse','triangle','arrow','line','star'] as const;
@@ -14,7 +15,7 @@ export function readShape(value:unknown):ShapeStyle{
 }
 /** Pure native shape operation; no bitmap assets, uploads or remote requests. */
 export function addShape(p:EditorProject,kind:ShapeKind,startTime:number,duration=3,patch:Partial<ShapeStyle>={},pose:Partial<Transform>={}):EditorProject{
- if(!Number.isFinite(startTime)||startTime<0||!Number.isFinite(duration)||duration<1/p.settings.fps||startTime+duration>60)throw Error('Keep shapes inside the 60-second edit.');
+ if(!Number.isFinite(startTime)||startTime<0||!Number.isFinite(duration)||duration<1/p.settings.fps||startTime+duration>MAX_VIDEO_SECONDS)throw Error(`Keep shapes inside the ${MAX_VIDEO_SECONDS}-second edit.`);
  const transform={...defaultTransform,...pose};if(Object.values(transform).some(n=>!Number.isFinite(n))||Math.abs(transform.x)>2||Math.abs(transform.y)>2||transform.scale<.05||transform.scale>10||Math.abs(transform.rotation)>3600||transform.opacity<0||transform.opacity>1)throw Error('Invalid shape transform.');
  const shape=readShape({...defaultShape,...(kind==='line'?{height:.015,strokeWidth:6}:{}),...patch,kind});
  const isShapeTrack=(id:string)=>{const t=p.tracks[id];return t.kind==='overlay'&&(t.name==='Shapes'||t.clipIds.length>0)&&t.clipIds.every(clipId=>!!p.clips[clipId]?.shape);};

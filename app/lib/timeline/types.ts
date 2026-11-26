@@ -22,28 +22,24 @@ export type TimelineItemType =
   | "sfx"
   | "overlay";
 
+import type { TransitionKind } from "../editor/transitions";
+import type { MediaMotion } from "../editor/mediaAnimation";
+
 export type TransitionType =
   | "cut"
-  | "fade"
-  | "dissolve"
+  | TransitionKind
   | "dip_black"
   | "dip_white"
-  | "slide"
-  | "zoom"
   | "wipe"
   | "push"
   | "blur";
 
 export type MotionAnimationType =
-  | "none"
+  | MediaMotion
   | "slow_zoom_in"
   | "slow_zoom_out"
   | "pan_left"
-  | "pan_right"
-  | "ken-burns-push"
-  | "ken-burns-pull"
-  | "ken-burns-pan-left"
-  | "ken-burns-pan-right";
+  | "pan_right";
 
 export type SpeedCurvePreset =
   | "normal"
