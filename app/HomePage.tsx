@@ -5,6 +5,10 @@ import Link from "next/link";
 import BrandMark from "./components/BrandMark";
 import PublicAnswers from "./components/marketing/PublicAnswers";
 import LegalLinks from "./components/LegalLinks";
+import CreatorObject3D, { type CreatorObjectVariant } from "./components/3d/CreatorObject3D";
+import SpatialTiltCard from "./components/3d/SpatialTiltCard";
+import MotionGraphicCanvasPreview from "./components/assets/MotionGraphicCanvasPreview";
+import { KREOVAR_MOTION_TEMPLATES } from "./lib/editor/kreovarMotionTemplates";
 import { FEATURE_PAGES } from "./lib/featurePages";
 import { PLANS } from "./config/plans";
 import { useAuthGate } from "./lib/useAuthGate";
@@ -23,7 +27,52 @@ import {
   Volume2,
   Download,
   Zap,
+  Aperture,
+  Clapperboard,
 } from "lucide-react";
+
+const SHOWCASE_3D_OBJECTS: Array<{
+  id: CreatorObjectVariant;
+  label: string;
+  caption: string;
+  icon: typeof Aperture;
+}> = [
+  {
+    id: "cinema-lens",
+    label: "Optics & Iris",
+    caption: "Drag to inspect lens barrel · Click to stop-down sapphire aperture blades",
+    icon: Aperture,
+  },
+  {
+    id: "timeline-deck",
+    label: "Multi-Track Deck",
+    caption: "Layered V2/V1/A1 glass strips · Click to sweep keyframe playhead",
+    icon: Layers,
+  },
+  {
+    id: "director-slate",
+    label: "Director Slate",
+    caption: "Machined production clapperboard · Click to snap slate shut",
+    icon: Clapperboard,
+  },
+  {
+    id: "studio-mic",
+    label: "Voice Condenser",
+    caption: "Broadcast capsule & acoustic halo · Click for waveform ripple",
+    icon: Mic,
+  },
+];
+
+const LANDING_MOTION_SHOWCASE_IDS = [
+  "split-kinetic-title",
+  "vox-marker-highlight",
+  "podcast-waveform-pill",
+  "youtube-subscribe-cta",
+  "stat-hero-counter",
+  "line-trend-sparkline",
+  "creator-lower-third",
+  "promo-offer-tag",
+];
 
 // Infinite sliding marquee badges
 const TICKER_ITEMS_1 = [
@@ -52,17 +101,27 @@ export default function Home() {
   const { status, session } = useAuthGate();
   const isAuthed = status === "authed" && !!session;
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
+  const [active3DObject, setActive3DObject] = useState<CreatorObjectVariant>("cinema-lens");
+  const [activeMotionIdx, setActiveMotionIdx] = useState(0);
+
+  const featuredMotionTemplates = KREOVAR_MOTION_TEMPLATES.filter((t) =>
+    LANDING_MOTION_SHOWCASE_IDS.includes(t.id)
+  );
+  const selectedMotionTemplate =
+    featuredMotionTemplates[activeMotionIdx] || KREOVAR_MOTION_TEMPLATES[0];
+  const selected3DMeta =
+    SHOWCASE_3D_OBJECTS.find((item) => item.id === active3DObject) || SHOWCASE_3D_OBJECTS[0];
 
   return (
-    <div className="vx-glass-landing relative min-h-screen bg-[#FAFAFA] text-[#0F172A] font-sans antialiased selection:bg-blue-600 selection:text-white overflow-x-hidden">
+    <div className="vx-glass-landing vx-pearl-backdrop relative min-h-screen text-[#142440] font-sans antialiased selection:bg-[#1D4FB1] selection:text-white overflow-x-hidden">
       {/* Subtle Background Lighting & Mesh */}
       <div aria-hidden="true" className="vx-landing-lighting fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f00a_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f00a_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-70" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1d4fb108_1px,transparent_1px),linear-gradient(to_bottom,#1d4fb108_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-80" />
       </div>
 
       {/* ── TOP NOTIFICATION BANNER (When User Is Logged In) ── */}
       {isAuthed && (
-        <div className="vx-landing-banner relative z-50 bg-white border-b border-slate-200/80 px-4 py-2 text-center text-xs text-slate-600 flex items-center justify-center gap-2.5 shadow-2xs">
+        <div className="vx-landing-banner relative z-50 bg-white/85 backdrop-blur-md border-b border-slate-200/80 px-4 py-2 text-center text-xs text-slate-600 flex items-center justify-center gap-2.5 shadow-2xs">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="font-medium text-slate-800">
             Welcome back, {session?.user?.email?.split("@")[0]}
@@ -70,7 +129,7 @@ export default function Home() {
           <span className="text-slate-300">•</span>
           <Link
             href="/dashboard"
-            className="font-semibold text-blue-600 hover:text-blue-700 transition-colors inline-flex items-center gap-1 group"
+            className="font-semibold text-[#1D4FB1] hover:text-blue-800 transition-colors inline-flex items-center gap-1 group"
           >
             Open Creator Dashboard{" "}
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -79,7 +138,7 @@ export default function Home() {
       )}
 
       {/* ── HEADER ── */}
-      <header className="vx-glass-landing-header sticky top-0 inset-x-0 h-16 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/80 transition-all">
+      <header className="vx-glass-landing-header vx-public-glass-header sticky top-0 inset-x-0 h-16 z-40 transition-all">
         <div className="vx-landing-nav max-w-7xl mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 group">
@@ -467,10 +526,101 @@ export default function Home() {
               </div>
             </div>
           </div>
+
+          {/* ── INTERACTIVE 3D STUDIO OBJECTS & LIVE MOTION GRAPHICS THEATER ── */}
+          <div className="mt-12 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            {/* Left: Interactive 3D Video Hardware Stage */}
+            <SpatialTiltCard maxTilt={3.5} className="vx-frosted-surface lg:col-span-5 rounded-3xl p-5 sm:p-6 flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/80 px-2.5 py-1 text-[10px] font-mono font-semibold uppercase tracking-wider text-[#1D4FB1]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#1D4FB1] vx-live-pulse" />
+                    Interactive 3D Rig
+                  </span>
+                  <span className="text-[11px] font-mono text-[#52647e]">Drag · Click</span>
+                </div>
+                <h2 className="text-lg font-bold text-[#142440]">
+                  Tactile Creator Hardware
+                </h2>
+
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Switch 3D studio hardware object">
+                  {SHOWCASE_3D_OBJECTS.map((item) => {
+                    const Icon = item.icon;
+                    const active = item.id === active3DObject;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setActive3DObject(item.id)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold transition-all cursor-pointer ${
+                          active
+                            ? "bg-[#13223E] text-white shadow-xs"
+                            : "bg-white/80 text-slate-600 border border-slate-200/80 hover:bg-white hover:text-[#142440]"
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="vx-3d-viewport mt-4 h-64 sm:h-72">
+                <CreatorObject3D variant={active3DObject} height={288} />
+              </div>
+
+              <p className="mt-3 text-xs text-[#52647e]">{selected3DMeta.caption}</p>
+            </SpatialTiltCard>
+
+            {/* Right: Live Procedural Motion Graphics Preview Stage */}
+            <div className="vx-frosted-surface lg:col-span-7 rounded-3xl p-5 sm:p-6 flex flex-col justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-50 border border-teal-200/80 px-2.5 py-1 text-[10px] font-mono font-semibold uppercase tracking-wider text-[#287778]">
+                    Live Canvas2D Previews
+                  </span>
+                  <h2 className="mt-1.5 text-lg font-bold text-[#142440]">
+                    24 Animated Motion Graphics Templates
+                  </h2>
+                </div>
+                <Link
+                  href="/motion-graphics"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white/90 border border-slate-200 px-3 py-1.5 text-xs font-semibold text-[#142440] hover:border-[#1D4FB1] hover:text-[#1D4FB1] transition-colors"
+                >
+                  <span>Explore All 24</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <MotionGraphicCanvasPreview
+                template={selectedMotionTemplate}
+                interactive
+                showControls
+              />
+
+              <div className="mt-3.5 flex flex-wrap gap-1.5" role="group" aria-label="Select live motion graphic template">
+                {featuredMotionTemplates.map((tpl, idx) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => setActiveMotionIdx(idx)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                      activeMotionIdx === idx
+                        ? "bg-[#1D4FB1] text-white shadow-xs"
+                        : "bg-white/80 text-slate-600 border border-slate-200/80 hover:bg-white hover:text-[#142440]"
+                    }`}
+                  >
+                    {tpl.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* ── SMOOTH MARQUEE TICKER ── */}
-        <section className="vx-landing-ticker relative z-10 py-5 border-y border-slate-200/80 bg-white overflow-hidden select-none">
+        <section className="vx-landing-ticker relative z-10 py-5 border-y border-slate-200/70 bg-white/65 backdrop-blur-md overflow-hidden select-none">
           <div className="flex gap-4 whitespace-nowrap overflow-hidden">
             <div className="vx-marquee-left flex gap-6 shrink-0 items-center text-xs font-semibold text-slate-700 font-mono tracking-tight">
               {[...TICKER_ITEMS_1, ...TICKER_ITEMS_1].map((item, idx) => (
@@ -512,9 +662,9 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="vx-stagger-row grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Feature 1: Multi-Track Timeline */}
-            <div className="vx-landing-card bg-white rounded-3xl border border-slate-200 p-8 flex flex-col justify-between shadow-xs hover:shadow-md hover:border-slate-300 transition-all">
+            <SpatialTiltCard className="vx-landing-card vx-frosted-surface rounded-3xl p-8 flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200/60 flex items-center justify-center text-blue-600 shadow-2xs">
                   <Film className="w-6 h-6" />
@@ -541,10 +691,10 @@ export default function Home() {
                   </li>
                 </ul>
               </div>
-            </div>
+            </SpatialTiltCard>
 
             {/* Feature 2: Kinetic Captions */}
-            <div className="vx-landing-card bg-white rounded-3xl border border-slate-200 p-8 flex flex-col justify-between shadow-xs hover:shadow-md hover:border-slate-300 transition-all">
+            <SpatialTiltCard className="vx-landing-card vx-frosted-surface rounded-3xl p-8 flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600 shadow-2xs">
                   <Type className="w-6 h-6" />
@@ -571,10 +721,10 @@ export default function Home() {
                   </li>
                 </ul>
               </div>
-            </div>
+            </SpatialTiltCard>
 
             {/* Feature 3: Studio AI Voiceovers */}
-            <div className="vx-landing-card bg-white rounded-3xl border border-slate-200 p-8 flex flex-col justify-between shadow-xs hover:shadow-md hover:border-slate-300 transition-all">
+            <SpatialTiltCard className="vx-landing-card vx-frosted-surface rounded-3xl p-8 flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-200/60 flex items-center justify-center text-purple-600 shadow-2xs">
                   <Mic className="w-6 h-6" />
@@ -601,10 +751,10 @@ export default function Home() {
                   </li>
                 </ul>
               </div>
-            </div>
+            </SpatialTiltCard>
 
             {/* Feature 4: Edit With AI */}
-            <div className="vx-landing-card bg-white rounded-3xl border border-slate-200 p-8 flex flex-col justify-between shadow-xs hover:shadow-md hover:border-slate-300 transition-all">
+            <SpatialTiltCard className="vx-landing-card vx-frosted-surface rounded-3xl p-8 flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200/60 flex items-center justify-center text-emerald-600 shadow-2xs">
                   <Wand2 className="w-6 h-6" />
@@ -631,13 +781,13 @@ export default function Home() {
                   </li>
                 </ul>
               </div>
-            </div>
+            </SpatialTiltCard>
           </div>
         </section>
 
         {/* ── VALUE COMPARISON: WHY CREATORS CHOOSE KREOVAR ── */}
         <section className="relative z-10 py-16 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
-          <div className="rounded-3xl bg-slate-900 text-white p-8 sm:p-12 border border-slate-800 shadow-xl space-y-8">
+          <div className="rounded-3xl bg-gradient-to-br from-[#13223E] via-[#172C50] to-[#1C3357] text-white p-8 sm:p-12 border border-white/15 shadow-2xl space-y-8">
             <div className="text-center max-w-2xl mx-auto space-y-3">
               <span className="text-xs font-mono font-semibold uppercase tracking-wider text-blue-400 bg-blue-950/80 px-3 py-1 rounded-full border border-blue-800/60">
                 Unbeatable Creator Value
@@ -762,7 +912,7 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
             {/* Free Plan */}
-            <div className="bg-white rounded-3xl border border-slate-200 p-8 flex flex-col justify-between hover:border-slate-300 transition-all shadow-xs">
+            <SpatialTiltCard className="vx-frosted-surface rounded-3xl p-8 flex flex-col justify-between">
               <div className="space-y-6">
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">Free</h3>
@@ -790,15 +940,15 @@ export default function Home() {
               <div className="pt-8">
                 <Link
                   href={isAuthed ? "/projects" : "/signup"}
-                  className="w-full py-3 px-4 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-900 font-semibold text-xs sm:text-sm flex items-center justify-center transition-colors shadow-2xs"
+                  className="w-full py-3 px-4 rounded-xl border border-slate-300 bg-white/80 hover:bg-white text-slate-900 font-semibold text-xs sm:text-sm flex items-center justify-center transition-colors shadow-2xs"
                 >
                   {isAuthed ? "Go to Projects" : "Start Free"}
                 </Link>
               </div>
-            </div>
+            </SpatialTiltCard>
 
             {/* Pro Plan ($9 / mo or $90 / yr) */}
-            <div className="relative bg-white rounded-3xl border-2 border-slate-900 p-8 flex flex-col justify-between shadow-xl">
+            <SpatialTiltCard className="vx-frosted-surface relative rounded-3xl !border-2 !border-[#1D4FB1] p-8 flex flex-col justify-between shadow-xl">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold tracking-wide uppercase shadow-sm">
                 LAUNCH SPECIAL
               </div>
@@ -841,13 +991,13 @@ export default function Home() {
               <div className="pt-8">
                 <Link
                   href={`/checkout/pro?cycle=${billingCycle}`}
-                  className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all shadow-md group"
+                  className="w-full py-3 px-4 rounded-xl bg-[#13223E] hover:bg-[#1D4FB1] text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all shadow-md group"
                 >
                   <span>Upgrade to Pro</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </div>
-            </div>
+            </SpatialTiltCard>
           </div>
         </section>
 
@@ -857,37 +1007,38 @@ export default function Home() {
         {/* ── TOOL GUIDES & EXPLORE SECTION ── */}
         <section aria-labelledby="explore-studio-tools" className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="max-w-2xl mb-8 space-y-2">
-            <h2 id="explore-studio-tools" className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            <h2 id="explore-studio-tools" className="text-2xl sm:text-3xl font-bold tracking-tight text-[#142440]">
               Explore Kreovar Features
             </h2>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-[#52647e]">
               Deep dive into individual studio workflows, caption styles, and voice tools.
             </p>
           </div>
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="vx-stagger-row grid gap-6 md:grid-cols-3">
             {FEATURE_PAGES.map((page) => (
-              <Link
-                key={page.path}
-                href={page.path}
-                className="vx-landing-card group rounded-3xl border border-slate-200 bg-white p-7 transition-all hover:border-blue-400 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
-              >
-                <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                  {page.label}
-                </h3>
-                <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-600">
-                  {page.description}
-                </p>
-                <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 group-hover:translate-x-0.5 transition-transform">
-                  Explore {page.label} →
-                </span>
-              </Link>
+              <SpatialTiltCard key={page.path} className="vx-landing-card vx-frosted-surface rounded-3xl">
+                <Link
+                  href={page.path}
+                  className="group block p-7 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+                >
+                  <h3 className="text-lg font-bold text-[#142440] group-hover:text-[#1D4FB1] transition-colors">
+                    {page.label}
+                  </h3>
+                  <p className="mt-2 text-xs sm:text-sm leading-relaxed text-[#52647e]">
+                    {page.description}
+                  </p>
+                  <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[#1D4FB1] group-hover:translate-x-0.5 transition-transform">
+                    Explore {page.label} →
+                  </span>
+                </Link>
+              </SpatialTiltCard>
             ))}
           </div>
         </section>
 
         {/* ── FINAL FOCUSED CONVERSION BANNER (NO DUPLICATE BUTTONS) ── */}
         <section className="relative z-10 py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-          <div className="relative bg-slate-900 text-white rounded-3xl p-8 sm:p-14 text-center overflow-hidden shadow-2xl border border-slate-800">
+          <div className="relative bg-gradient-to-br from-[#13223E] via-[#172B4E] to-[#1C3357] text-white rounded-3xl p-8 sm:p-14 text-center overflow-hidden shadow-2xl border border-white/15">
             <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
 
             <div className="relative z-10 max-w-2xl mx-auto space-y-6">
@@ -923,7 +1074,7 @@ export default function Home() {
       </main>
 
       {/* ── FOOTER ── */}
-      <footer className="vx-landing-footer relative z-10 border-t border-slate-200 bg-white py-12 text-xs text-slate-500 font-sans">
+      <footer className="vx-landing-footer vx-public-glass-header relative z-10 border-t border-slate-200/80 py-12 text-xs text-slate-500 font-sans">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
             <BrandMark size={24} />

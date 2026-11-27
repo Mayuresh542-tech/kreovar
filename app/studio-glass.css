@@ -192,3 +192,193 @@
   .vx-dashboard .vx-empty-projects > div { flex: 1 1 200px; }
   .vx-glass-shell .vx-route-entry > footer { margin-top: 28px; padding-top: 18px; }
 }
+
+/* ─── Elevated Frosted Pearl & Tactile 3D Spatial Tokens ─── */
+:root {
+  --vx-pearl-canvas: #f2f5fb;
+  --vx-pearl-mist-a: rgba(219, 234, 254, 0.62);
+  --vx-pearl-mist-b: rgba(204, 251, 241, 0.42);
+  --vx-glass-elevated: rgba(255, 255, 255, 0.84);
+  --vx-glass-border-bright: rgba(255, 255, 255, 0.94);
+  --vx-glass-edge-cool: rgba(132, 157, 191, 0.24);
+  --vx-cobalt: #1d4fb1;
+  --vx-teal: #287778;
+}
+
+/* Reusable translucent frosted card surface preserving Kreovar daylight contrast */
+.vx-frosted-surface {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.92) 0%, rgba(242, 246, 253, 0.8) 100%);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+  border: 1px solid var(--vx-glass-edge-cool);
+  box-shadow:
+    inset 0 1px 0 var(--vx-glass-border-bright),
+    0 18px 40px -26px rgba(20, 36, 64, 0.2);
+}
+
+.vx-frosted-surface-soft {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.76) 0%, rgba(236, 242, 252, 0.68) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(148, 174, 209, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 12px 30px -22px rgba(20, 36, 64, 0.16);
+}
+
+/* Public / Auth atmospheric frosted canvas */
+.vx-pearl-backdrop {
+  background-color: var(--vx-pearl-canvas);
+  background-image:
+    radial-gradient(ellipse 68% 44% at 14% 8%, var(--vx-pearl-mist-a), transparent 72%),
+    radial-gradient(ellipse 56% 40% at 88% 12%, var(--vx-pearl-mist-b), transparent 70%),
+    radial-gradient(ellipse 60% 42% at 52% 96%, rgba(224, 236, 255, 0.45), transparent 74%);
+}
+
+.vx-public-glass-header {
+  background: rgba(246, 249, 255, 0.82);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+  border-bottom: 1px solid rgba(132, 157, 191, 0.22);
+  box-shadow: 0 8px 30px -24px rgba(20, 36, 64, 0.25);
+}
+
+/* Interactive 3D Viewport Stage (Three.js Creator Hardware) */
+.vx-3d-viewport {
+  position: relative;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  background:
+    radial-gradient(circle at 22% 18%, rgba(224, 237, 255, 0.9), transparent 58%),
+    radial-gradient(circle at 82% 80%, rgba(209, 244, 240, 0.72), transparent 60%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(240, 245, 253, 0.78));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    inset 0 -18px 36px -28px rgba(29, 79, 177, 0.14),
+    0 24px 48px -28px rgba(20, 36, 64, 0.22);
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+}
+
+.vx-3d-viewport-dark {
+  position: relative;
+  border-radius: 1.35rem;
+  border: 1px solid rgba(148, 184, 255, 0.22);
+  background:
+    radial-gradient(circle at 30% 20%, rgba(37, 99, 235, 0.22), transparent 62%),
+    radial-gradient(circle at 80% 80%, rgba(40, 119, 120, 0.22), transparent 62%),
+    linear-gradient(155deg, rgba(16, 30, 56, 0.78), rgba(24, 45, 82, 0.64));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 20px 44px -22px rgba(7, 15, 32, 0.58);
+  overflow: hidden;
+}
+
+/* Spatial 3D Pointer Tilt Cards */
+.vx-tilt-card {
+  position: relative;
+  transform-style: preserve-3d;
+  will-change: transform;
+  transform: perspective(1000px) rotateX(var(--vx-rx, 0deg)) rotateY(var(--vx-ry, 0deg));
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 220ms ease;
+}
+
+.vx-tilt-glare::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 2;
+  background: radial-gradient(
+    260px circle at var(--vx-gx, 50%) var(--vx-gy, 50%),
+    rgba(255, 255, 255, 0.56),
+    rgba(37, 99, 235, 0.06) 44%,
+    transparent 74%
+  );
+  transition: opacity 220ms ease;
+}
+
+.vx-tilt-glare[data-tilted="true"]::before {
+  opacity: 1;
+}
+
+/* Enhanced Dashboard, Tool Card, & Project Card frosted polish */
+.vx-glass-shell .vx-studio-sidebar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.84) 0%, rgba(242, 245, 251, 0.88) 100%);
+  backdrop-filter: blur(22px) saturate(135%);
+  -webkit-backdrop-filter: blur(22px) saturate(135%);
+  border-right: 1px solid rgba(132, 157, 191, 0.22);
+}
+
+.vx-glass-shell .vx-topheader {
+  background: rgba(247, 250, 255, 0.8);
+  backdrop-filter: blur(20px) saturate(130%);
+  -webkit-backdrop-filter: blur(20px) saturate(130%);
+  border-bottom: 1px solid rgba(132, 157, 191, 0.22);
+}
+
+.vx-glass-shell .vx-tool-card {
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.88) 0%, rgba(241, 245, 252, 0.78) 100%);
+  border: 1px solid rgba(132, 157, 191, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 12px 28px -22px rgba(20, 36, 64, 0.22);
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 260ms ease,
+    border-color 220ms ease;
+}
+
+.vx-glass-shell .vx-tool-card:hover {
+  border-color: rgba(37, 99, 235, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    0 20px 42px -24px rgba(29, 79, 177, 0.28);
+}
+
+.vx-glass-shell .vx-trend-strip {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(235, 243, 255, 0.8));
+  border: 1px solid rgba(132, 157, 191, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94), 0 12px 26px -22px rgba(20, 36, 64, 0.18);
+  backdrop-filter: blur(16px);
+}
+
+/* Smooth float and subtle frosted ambient pulse (reduced-motion safe) */
+@media (prefers-reduced-motion: no-preference) {
+  .vx-float-slow {
+    animation: vx-float-gentle 5.8s ease-in-out infinite;
+  }
+  .vx-live-pulse {
+    animation: vx-live-ring 2.2s ease-out infinite;
+  }
+  .vx-hero-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px -14px rgba(15, 23, 42, 0.6);
+  }
+}
+
+@keyframes vx-float-gentle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes vx-live-ring {
+  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45); }
+  70% { box-shadow: 0 0 0 7px rgba(37, 99, 235, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vx-tilt-card {
+    transform: none !important;
+    transition: none !important;
+  }
+  .vx-tilt-glare::before {
+    display: none;
+  }
+}

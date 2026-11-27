@@ -229,7 +229,7 @@ test("Task 13: Canvas object movement through full-frame outline & clean AssetDr
   assert.ok(!assetDrawer.includes('right-1.5 top-1/2 -translate-y-1/2 px-2 py-1 bg-cyan-600'), "B-Roll Search button must not overlap input text");
   assert.ok(assetDrawer.includes("flex-wrap items-center gap-1.5"), "Category niche pills must wrap cleanly instead of showing clipped horizontal scrollbar");
 
-  // 18 Motion Graphics templates paired in UI & legacy GraphicControls panel removed
+  // 24 Motion Graphics templates paired in UI & legacy GraphicControls panel removed
   const toolSidebar = fs.readFileSync(path.join(ROOT, "app/components/editor/ToolSidebar.tsx"), "utf-8");
   const inspector = fs.readFileSync(path.join(ROOT, "app/components/editor/EditorPropertiesInspector.tsx"), "utf-8");
   assert.ok(toolSidebar.includes('"graphics"'), "ToolSidebar must include Graphics tab");

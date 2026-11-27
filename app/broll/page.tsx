@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import StudioShell from "../components/StudioShell";
 import AuthLoadingScreen from "../components/AuthLoadingScreen";
@@ -12,11 +11,9 @@ import { BRollVideoItem } from "../api/broll/search/route";
 import BRollDownloadButton from "../components/BRollDownloadButton";
 import {
   Search,
-  Film,
   Sparkles,
   Check,
   Copy,
-  ExternalLink,
   SlidersHorizontal,
   Video,
 } from "lucide-react";
@@ -76,7 +73,6 @@ const REQUIREMENT_CATEGORIES = [
 
 export default function BRollPage() {
   const { status } = useAuthGate();
-  const router = useRouter();
 
   // Search State
   const [requirementQuery, setRequirementQuery] = useState("cinematic city drone");
@@ -155,19 +151,19 @@ export default function BRollPage() {
     <StudioShell active="broll">
       <div className="max-w-7xl mx-auto w-full py-6 space-y-6">
         {/* Top Header Card */}
-        <div className="p-6 sm:p-8 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
+        <div className="vx-frosted-surface p-6 sm:p-8 rounded-3xl">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                <span className="text-[11px] font-mono uppercase font-semibold tracking-wider text-slate-500">
+                <span className="w-2 h-2 rounded-full bg-[#1D4FB1] animate-pulse" />
+                <span className="text-[11px] font-mono uppercase font-semibold tracking-wider text-[#1D4FB1]">
                   Visual Assets &amp; Cutaways
                 </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-heading">
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#142440] tracking-tight font-heading">
                 B-roll Library
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-2xl mt-1.5 leading-relaxed">
+              <p className="text-xs sm:text-sm text-[#52647e] max-w-2xl mt-1.5 leading-relaxed">
                 Search, preview and download stock footage.
               </p>
             </div>
@@ -175,14 +171,14 @@ export default function BRollPage() {
             <div className="flex items-center gap-2.5 shrink-0">
               <Link
                 href="/create"
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs sm:text-sm flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#13223E] hover:bg-[#1D4FB1] text-white font-medium text-xs sm:text-sm flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Create Video</span>
               </Link>
               <Link
                 href="/projects"
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs sm:text-sm flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
+                className="px-4 py-2 rounded-xl bg-white/85 hover:bg-white text-slate-700 font-medium text-xs sm:text-sm flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-200/90"
               >
                 <Video className="w-3.5 h-3.5" />
                 <span>Projects</span>
@@ -398,23 +394,38 @@ export default function BRollPage() {
                       orientation === "portrait" ? "aspect-[9/16]" : "aspect-[16/9]"
                     }`}
                   >
-                    {/* Video Player / Thumbnail */}
-                    {isHovered && vid.videoUrl ? (
-                      <video
-                        src={vid.videoUrl}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        className="absolute inset-0 w-full h-full object-cover z-0"
-                      />
-                    ) : (
-                      <img
-                        src={vid.thumbnail}
-                        alt={vid.title || "B-roll cutaway"}
-                        className="absolute inset-0 w-full h-full object-cover z-0 transition-transform duration-500 group-hover:scale-105"
-                      />
-                    )}
+                    {/* Video Player / Thumbnail — Click to expand modal preview */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Preview ${vid.title || "B-roll clip"}`}
+                      onClick={() => setPreviewingVideo(vid)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setPreviewingVideo(vid);
+                        }
+                      }}
+                      className="absolute inset-0 z-0 cursor-pointer"
+                    >
+                      {isHovered && vid.videoUrl ? (
+                        <video
+                          src={vid.videoUrl}
+                          poster={vid.thumbnail || undefined}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img
+                          src={vid.thumbnail}
+                          alt={vid.title || "B-roll cutaway"}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      )}
+                    </div>
 
                     {/* Gradient overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/50 z-10 pointer-events-none" />
@@ -482,7 +493,7 @@ export default function BRollPage() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-2xl p-6 space-y-4"
+                className="vx-frosted-surface relative w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl p-6 space-y-4"
               >
                 <div className="flex items-center justify-between">
                   <div>

@@ -30,7 +30,13 @@ You are acting as a senior motion designer and editorial director equipped with 
   - **16:9 Widescreen (YouTube / Explainer)**: Alternate clean side thirds (\`x: 0.28\` or \`-0.28\`, \`y: -0.04, scale: 0.84\`); \`lower-third\` bottom-left (\`x: -0.20, y: 0.26\`). Respect YouTube outro card zones if placing end CTAs.
   - **Vision Evidence**: If \`VISUAL_OBSERVATIONS\` / \`clearRegions\` exist, place ONLY inside clear regions away from \`subjectRegion\` / \`occupiedRegions\`. For \`pointer-callout\`, aim \`targetX\` / \`targetY\` directly at the subject/UI area and dock the card in an adjacent clear quadrant.
 
-## 3. All 18 Editable Templates (User/Speech Cue -> addGraphic Kind)
+## 3. All 24 Editable Templates (User/Speech Cue -> addGraphic Kind)
+- Bold split hero hook / section opener -> \`"split-title"\` (\`text\`, \`subtitle: "Part 01 · Hook"\`, \`accent\`, \`theme\`)
+- Vox-style highlighted claim / key stat phrase -> \`"marker-highlight"\` (\`text\`, \`subtitle: "Source ..."\`, \`accent\`)
+- Podcast voiceover / narration equalizer pill -> \`"audio-waveform"\` (\`text\`, \`subtitle\`, \`accent\`)
+- YouTube channel handle Subscribe bar + click ripple -> \`"subscribe-cta"\` (\`text: "@handle"\`, \`subtitle\`, \`accent\`)
+- Press / research paper clipping citation -> \`"article-citation"\` (\`text\`, \`subtitle: "Study 2026"\`, \`accent\`)
+- Sweeping stopwatch / "watch until the end" countdown -> \`"timer-badge"\` (\`text\`, \`subtitle\`, \`value\`, \`accent\`)
 - Single hero number / revenue / multiplier / time -> \`"stat-counter"\` (\`value\`, \`prefix\`, \`suffix\`, \`subtitle\`, \`icon\`)
 - Percentage / completion / retention score -> \`"progress-ring"\` (\`value\`, \`suffix: "%"\`, \`subtitle\`)
 - 2–5 ranked comparisons / categorical metrics -> \`"bar-chart"\` (\`bars: [{ label, value, displayValue }]\`)
@@ -51,7 +57,7 @@ You are acting as a senior motion designer and editorial director equipped with 
 - Sale promo / price drop (Was -> Now) -> \`"offer-tag"\` (\`text: "40% OFF"\`, \`subtitle: "$99"\`, \`value: 59\`, \`prefix: "$"\`)
 
 ## 4. Custom Motion Graphics Across All 19 Packs (\`kind: "custom"\` + \`customSpec\`)
-When the user asks for a **custom motion graphic** or a visual not matched by the 18 presets above (SMS chat bubbles, flowchart/isometric/whiteboard diagram, map route, audio waveform, math curve, ad product HUD, glass badge, particle/reticle accent), synthesize it with \`kind: "custom"\` and procedural Canvas2D primitives:
+When the user asks for a **custom motion graphic** or a visual not matched by the 24 presets above (SMS chat bubbles, flowchart/isometric/whiteboard diagram, map route, math curve, ad product HUD, glass badge, particle/reticle accent), synthesize it with \`kind: "custom"\` and procedural Canvas2D primitives:
 \`rect\`, \`pill\`, \`circle\`, \`ring\`, \`line\`, \`arrow\`, \`bar\`, \`sparkline\`, \`text\`, \`counter\`, \`icon\` (coords \`x, y\` normalized \`-0.5..0.5\` inside card; \`delay: 0..4\`; \`entrance: "fade"|"slide-up"|"slide-left"|"pop"|"draw"|"count-up"\`):
 - **Text Message / SMS / iMessage** (*text-message-video-skills*): alternating \`pill\` bubbles (\`x: -0.14\` slate vs \`x: 0.14\` accent) + concise \`text\` inside each, staggered by \`0.25s\` with \`entrance: "pop"\`.
 - **Explainer / Diagram / Whiteboard / Map Route** (*explainer / diagram / isometric / map-animation*): node \`rect\`/\`pill\`/\`circle\` boxes joined by \`arrow\`/\`line\` (\`entrance: "draw"\`, increasing \`delay\`), pin \`circle\` markers + trend \`sparkline\`.
@@ -67,9 +73,9 @@ When the user asks for a **custom motion graphic** or a visual not matched by th
 
 export function getMotionDirectorPromptSection(compact = false): string {
   if (compact) {
-    return `MOTION SKILLS (All 19 iart-ai Packs: 18 Editable Templates + Custom Composer + In-Place Editing):
+    return `MOTION SKILLS (All 19 iart-ai Packs: 24 Editable Templates + Custom Composer + In-Place Editing):
 APPLY (addGraphic): Choose crisp 2-6 word headlines, real transcript/prompt facts, theme:"clean-light"|"frosted-glass"|"editorial-paper"|"dark-slate" (light default unless bright footage or dark requested), hold 1.8..5.5s, >=3.0s gaps.
-- 18 Templates: "stat-counter" (value,prefix,suffix), "progress-ring" (value,suffix), "bar-chart" (bars), "line-chart" (bars,value,prefix,suffix), "kpi-grid" (bars x2), "comparison" ({leftTitle,leftValue,rightTitle,rightValue}), "checklist" (items), "step-flow" (items), "timeline-steps" (items), "lower-third" (subtitle,icon), "social-follow" (prefix,subtitle,icon), "chapter-card" (subtitle), "notification" (subtitle,icon), "poll-card" (bars), "pointer-callout" (targetX,targetY,subtitle), "quote-card" (subtitle), "kinetic-badge" (icon,accent), "offer-tag" (subtitle,value,prefix).
+- 24 Templates: "split-title" (subtitle,accent,theme), "marker-highlight" (subtitle,accent), "audio-waveform" (subtitle,accent), "subscribe-cta" (text:"@handle",subtitle,accent), "article-citation" (subtitle,accent), "timer-badge" (subtitle,value,accent), "stat-counter" (value,prefix,suffix), "progress-ring" (value,suffix), "bar-chart" (bars), "line-chart" (bars,value,prefix,suffix), "kpi-grid" (bars x2), "comparison" ({leftTitle,leftValue,rightTitle,rightValue}), "checklist" (items), "step-flow" (items), "timeline-steps" (items), "lower-third" (subtitle,icon), "social-follow" (prefix,subtitle,icon), "chapter-card" (subtitle), "notification" (subtitle,icon), "poll-card" (bars), "pointer-callout" (targetX,targetY,subtitle), "quote-card" (subtitle), "kinetic-badge" (icon,accent), "offer-tag" (subtitle,value,prefix).
 - CUSTOM GRAPHICS (kind:"custom" + customSpec): Build bespoke graphics when requested or when templates don't fit (SMS/iMessage pill threads, flowchart/diagram/whiteboard/map routes with draw lines/arrows & pin circles, audiogram bar waveforms, Manim/Wrapped sparkline+counter dashboards, ad/promo price stacks, frosted/HUD cards). Primitives: "rect"|"pill"|"circle"|"ring"|"line"|"arrow"|"bar"|"sparkline"|"text"|"counter"|"icon" in x:-0.5..0.5, y:-0.5..0.5, w?, h?, r?, points?, delay:0..4 (0.08..0.25s Hero->Support stagger), duration?, entrance:"fade"|"slide-up"|"slide-left"|"pop"|"draw"|"count-up".
 EDIT OR REMOVE (changeGraphic / removeGraphic): When editing/moving/recoloring/rewording/retiming an existing graphic in project.clips, mutate its actual clipId via changeGraphic (with optional kind,text,subtitle,theme,accent,icon,value,prefix,suffix,items,bars,comparison,targetX,targetY,customSpec,x,y,scale,startTime,duration,motion) instead of duplicating. Use removeGraphic {clipId} to delete one.
 WHERE TO PLACE:

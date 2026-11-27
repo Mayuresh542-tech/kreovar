@@ -141,15 +141,20 @@ function ScriptContent() {
       <div className="mb-5 space-y-3"><UsageSummary compact feature="content"/><ContentWorkflow step="script" topic={topic}/>{libraryMessage&&<p role="status" className="text-sm text-slate-600">{libraryMessage}</p>}{unsaved&&libraryMessage.includes("failed")&&<button type="button" className="text-sm underline" onClick={()=>void saveWork(unsaved.title,unsaved.text,unsaved.topic)}>Retry saving</button>}</div>
       <div className="space-y-8 pb-16">
         {/* Header */}
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+        <div className="vx-frosted-surface rounded-2xl p-5 sm:p-6 space-y-1.5">
+          <span className="inline-flex items-center rounded-full bg-blue-50 border border-blue-200/80 px-2.5 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-[#1D4FB1]">
+            Script Studio
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#142440]">
             Script Writer
           </h1>
-          
+          <p className="text-xs sm:text-sm text-[#52647e]">
+            Generate structured hooks, spoken beats, and CTAs timed to your target video length.
+          </p>
         </div>
 
         {/* Input & Generator Card */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-xs">
+        <div className="vx-frosted-surface rounded-2xl p-6 space-y-4">
           <div className="space-y-2">
             <label className="text-xs font-semibold text-slate-700 block">
               What topic, trend, or idea do you want to script?

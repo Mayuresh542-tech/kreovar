@@ -60,7 +60,7 @@ export default function StudioShell({
     : "Your account";
 
   return (
-    <div className="vx-shell vx-glass-shell flex h-dvh bg-[#FAFAFA] text-[#0F172A] font-sans overflow-hidden">
+    <div className="vx-shell vx-glass-shell vx-pearl-backdrop flex h-dvh text-[#142440] font-sans overflow-hidden">
       {/* 1. Unified Master Sidebar (240px) */}
       <Sidebar
         active={active}

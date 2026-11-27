@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   X,
   Upload,
@@ -12,18 +12,10 @@ import {
   Film,
   Music,
   Image as ImageIcon,
-  Check,
   Sparkles,
-  Sliders,
-  Maximize,
   SlidersHorizontal,
-  FolderOpen,
   Volume2,
   VolumeX,
-  ExternalLink,
-  Layers,
-  ArrowRight,
-  RefreshCw,
   Copy,
   Split,
   Scissors,
@@ -37,12 +29,13 @@ import { EditorToolTab } from "./ToolSidebar";
 import { useEditor } from "./workspace/EditorContext";
 import { useProject } from "@/app/lib/editor/store";
 import { loadDemoProjectIntoStore } from "@/app/lib/editor/demoProject";
+import MotionGraphicCanvasPreview from "../assets/MotionGraphicCanvasPreview";
+import TransitionPreviewStage from "./TransitionPreviewStage";
 import {
   MediaAsset,
   canPlace,
   Ratio,
   aspectRatios,
-  dimensions,
   textForClip,
   TextStyle,
   AudioRole,
@@ -58,7 +51,6 @@ import {
   clearAllTransitions,
   findAdjacentClipPairs,
   changeClipProperty,
-  changeTrack,
   changeText,
   duplicateClip,
   frameClip,
@@ -78,16 +70,20 @@ import {
   type TransitionCategory,
 } from "@/app/lib/editor/transitions";
 import { importMedia, visualDimensions } from "@/app/lib/editor/media";
+import { cacheWrite } from "@/app/lib/editor/cache";
 import { audioRole } from "@/app/lib/editor/audioMix";
 import { BUILTIN_SFX } from "@/app/lib/assets/builtinSfx";
-import { DEFAULT_CAPTION_TEMPLATES } from "@/app/lib/captions/templates";
 import { ALL_CAPTION_TEMPLATES } from "@/app/lib/captions/referenceTemplates";
 import CaptionRenderer from "../captions/CaptionRenderer";
 import { applyCaptionTemplate } from "@/app/lib/editor/captionTemplates";
 import { applyStudioStyle, studioCaptions } from "@/app/lib/editor/editorCaptionStudio";
 import { setVisualTreatment } from "@/app/lib/editor/visualTreatment";
-import { uploadAssetFile, linkAsset } from "@/app/lib/assets/client";
-import { supabase } from "@/app/lib/supabase";
+import {
+  uploadAssetFile,
+  linkAsset,
+  importStockAsset,
+  assetHeaders,
+} from "@/app/lib/assets/client";
 import type { StockVideo } from "@/app/lib/server/stockSearch";
 import { BROLL_CATEGORIES, type BrollNiche, searchCuratedBroll } from "@/app/lib/assets/curatedBrollCatalog";
 import MediaAnimationControls from "./workspace/MediaAnimationControls";
@@ -101,6 +97,77 @@ import {
   type KreovarMotionTemplate,
   type MotionTemplateCategory,
 } from "@/app/lib/editor/kreovarMotionTemplates";
+
+const COLOR_FILTER_PRESETS = [
+  { id: "reset", name: "Original", desc: "Natural ungraded", effects: { brightness: 0, contrast: 0, saturation: 0, blur: 0 }, swatch: "from-sky-500 via-indigo-500 to-amber-400" },
+  { id: "studio-crisp", name: "Studio Crisp", desc: "+6B · +14C · +12S", effects: { brightness: 6, contrast: 14, saturation: 12, blur: 0 }, swatch: "from-cyan-500 via-blue-600 to-slate-900" },
+  { id: "cinematic-teal", name: "Cinema Teal", desc: "-4B · +26C · +24S", effects: { brightness: -4, contrast: 26, saturation: 24, blur: 0 }, swatch: "from-teal-500 via-slate-800 to-orange-500" },
+  { id: "warm-vlog", name: "Warm Vlog", desc: "+8B · +10C · +28S", effects: { brightness: 8, contrast: 10, saturation: 28, blur: 0 }, swatch: "from-amber-400 via-orange-500 to-rose-500" },
+  { id: "moody-noir", name: "Moody Noir", desc: "-8B · +32C · B&W", effects: { brightness: -8, contrast: 32, saturation: -100, blur: 0 }, swatch: "from-slate-300 via-slate-600 to-slate-950" },
+  { id: "faded-film", name: "Faded Film", desc: "+10B · -14C · -24S", effects: { brightness: 10, contrast: -14, saturation: -24, blur: 0 }, swatch: "from-stone-400 via-amber-700 to-slate-800" },
+  { id: "docu-punch", name: "Docu Punch", desc: "+2B · +22C · -8S", effects: { brightness: 2, contrast: 22, saturation: -8, blur: 0 }, swatch: "from-blue-600 via-slate-700 to-emerald-500" },
+  { id: "soft-glow", name: "Soft Glow", desc: "+10B · -6C · 2px Blur", effects: { brightness: 10, contrast: -6, saturation: 10, blur: 2 }, swatch: "from-pink-400 via-violet-500 to-sky-400" },
+] as const;
+
+const CAMERA_ZOOM_PRESETS = [
+  { name: "Center Punch", scale: 1.25, desc: "Quick focus" },
+  { name: "Emphasis Zoom", scale: 1.4, desc: "Keyword hit" },
+  { name: "Extreme Punch", scale: 1.6, desc: "High drama" },
+  { name: "Slow Push-In", scale: 1.15, desc: "Story drift" },
+] as const;
+
+const TEXT_TITLE_PRESETS = [
+  { name: "Default Title", text: "Heading Text", color: "#FFFFFF", size: 48, font: "Inter", desc: "Clean primary title", bg: "from-slate-900 to-slate-800" },
+  { name: "Bold Headline", text: "BREAKING NEWS", color: "#00E5FF", size: 54, font: "Montserrat", desc: "High-impact punch", bg: "from-slate-950 to-cyan-950" },
+  { name: "Cyber Glow", text: "CYBER GLOW", color: "#38BDF8", size: 46, font: "Orbitron", desc: "Sci-fi neon glow", bg: "from-slate-950 to-indigo-950" },
+  { name: "Minimal Subtitle", text: "Minimal Caption", color: "#E2E8F0", size: 36, font: "Inter", desc: "Clean lower subtitle", bg: "from-slate-800 to-slate-900" },
+  { name: "Lower Third", text: "Speaker // Creator", color: "#FDE047", size: 32, font: "Poppins", desc: "Identity banner", bg: "from-zinc-900 to-slate-900" },
+  { name: "Neon Flame", text: "VIRAL HOOK", color: "#F43F5E", size: 52, font: "Impact", desc: "Red viral attention", bg: "from-slate-950 to-rose-950" },
+  { name: "Documentary Serif", text: "THE REAL STORY", color: "#F8FAFC", size: 44, font: "Georgia", desc: "Editorial film title", bg: "from-stone-900 to-slate-900" },
+  { name: "Warm Highlight", text: "KEY TAKEAWAY", color: "#FDE68A", size: 42, font: "Poppins", desc: "Creator emphasis card", bg: "from-slate-900 to-amber-950" },
+] as const;
+
+/** Shared visual punch-in zoom preset cards used across Filters and Effects tabs. */
+function CameraZoomGrid({
+  onApply,
+  cardTone = "slate",
+}: {
+  onApply: (name: string, scale: number) => void;
+  cardTone?: "slate" | "white";
+}) {
+  const toneClass =
+    cardTone === "white"
+      ? "border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/40"
+      : "border-slate-200 bg-slate-50 hover:border-blue-400 hover:bg-white";
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {CAMERA_ZOOM_PRESETS.map((zoom) => (
+        <button
+          key={zoom.name}
+          type="button"
+          onClick={() => onApply(zoom.name, zoom.scale)}
+          className={`p-2 rounded-xl border ${toneClass} text-left transition-all cursor-pointer group`}
+        >
+          <div className="h-10 rounded-lg bg-slate-900 border border-slate-200 overflow-hidden flex items-center justify-center mb-1.5 relative">
+            <div
+              className="w-8 h-5 rounded border border-sky-300/80 bg-gradient-to-br from-sky-500/40 to-blue-600/40 transition-transform duration-300 group-hover:scale-110"
+              style={{ transform: `scale(${Math.min(1.45, zoom.scale)})` }}
+            />
+            <span className="absolute top-1 right-1 text-[8px] font-mono text-sky-200 bg-black/50 px-1 rounded">
+              {zoom.scale}×
+            </span>
+          </div>
+          <p className="text-xs font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+            {zoom.name}
+          </p>
+          <span className="text-[10px] text-slate-500 font-mono">
+            {zoom.scale}× · {zoom.desc}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 interface AssetDrawerProps {
   activeTab: EditorToolTab;
@@ -126,7 +193,6 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
   // Captions Tab State
   const [captionQuery, setCaptionQuery] = useState("");
   const [isHinglishMode, setIsHinglishMode] = useState(false);
-  const [hoveredPreset, setHoveredPreset] = useState<string | null>(null);
   const [activeCaptionTemplate, setActiveCaptionTemplate] = useState("study-hormozi-style");
   const previousCaptionTemplateRef = useRef("study-hormozi-style");
 
@@ -138,7 +204,13 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
   const [brollCategory, setBrollCategory] = useState<string>("all");
   const [brollQuery, setBrollQuery] = useState("");
   const [isSearchingBroll, setIsSearchingBroll] = useState(false);
-  const [brollResults, setBrollResults] = useState<StockVideo[]>([]);
+  const [brollSearchOverride, setBrollSearchOverride] = useState<{
+    key: string;
+    videos: StockVideo[];
+  } | null>(null);
+  const [importingBrollId, setImportingBrollId] = useState<string | null>(null);
+  const [hoveredBrollId, setHoveredBrollId] = useState<string | null>(null);
+  const [previewingBroll, setPreviewingBroll] = useState<StockVideo | null>(null);
 
   // Motion Graphics Template Gallery State
   const [graphicCategory, setGraphicCategory] = useState<MotionTemplateCategory>("All");
@@ -151,6 +223,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
   const [transitionIntensity, setTransitionIntensity] = useState<number>(1.0);
   const [pairTransitionSfx, setPairTransitionSfx] = useState<boolean>(false);
   const [lastTransitionKind, setLastTransitionKind] = useState<TransitionKind>("whip-left");
+  const [hoveredTransitionKind, setHoveredTransitionKind] = useState<TransitionKind | null>(null);
 
   // Framing State
   const [framing, setFraming] = useState(false);
@@ -203,7 +276,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
       url: sfx.url,
     };
     run((p) => {
-      let next = addAsset(p, newAsset);
+      const next = addAsset(p, newAsset);
       return addClip(next, assetId, audioTrack.id, playback.getSnapshot().time, {
         name: sfx.name,
         duration: sfx.duration,
@@ -289,70 +362,136 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
     }
   };
 
-  // Load curated B-roll clips when tab is active or category changes
-  useEffect(() => {
-    if (activeTab === "broll") {
-      const orientation = project.settings.aspectRatio === "9:16" ? "portrait" : "landscape";
-      const cat = brollCategory === "all" ? undefined : (brollCategory as BrollNiche);
-      const items = searchCuratedBroll(brollQuery, {
-        category: cat,
-        orientation,
-        limit: 14,
-      });
-      setBrollResults(items);
-    }
-  }, [activeTab, brollCategory, project.settings.aspectRatio]);
+  // Derive curated B-roll cleanly by active category/query/aspectRatio
+  const brollContextKey = `${brollCategory}:${project.settings.aspectRatio}`;
+  const curatedBroll = useMemo(() => {
+    const orientation = project.settings.aspectRatio === "9:16" ? "portrait" : "landscape";
+    const cat = brollCategory === "all" ? undefined : (brollCategory as BrollNiche);
+    return searchCuratedBroll(brollQuery, {
+      category: cat,
+      orientation,
+      limit: 14,
+    });
+  }, [brollCategory, brollQuery, project.settings.aspectRatio]);
+  const brollResults =
+    brollSearchOverride?.key === `${brollContextKey}:${brollQuery.trim()}`
+      ? brollSearchOverride.videos
+      : curatedBroll;
 
   // B-Roll Search & Placement
   const handleSearchBroll = async (queryText: string) => {
     if (!queryText.trim() || isSearchingBroll) return;
+    const trimmed = queryText.trim();
+    const overrideKey = `${brollContextKey}:${trimmed}`;
     setIsSearchingBroll(true);
     try {
       const orientation = project.settings.aspectRatio === "9:16" ? "portrait" : "landscape";
       const catParam = brollCategory !== "all" ? `&category=${brollCategory}` : "";
       const res = await fetch(
-        `/api/broll/search?query=${encodeURIComponent(queryText.trim())}&orientation=${orientation}&per_page=14${catParam}`
+        `/api/broll/search?query=${encodeURIComponent(trimmed)}&orientation=${orientation}&per_page=14${catParam}`
       );
       const data = await res.json().catch(() => ({}));
       if (data.videos && Array.isArray(data.videos) && data.videos.length > 0) {
-        setBrollResults(data.videos);
+        setBrollSearchOverride({ key: overrideKey, videos: data.videos });
         notify(`Found ${data.videos.length} clips for "${queryText}".`);
       } else {
         const cat = brollCategory === "all" ? undefined : (brollCategory as BrollNiche);
-        const fallback = searchCuratedBroll(queryText, {
+        const fallback = searchCuratedBroll(trimmed, {
           category: cat,
           orientation,
           limit: 14,
         });
-        setBrollResults(fallback);
+        setBrollSearchOverride({ key: overrideKey, videos: fallback });
         notify(`Showing ${fallback.length} matching clips.`);
       }
     } catch {
       const orientation = project.settings.aspectRatio === "9:16" ? "portrait" : "landscape";
       const cat = brollCategory === "all" ? undefined : (brollCategory as BrollNiche);
-      const fallback = searchCuratedBroll(queryText, {
+      const fallback = searchCuratedBroll(trimmed, {
         category: cat,
         orientation,
         limit: 14,
       });
-      setBrollResults(fallback);
+      setBrollSearchOverride({ key: overrideKey, videos: fallback });
     } finally {
       setIsSearchingBroll(false);
     }
   };
 
-  const handleAddBrollToTimeline = (v: StockVideo) => {
+  const handleAddBrollToTimeline = async (v: StockVideo) => {
+    if (importingBrollId === v.id) return;
+    setImportingBrollId(v.id);
     const assetId = crypto.randomUUID();
     const clipId = crypto.randomUUID();
     const time = playback.getSnapshot().time;
-    run((p) => {
-      let overlayTrack = p.trackOrder.map((id) => p.tracks[id]).find((t) => t.kind === "overlay" && !t.locked);
-      let next = p;
-      if (!overlayTrack) {
-        next = addTrack(next, "overlay");
-        overlayTrack = next.tracks[next.trackOrder[next.trackOrder.length - 1]];
+    const insertBrollAsset = (asset: MediaAsset) => {
+      run((p) => {
+        let overlayTrack = p.trackOrder
+          .map((id) => p.tracks[id])
+          .find((t) => t.kind === "overlay" && !t.locked);
+        let next = p;
+        if (!overlayTrack) {
+          next = addTrack(next, "overlay");
+          overlayTrack = next.tracks[next.trackOrder[next.trackOrder.length - 1]];
+        }
+        next = addAsset(next, asset);
+        return addClip(next, asset.id, overlayTrack.id, time, {
+          id: clipId,
+          name: v.title,
+          duration: Math.min(asset.duration || v.duration, 4),
+        });
+      });
+      select([clipId]);
+    };
+
+    try {
+      // 1. Prefer server-proxied library import when authenticated (guarantees private Kreovar storage & clean export)
+      try {
+        const saved = await importStockAsset(v.videoUrl, v.title, v.duration || 5);
+        await linkAsset(project.id, "broll_assets", saved.id).catch(() => {});
+        insertBrollAsset({
+          id: assetId,
+          kind: "video",
+          name: v.title,
+          libraryId: saved.id,
+          duration: saved.duration || v.duration,
+          width: saved.width || v.width,
+          height: saved.height || v.height,
+          url: saved.url,
+          thumbnail: v.thumbnail,
+          size: saved.size,
+          mime: saved.mime || "video/mp4",
+        });
+        notify(`Imported "${v.title}" B-roll to timeline.`);
+        return;
+      } catch {
+        // Fall through to local IndexedDB proxy cache when guest/offline/quota-exempt
       }
-      const asset: MediaAsset = {
+
+      // 2. Proxy/cache video bytes into IndexedDB so compositing & WebCodecs export stay same-origin (zero CORS taint)
+      const localKey = `${scope}:${assetId}`;
+      let cachedBlob: Blob | undefined;
+      try {
+        const headers = await assetHeaders().catch(() => null);
+        const proxyUrl = headers
+          ? `/api/broll/download?url=${encodeURIComponent(v.videoUrl)}&filename=${encodeURIComponent(v.title)}`
+          : v.videoUrl;
+        const response = await fetch(proxyUrl, {
+          headers: headers || undefined,
+          signal: AbortSignal.timeout(45000),
+        });
+        if (response.ok) {
+          const blob = await response.blob();
+          if (blob.size > 0 && blob.size <= 100 * 1024 * 1024) {
+            await cacheWrite("media", localKey, blob);
+            cachedBlob = blob;
+          }
+        }
+      } catch {
+        // Ignore proxy/CORS fetch errors and fall back to remote URL below
+      }
+
+      insertBrollAsset({
         id: assetId,
         kind: "video",
         name: v.title,
@@ -361,18 +500,18 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
         height: v.height,
         url: v.videoUrl,
         thumbnail: v.thumbnail,
-        size: 0,
-        mime: "video/mp4",
-      };
-      next = addAsset(next, asset);
-      return addClip(next, assetId, overlayTrack.id, time, {
-        id: clipId,
-        name: v.title,
-        duration: Math.min(v.duration, 4),
+        localKey: cachedBlob ? localKey : undefined,
+        size: cachedBlob ? cachedBlob.size : 0,
+        mime: cachedBlob?.type || "video/mp4",
       });
-    });
-    select([clipId]);
-    notify(`Added "${v.title}" B-roll to overlay track.`);
+      notify(
+        cachedBlob
+          ? `Cached & added "${v.title}" B-roll to timeline.`
+          : `Added "${v.title}" B-roll (streamed remote preview).`
+      );
+    } finally {
+      setImportingBrollId((curr) => (curr === v.id ? null : curr));
+    }
   };
 
   // Add Transition between selected or playhead-adjacent clips (with optional matching SFX)
@@ -710,8 +849,6 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                   return (
                     <div
                       key={preset.id}
-                      onMouseEnter={() => setHoveredPreset(preset.id)}
-                      onMouseLeave={() => setHoveredPreset(null)}
                       className={`p-3 rounded-xl border bg-white transition-all cursor-pointer group ${
                         isSelected
                           ? "border-sky-500 ring-2 ring-sky-200 bg-sky-50/20 shadow-xs"
@@ -1093,6 +1230,49 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
               </div>
             </div>
 
+            {/* Expanded Inline B-Roll Video Preview Player */}
+            {previewingBroll && (
+              <div className="rounded-xl border border-cyan-200 bg-slate-950 overflow-hidden shadow-sm">
+                <div className="flex items-center justify-between px-2.5 py-1.5 bg-slate-900 border-b border-slate-800 text-[11px] text-white">
+                  <span className="truncate font-semibold pr-2">{previewingBroll.title}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewingBroll(null)}
+                    className="text-slate-400 hover:text-white shrink-0 cursor-pointer"
+                    aria-label="Close B-roll preview"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="aspect-video w-full bg-black">
+                  <video
+                    key={previewingBroll.id}
+                    src={previewingBroll.videoUrl}
+                    poster={previewingBroll.thumbnail || undefined}
+                    controls
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2 px-2.5 py-2 bg-slate-900/95 text-[10px] text-slate-300">
+                  <span className="font-mono truncate">
+                    {previewingBroll.duration.toFixed(1)}s · {previewingBroll.width}×{previewingBroll.height}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={importingBrollId === previewingBroll.id}
+                    onClick={() => void handleAddBrollToTimeline(previewingBroll)}
+                    className="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-60 text-white font-semibold flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <Plus size={12} />
+                    <span>{importingBrollId === previewingBroll.id ? "Adding..." : "Add to Timeline"}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Live Search Results */}
             {brollResults.length > 0 && (
               <div className="space-y-2">
@@ -1105,37 +1285,72 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                   </span>
                 </div>
                 <div className="space-y-2">
-                  {brollResults.map((v) => (
-                    <div
-                      key={v.id}
-                      className="p-2 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 hover:border-cyan-400 transition-colors group"
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div className="w-11 h-9 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-                          {v.thumbnail ? (
-                            <img src={v.thumbnail} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <Film size={16} className="text-cyan-600" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-slate-900 truncate" title={v.title}>{v.title}</p>
-                          <p className="text-[10px] text-slate-500 font-mono truncate">
-                            {v.duration.toFixed(1)}s · {v.width}×{v.height}
-                          </p>
+                  {brollResults.map((v) => {
+                    const isHovering = hoveredBrollId === v.id;
+                    return (
+                      <div
+                        key={v.id}
+                        onMouseEnter={() => setHoveredBrollId(v.id)}
+                        onMouseLeave={() => setHoveredBrollId(null)}
+                        className="p-2 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2 hover:border-cyan-400 transition-colors group"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setPreviewingBroll(v)}
+                          title="Click to preview B-roll clip"
+                          className="flex items-center gap-2.5 min-w-0 flex-1 text-left cursor-pointer"
+                        >
+                          <div className="relative w-16 h-10 rounded-lg bg-slate-900 border border-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {isHovering && v.videoUrl ? (
+                              <video
+                                src={v.videoUrl}
+                                poster={v.thumbnail || undefined}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                className="w-full h-full object-cover"
+                              />
+                            ) : v.thumbnail ? (
+                              <img src={v.thumbnail} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <Film size={16} className="text-cyan-400" />
+                            )}
+                            <span className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Play size={12} className="text-white fill-white" />
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-slate-900 truncate group-hover:text-cyan-700" title={v.title}>{v.title}</p>
+                            <p className="text-[10px] text-slate-500 font-mono truncate">
+                              {v.duration.toFixed(1)}s · {v.width}×{v.height}
+                            </p>
+                          </div>
+                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewingBroll(v)}
+                            title="Preview clip"
+                            aria-label={`Preview ${v.title}`}
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                          >
+                            <Play size={11} />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={importingBrollId === v.id}
+                            onClick={() => void handleAddBrollToTimeline(v)}
+                            title="Add to timeline"
+                            className="px-2 py-1.5 rounded-lg bg-cyan-50 hover:bg-cyan-600 disabled:opacity-60 text-cyan-600 hover:text-white border border-cyan-200 hover:border-cyan-600 transition-colors flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
+                          >
+                            <Plus size={12} />
+                            <span>{importingBrollId === v.id ? "Adding..." : "Add"}</span>
+                          </button>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleAddBrollToTimeline(v)}
-                        title="Add to timeline"
-                        className="shrink-0 px-2 py-1.5 rounded-lg bg-cyan-50 hover:bg-cyan-600 text-cyan-600 hover:text-white border border-cyan-200 hover:border-cyan-600 transition-colors flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
-                      >
-                        <Plus size={12} />
-                        <span>Add</span>
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1187,7 +1402,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
           </div>
         )}
 
-        {/* ======================= TAB: MOTION GRAPHICS (18 Editable Templates) ======================= */}
+        {/* ======================= TAB: MOTION GRAPHICS (24 Editable Templates) ======================= */}
         {activeTab === "graphics" && (
           <div className="space-y-3.5">
             <div className="relative">
@@ -1197,7 +1412,7 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
               />
               <input
                 type="text"
-                placeholder="Search 18 motion templates..."
+                placeholder="Search 24 motion templates..."
                 value={graphicQuery}
                 onChange={(e) => setGraphicQuery(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white"
@@ -1229,7 +1444,6 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                     .toLowerCase()
                     .includes(graphicQuery.toLowerCase())
               ).map((tpl) => {
-                const isDarkCard = tpl.theme === "dark-slate";
                 return (
                   <div
                     key={tpl.id}
@@ -1259,47 +1473,12 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                       </button>
                     </div>
 
-                    {/* Visual Mini Card Preview */}
-                    <div
-                      className={`rounded-lg px-2.5 py-2 border text-left ${
-                        isDarkCard
-                          ? "bg-slate-900 border-slate-800 text-white"
-                          : tpl.theme === "editorial-paper"
-                          ? "bg-[#FAF8F2] border-stone-200 text-stone-900"
-                          : "bg-slate-50 border-slate-200 text-slate-900"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className="text-[11px] font-bold truncate"
-                          style={{ color: isDarkCard ? "#F8FAFC" : "#0F172A" }}
-                        >
-                          {tpl.prefix ?? ""}
-                          {tpl.value !== undefined ? tpl.value : tpl.text}
-                          {tpl.suffix ?? ""}
-                        </span>
-                        <span
-                          className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded uppercase shrink-0"
-                          style={{
-                            backgroundColor: `${tpl.accent}22`,
-                            color: tpl.accent,
-                          }}
-                        >
-                          {tpl.kind}
-                        </span>
-                      </div>
-                      {(tpl.subtitle || tpl.items?.[0] || tpl.bars?.[0]?.label) && (
-                        <p
-                          className={`text-[10px] truncate mt-0.5 ${
-                            isDarkCard ? "text-slate-300" : "text-slate-500"
-                          }`}
-                        >
-                          {tpl.subtitle ||
-                            (tpl.items ? tpl.items.slice(0, 2).join(" · ") : undefined) ||
-                            (tpl.bars ? tpl.bars.map((b) => b.label).join(" vs ") : undefined)}
-                        </p>
-                      )}
-                    </div>
+                    {/* Live Canvas2D Preview of Parametric Motion Graphic */}
+                    <MotionGraphicCanvasPreview
+                      template={tpl}
+                      compact
+                      aspect="16:9"
+                    />
                   </div>
                 );
               })}
@@ -1322,31 +1501,40 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
         {/* ======================= TAB: TEXT & TITLES ======================= */}
         {activeTab === "text" && (
           <div className="space-y-4">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Title &amp; Typography Presets
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                Title &amp; Typography Presets
+              </span>
+              <span className="text-[10px] font-mono text-slate-400">
+                {TEXT_TITLE_PRESETS.length} styles
+              </span>
+            </div>
             <div className="grid grid-cols-2 gap-2">
-              {[
-                { name: "Default Title", text: "Heading Text", color: "#FFFFFF", size: 48, font: "Inter", desc: "Clean primary title" },
-                { name: "Bold Headline", text: "BREAKING NEWS", color: "#00E5FF", size: 54, font: "Montserrat", desc: "High-impact punch" },
-                { name: "Cyber Glow", text: "CYBER GLOW", color: "#38BDF8", size: 46, font: "Orbitron", desc: "Sci-fi neon glow" },
-                { name: "Minimal Subtitle", text: "Minimal Caption", color: "#E2E8F0", size: 36, font: "Inter", desc: "Clean lower subtitle" },
-                { name: "Lower Third", text: "Speaker Name // Creator", color: "#FDE047", size: 32, font: "Poppins", desc: "Identity banner" },
-                { name: "Neon Flame", text: "VIRAL HOOK", color: "#F43F5E", size: 52, font: "Impact", desc: "Red viral attention" },
-              ].map((preset, idx) => (
+              {TEXT_TITLE_PRESETS.map((preset) => (
                 <div
-                  key={idx}
-                  className="p-3 rounded-xl border border-slate-200 bg-slate-50 hover:border-slate-300 flex flex-col justify-between group transition-all relative overflow-hidden"
+                  key={preset.name}
+                  className="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-blue-400 flex flex-col justify-between group transition-all relative overflow-hidden"
                 >
                   <div>
-                    <p className="text-xs font-bold text-slate-900 truncate">{preset.name}</p>
-                    <p className="text-[10px] text-slate-500 truncate mt-0.5">{preset.desc}</p>
                     <div
-                      className="mt-2 py-2 px-1 rounded bg-white border border-slate-200 text-center font-bold text-xs truncate shadow-2xs"
-                      style={{ color: preset.color }}
+                      className={`h-14 rounded-lg bg-gradient-to-br ${preset.bg} flex items-center justify-center px-2 border border-slate-800/80 overflow-hidden`}
                     >
-                      {preset.text}
+                      <span
+                        className="font-bold text-xs tracking-tight truncate transition-transform duration-300 group-hover:scale-105"
+                        style={{
+                          color: preset.color,
+                          fontFamily: preset.font,
+                          textShadow:
+                            preset.name.includes("Glow") || preset.name.includes("Flame")
+                              ? `0 0 12px ${preset.color}88`
+                              : "0 1px 4px rgba(0,0,0,0.65)",
+                        }}
+                      >
+                        {preset.text}
+                      </span>
                     </div>
+                    <p className="text-xs font-bold text-slate-900 truncate mt-2">{preset.name}</p>
+                    <p className="text-[10px] text-slate-500 truncate mt-0.5">{preset.font} · {preset.desc}</p>
                   </div>
                   <button
                     type="button"
@@ -1526,37 +1714,75 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 max-h-[420px] overflow-y-auto pr-1">
-                {filtered.map((tr) => (
-                  <button
-                    key={tr.id}
-                    type="button"
-                    title={`${tr.whenToUse} — Avoid: ${tr.avoidWhen}`}
-                    onClick={() => handleAddTransition(tr.id)}
-                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer group ${
-                      lastTransitionKind === tr.id
-                        ? "border-blue-500 bg-blue-50/40"
-                        : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100"
-                    }`}
-                  >
-                    <p className="text-xs font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
-                      {tr.name}
-                    </p>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block line-clamp-2">
-                      {tr.shortDesc}
-                    </span>
-                    <div className="mt-1.5 flex items-center justify-between gap-1">
-                      <span className="text-[9px] font-mono text-slate-600 bg-white border border-slate-200 px-1.5 py-0.5 rounded">
-                        {tr.defaultDuration.toFixed(2)}s
+              {/* Interactive Transition Monitor */}
+              {(() => {
+                const liveKind = hoveredTransitionKind ?? lastTransitionKind;
+                const liveSpec = getTransitionSpec(liveKind);
+                return (
+                  <div className="rounded-xl border border-slate-200 bg-white p-2 space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between gap-2 px-0.5">
+                      <span className="text-[10px] font-bold text-slate-900 truncate">
+                        Preview: {liveSpec.name}
                       </span>
-                      {tr.recommendedSfx && (
-                        <span className="text-[8px] font-mono text-sky-700 bg-sky-50 border border-sky-200 px-1 py-0.5 rounded truncate">
-                          +{tr.recommendedSfx}
-                        </span>
-                      )}
+                      <span className="text-[9px] font-mono text-blue-600 shrink-0">
+                        {liveSpec.category}
+                      </span>
                     </div>
-                  </button>
-                ))}
+                    <TransitionPreviewStage
+                      kind={liveKind}
+                      duration={transitionDuration}
+                      intensity={transitionIntensity}
+                      interactive
+                    />
+                  </div>
+                );
+              })()}
+
+              <div className="grid grid-cols-2 gap-2 max-h-[380px] overflow-y-auto pr-1">
+                {filtered.map((tr) => {
+                  const isCardHovered = hoveredTransitionKind === tr.id;
+                  return (
+                    <button
+                      key={tr.id}
+                      type="button"
+                      title={`${tr.whenToUse} — Avoid: ${tr.avoidWhen}`}
+                      onMouseEnter={() => setHoveredTransitionKind(tr.id)}
+                      onMouseLeave={() => setHoveredTransitionKind(null)}
+                      onClick={() => handleAddTransition(tr.id)}
+                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer group space-y-1.5 ${
+                        lastTransitionKind === tr.id
+                          ? "border-blue-500 bg-blue-50/40"
+                          : "border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50"
+                      }`}
+                    >
+                      <TransitionPreviewStage
+                        kind={tr.id}
+                        duration={transitionDuration}
+                        intensity={transitionIntensity}
+                        compact
+                        hovered={isCardHovered}
+                      />
+                      <div>
+                        <p className="text-xs font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                          {tr.name}
+                        </p>
+                        <span className="text-[10px] text-slate-500 mt-0.5 block line-clamp-1">
+                          {tr.shortDesc}
+                        </span>
+                        <div className="mt-1 flex items-center justify-between gap-1">
+                          <span className="text-[9px] font-mono text-slate-600 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
+                            {tr.defaultDuration.toFixed(2)}s
+                          </span>
+                          {tr.recommendedSfx && (
+                            <span className="text-[8px] font-mono text-sky-700 bg-sky-50 border border-sky-200 px-1 py-0.5 rounded truncate">
+                              +{tr.recommendedSfx}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           );
@@ -1565,42 +1791,99 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
         {/* ======================= TAB: FILTERS & ZOOMS ======================= */}
         {activeTab === "filters" && (
           <div className="space-y-4">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-              Camera Punch-in Zooms
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { name: "Center Punch", scale: 1.25, desc: "Quick focus" },
-                { name: "Emphasis Zoom", scale: 1.4, desc: "Keyword hit" },
-                { name: "Extreme Punch", scale: 1.6, desc: "High drama" },
-                { name: "Slow Push-In", scale: 1.15, desc: "Story drift" },
-              ].map((zoom, i) => (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                Color Grading &amp; Filter Looks
+              </span>
+              {selectedClip && isVisual && (
                 <button
-                  key={i}
+                  type="button"
                   onClick={() => {
-                    if (selectedClip) {
+                    run((p) =>
+                      changeClipProperty(p, selectedClip.id, {
+                        effects: { brightness: 0, contrast: 0, saturation: 0, blur: 0 },
+                      })
+                    );
+                    notify("Reset color filter adjustments.");
+                  }}
+                  className="text-[10px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {COLOR_FILTER_PRESETS.map((preset) => {
+                const isApplied =
+                  selectedClip &&
+                  isVisual &&
+                  selectedClip.effects.brightness === preset.effects.brightness &&
+                  selectedClip.effects.contrast === preset.effects.contrast &&
+                  selectedClip.effects.saturation === preset.effects.saturation &&
+                  selectedClip.effects.blur === preset.effects.blur;
+                const cssFilter = `brightness(${Math.max(0.1, 1 + preset.effects.brightness / 100)}) contrast(${Math.max(0.1, 1 + preset.effects.contrast / 100)}) saturate(${Math.max(0, 1 + preset.effects.saturation / 100)}) blur(${Math.min(4, preset.effects.blur)}px)`;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => {
+                      if (!selectedClip || !isVisual) {
+                        notify("Select a video or image clip on the timeline first.");
+                        return;
+                      }
                       run((p) =>
                         changeClipProperty(p, selectedClip.id, {
-                          transform: {
-                            ...selectedClip.transform,
-                            scale: zoom.scale,
-                          },
+                          effects: { ...preset.effects },
                         })
                       );
-                      notify(`Applied ${zoom.name} to selected clip.`);
-                    } else {
-                      notify("Select a clip on the timeline first.");
-                    }
-                  }}
-                  className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100 text-left transition-all cursor-pointer group"
-                >
-                  <p className="text-xs font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{zoom.name}</p>
-                  <span className="text-[10px] text-slate-500 font-mono">
-                    {zoom.scale}× · {zoom.desc}
-                  </span>
-                </button>
-              ))}
+                      notify(`Applied "${preset.name}" filter look.`);
+                    }}
+                    className={`p-2 rounded-xl border text-left transition-all cursor-pointer group ${
+                      isApplied
+                        ? "border-blue-500 bg-blue-50/50 ring-1 ring-blue-300"
+                        : "border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="h-11 rounded-lg overflow-hidden border border-slate-200 relative mb-1.5 bg-slate-900">
+                      <div
+                        className={`w-full h-full bg-gradient-to-tr ${preset.swatch} flex items-center justify-center`}
+                        style={{ filter: cssFilter }}
+                      >
+                        <div className="w-6 h-6 rounded-full bg-white/85 shadow-sm border border-white/60" />
+                      </div>
+                      <span className="absolute bottom-1 right-1 text-[8px] font-mono bg-black/65 text-white px-1 rounded">
+                        LUT
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                      {preset.name}
+                    </p>
+                    <span className="text-[10px] text-slate-500 font-mono block truncate">
+                      {preset.desc}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
+
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block pt-1">
+              Camera Punch-in Zooms
+            </span>
+            <CameraZoomGrid
+              cardTone="slate"
+              onApply={(name, scale) => {
+                if (selectedClip && isVisual) {
+                  run((p) =>
+                    changeClipProperty(p, selectedClip.id, {
+                      transform: { ...selectedClip.transform, scale },
+                    })
+                  );
+                  notify(`Applied ${name} (${scale}×) to selected clip.`);
+                } else {
+                  notify("Select a visual clip on the timeline first.");
+                }
+              }}
+            />
           </div>
         )}
 
@@ -1610,39 +1893,21 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
             <span className="text-[11px] font-semibold text-slate-500 uppercase">
               Punch-in Camera Zooms
             </span>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { name: "Center Punch", scale: 1.25, desc: "Quick focus" },
-                { name: "Emphasis Zoom", scale: 1.4, desc: "Keyword hit" },
-                { name: "Extreme Punch", scale: 1.6, desc: "High drama" },
-                { name: "Slow Push-In", scale: 1.15, desc: "Story drift" },
-              ].map((zoom, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    if (selectedClip) {
-                      run((p) =>
-                        changeClipProperty(p, selectedClip.id, {
-                          transform: {
-                            ...selectedClip.transform,
-                            scale: zoom.scale,
-                          },
-                        })
-                      );
-                      notify(`Applied ${zoom.name} to selected clip.`);
-                    } else {
-                      notify("Select a clip on the timeline first.");
-                    }
-                  }}
-                  className="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/40 text-left transition-colors"
-                >
-                  <p className="text-xs font-semibold text-slate-900">{zoom.name}</p>
-                  <span className="text-[10px] text-slate-500 font-mono">
-                    {zoom.scale}× · {zoom.desc}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <CameraZoomGrid
+              cardTone="white"
+              onApply={(name, scale) => {
+                if (selectedClip && isVisual) {
+                  run((p) =>
+                    changeClipProperty(p, selectedClip.id, {
+                      transform: { ...selectedClip.transform, scale },
+                    })
+                  );
+                  notify(`Applied ${name} (${scale}×) to selected clip.`);
+                } else {
+                  notify("Select a visual clip on the timeline first.");
+                }
+              }}
+            />
 
             <span className="text-[11px] font-semibold text-slate-500 uppercase mt-4 block">
               Quick CapCut Transitions
@@ -1655,19 +1920,31 @@ export default function AssetDrawer({ activeTab, onClose }: AssetDrawerProps) {
                 { name: "Zoom Blur", kind: "zoom-blur" as TransitionKind, desc: "Hype radial zoom" },
                 { name: "S-Shake", kind: "camera-shake" as TransitionKind, desc: "Beat impact shake" },
                 { name: "RGB Glitch", kind: "glitch-rgb" as TransitionKind, desc: "Chromatic tear" },
-              ].map((tr) => (
-                <button
-                  key={tr.kind}
-                  type="button"
-                  onClick={() => handleAddTransition(tr.kind)}
-                  className="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/40 text-left transition-colors"
-                >
-                  <p className="text-xs font-semibold text-slate-900">{tr.name}</p>
-                  <span className="text-[10px] text-slate-500 font-mono">
-                    {tr.kind} · {tr.desc}
-                  </span>
-                </button>
-              ))}
+              ].map((tr) => {
+                const isQuickHovered = hoveredTransitionKind === tr.kind;
+                return (
+                  <button
+                    key={tr.kind}
+                    type="button"
+                    onMouseEnter={() => setHoveredTransitionKind(tr.kind)}
+                    onMouseLeave={() => setHoveredTransitionKind(null)}
+                    onClick={() => handleAddTransition(tr.kind)}
+                    className="p-2 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/40 text-left transition-colors space-y-1.5 cursor-pointer"
+                  >
+                    <TransitionPreviewStage
+                      kind={tr.kind}
+                      compact
+                      hovered={isQuickHovered}
+                    />
+                    <div>
+                      <p className="text-xs font-semibold text-slate-900">{tr.name}</p>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {tr.desc}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

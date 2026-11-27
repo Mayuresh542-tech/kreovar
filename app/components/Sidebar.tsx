@@ -271,18 +271,25 @@ export default function Sidebar({
                   onMobileClose?.();
                 }}
                 aria-current={isActive ? "page" : undefined}
-                className={`vx-studio-nav-item flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors duration-150 ${
+                className={`vx-studio-nav-item relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors duration-150 ${
                   isActive
-                    ? "bg-slate-900 text-white font-medium"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-normal"
+                    ? "text-white font-semibold"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-white/70 font-normal"
                 }`}
               >
+                {isActive && (
+                  <motion.span
+                    layoutId="kreovar-nav-active"
+                    transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                    className="absolute inset-0 rounded-lg bg-[#13223E] shadow-xs -z-0"
+                  />
+                )}
                 <Icon
-                  className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+                  className={`relative z-10 w-3.5 h-3.5 shrink-0 transition-colors ${
                     isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600"
                   }`}
                 />
-                <span className="truncate">{item.label}</span>
+                <span className="relative z-10 truncate">{item.label}</span>
               </Link>
             );
           })}
@@ -307,10 +314,10 @@ export default function Sidebar({
                     onMobileClose?.();
                   }}
                   aria-current={isActive ? "page" : undefined}
-                className={`vx-studio-nav-item flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors duration-150 ${
+                className={`vx-studio-nav-item relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors duration-150 ${
                     isActive
-                      ? "bg-blue-50 text-blue-700 font-semibold border border-blue-200/60"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-normal"
+                      ? "bg-blue-50/90 text-[#1D4FB1] font-semibold border border-blue-200/70 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/70 font-normal"
                   }`}
                 >
                   <Icon

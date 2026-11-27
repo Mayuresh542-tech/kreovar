@@ -12,6 +12,7 @@ import StudioShell from "../components/StudioShell";
 import AudioPlayer from "../components/AudioPlayer";
 import VoiceHistory, {type SavedVoice} from "../components/VoiceHistory";
 import AuthLoadingScreen from "../components/AuthLoadingScreen";
+import CreatorObject3D from "../components/3d/CreatorObject3D";
 import { useAuthGate } from "../lib/useAuthGate";
 import { CURATED_VOICES } from "../lib/server/tts/voices";
 import {downloadAsset} from "../lib/assets/client";
@@ -116,12 +117,24 @@ function VoiceContent() {
   return (
     <StudioShell active="voice"><UsageSummary compact feature="voice"/>
       <div className="space-y-8 pb-16">
-        {/* Header */}
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-            AI Voice Generator
-          </h1>
-          
+        {/* Header with interactive 3D Voice Condenser */}
+        <div className="vx-frosted-surface rounded-3xl p-5 sm:p-6 grid gap-5 lg:grid-cols-12 lg:items-center">
+          <div className="lg:col-span-7 space-y-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200/80 px-3 py-1 text-[10px] font-mono font-semibold uppercase tracking-wider text-[#1D4FB1]">
+              Voice Studio
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#142440]">
+              AI Voice Generator
+            </h1>
+            <p className="text-xs sm:text-sm text-[#52647e]">
+              Synthesize realistic studio voiceovers and send audio straight to your project timeline.
+            </p>
+          </div>
+          <div className="lg:col-span-5">
+            <div className="vx-3d-viewport h-44">
+              <CreatorObject3D variant="studio-mic" height={176} />
+            </div>
+          </div>
         </div>
 
         {error && (
@@ -133,7 +146,7 @@ function VoiceContent() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left: Text Input & Voice Controls */}
           <div className="lg:col-span-7 space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-xs">
+            <div className="vx-frosted-surface rounded-2xl p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-slate-700">
                   Script to Voicify

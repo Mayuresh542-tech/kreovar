@@ -180,7 +180,7 @@ function IdeasContent() {
         </div>
 
         {/* Prompt Input Form */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
+        <div className="vx-frosted-surface rounded-2xl p-5 sm:p-6 space-y-4">
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-slate-700">
               Target Topic, Keyword, or Core Concept

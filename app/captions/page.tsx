@@ -27,8 +27,8 @@ import {exportToSRT,exportToVTT,exportToASS,parseSRT} from "../lib/captions/subt
 import {drawCaptions} from "../lib/captions/canvasCaptions";
 import AddToProjectModal from "../components/projects/AddToProjectModal";
 
-const panel="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs";
-const button="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium disabled:opacity-50";
+const panel="vx-frosted-surface min-w-0 rounded-2xl p-4 sm:p-5";
+const button="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200/90 bg-white/85 hover:bg-white px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50";
 function CaptionsContent(){
  const router=useRouter(),params=useSearchParams(),{status}=useAuthGate();
  const [segments,setSegments]=useState<CaptionSegment[]>([]),[templateId,setTemplateId]=useState(DEFAULT_CAPTION_TEMPLATES[0].id),[url,setUrl]=useState<string|null>(null),[fileName,setFileName]=useState(""),[busy,setBusy]=useState(""),[error,setError]=useState(""),[time,setTime]=useState(0),[duration,setDuration]=useState(0),[aspect,setAspect]=useState(16/9),[text,setText]=useState(params.get("script")||params.get("text")||""),[exporting,setExporting]=useState(false),[progress,setProgress]=useState(0),[exportUrl,setExportUrl]=useState<string|null>(null),[captionAsset,setCaptionAsset]=useState<StudioAsset|null>(null),[modal,setModal]=useState(false);

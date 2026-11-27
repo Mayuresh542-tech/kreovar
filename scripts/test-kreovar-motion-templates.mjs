@@ -249,7 +249,7 @@ test("Legacy GraphicControls panel removed & all 19 iart-ai/motion-skills packs 
 
   const compactPrompt = getMotionDirectorPromptSection(true);
   const fullPrompt = getMotionDirectorPromptSection(false);
-  for (const token of ["customSpec", "18 Templates", "changeGraphic", "removeGraphic", "clearRegions"]) {
+  for (const token of ["customSpec", "24 Templates", "split-title", "marker-highlight", "audio-waveform", "subscribe-cta", "article-citation", "timer-badge", "changeGraphic", "removeGraphic", "clearRegions"]) {
     assert.ok(compactPrompt.includes(token), `Compact prompt missing ${token}`);
   }
   for (const token of ["Text Message", "Explainer", "Podcast / Audiogram", "manim"]) {

@@ -22,6 +22,12 @@ export const RICH_GRAPHIC_KINDS = [
   'kpi-grid',
   'poll-card',
   'offer-tag',
+  'split-title',
+  'marker-highlight',
+  'audio-waveform',
+  'subscribe-cta',
+  'article-citation',
+  'timer-badge',
   'custom',
 ] as const;
 
@@ -498,6 +504,9 @@ export function addMotionGraphic(
     kind === 'notification' ||
     kind === 'kinetic-badge' ||
     kind === 'social-follow' ||
+    kind === 'subscribe-cta' ||
+    kind === 'timer-badge' ||
+    kind === 'audio-waveform' ||
     kind === 'chapter-card' ||
     kind === 'offer-tag';
 
@@ -751,12 +760,51 @@ function safeClosePath(ctx: CanvasRenderingContext2D) {
   if (typeof ctx.closePath === 'function') ctx.closePath();
 }
 
+function safeClip(ctx: CanvasRenderingContext2D) {
+  if (typeof ctx.clip === 'function') ctx.clip();
+}
+
+function safeRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  if (typeof ctx.rect === 'function') ctx.rect(x, y, w, h);
+  else ctx.roundRect(x, y, w, h, 0);
+}
+
+function safeRotate(ctx: CanvasRenderingContext2D, angle: number) {
+  if (typeof ctx.rotate === 'function') ctx.rotate(angle);
+}
+
+function safeGradFill(
+  ctx: CanvasRenderingContext2D,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  stops: Array<[number, string]>,
+  fallback: string
+): string | CanvasGradient {
+  if (typeof ctx.createLinearGradient === 'function') {
+    const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+    for (const [offset, color] of stops) grad.addColorStop(offset, color);
+    return grad;
+  }
+  return fallback;
+}
+
 function safeCircle(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, start = 0, end = Math.PI * 2) {
   if (typeof ctx.arc === 'function') {
     ctx.arc(cx, cy, r, start, end);
   } else {
     ctx.roundRect(cx - r, cy - r, r * 2, r * 2, r);
   }
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  if (clean.length < 6) return `rgba(37, 99, 235, ${alpha})`;
+  const r = Number.parseInt(clean.slice(0, 2), 16) || 37;
+  const g = Number.parseInt(clean.slice(2, 4), 16) || 99;
+  const b = Number.parseInt(clean.slice(4, 6), 16) || 235;
+  return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1)})`;
 }
 
 function drawRoundedCard(
@@ -1007,23 +1055,53 @@ export function drawGraphicPanel(
   switch (g.kind) {
     case 'stat':
     case 'stat-counter': {
+      // Split glowing telemetry card with left accent blade + delta pill + count-up track
       const parsed = parseNumericFromText(titleText);
       const target = g.value ?? parsed.value;
       const prefix = g.prefix ?? parsed.prefix;
       const suffix = g.suffix ?? parsed.suffix;
       const label = g.subtitle || (g.value !== undefined ? titleText : parsed.label);
-      const cardW = Math.round(minDim * 0.56);
-      const cardH = Math.round(minDim * 0.175);
+      const cardW = Math.round(minDim * 0.6);
+      const cardH = Math.round(minDim * 0.185);
       const pad = Math.round(minDim * 0.024);
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
+
+      ctx.save();
+      ctx.shadowColor = palette.shadow;
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetY = 6;
+      ctx.fillStyle = safeGradFill(
+        ctx,
+        -cardW / 2,
+        -cardH / 2,
+        cardW / 2,
+        cardH / 2,
+        [
+          [0, palette.bg],
+          [1, hexToRgba(g.accent, g.theme === 'dark-slate' ? 0.18 : 0.08)],
+        ],
+        palette.bg
+      );
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, Math.round(minDim * 0.028));
+      ctx.fill();
+      ctx.strokeStyle = hexToRgba(g.accent, 0.35);
+      ctx.lineWidth = 1.4;
+      safeStroke(ctx);
+      ctx.restore();
+
+      // Left vertical accent blade
+      const bladeW = 6;
+      const bladeProg = progressWindow(time, 0.02, 0.32);
+      ctx.fillStyle = g.accent;
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2 + 10, -cardH / 2 + 14, bladeW, Math.max(8, (cardH - 28) * bladeProg), 3);
+      ctx.fill();
 
       const iconSize = g.icon && g.icon !== 'none' ? Math.round(minDim * 0.056) : 0;
       const iconPop = easeOutBack(progressWindow(time, 0.04, 0.25));
       if (iconSize) {
         ctx.save();
-        const ix = -cardW / 2 + pad + iconSize * 0.5;
-        const iy = -cardH / 2 + pad + iconSize * 0.5;
-        ctx.translate(ix, iy);
+        ctx.translate(-cardW / 2 + 24 + iconSize * 0.5, -cardH * 0.12);
         ctx.scale(iconPop, iconPop);
         drawVectorIcon(ctx, g.icon!, 0, 0, iconSize, '#ffffff', g.accent);
         ctx.restore();
@@ -1031,30 +1109,46 @@ export function drawGraphicPanel(
 
       const countProg = progressWindow(time, 0.08, 0.72);
       const numStr = `${prefix}${formatAnimatedNumber(target, countProg)}${suffix}`;
-      const numLeft = -cardW / 2 + pad + (iconSize ? iconSize + pad * 0.7 : 0);
+      const numLeft = -cardW / 2 + 26 + (iconSize ? iconSize + 14 : 0);
       ctx.fillStyle = palette.title;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.font = `800 ${Math.round(minDim * 0.058)}px ${family}`;
-      ctx.fillText(fitText(ctx, numStr, cardW - pad * 2 - (iconSize ? iconSize + pad : 0)), numLeft, -cardH * 0.14);
+      ctx.font = `800 ${Math.round(minDim * 0.062)}px ${family}`;
+      ctx.fillText(fitText(ctx, numStr, cardW - 60 - (iconSize ? iconSize + 18 : 0)), numLeft, -cardH * 0.14);
+
+      // Delta chip top-right
+      const chipPop = easeOutBack(progressWindow(time, 0.18, 0.25));
+      ctx.save();
+      ctx.translate(cardW / 2 - pad - 24, -cardH * 0.24);
+      ctx.scale(chipPop, chipPop);
+      ctx.fillStyle = hexToRgba(g.accent, 0.16);
+      ctx.beginPath();
+      ctx.roundRect(-24, -10, 48, 20, 10);
+      ctx.fill();
+      ctx.fillStyle = g.accent;
+      ctx.textAlign = 'center';
+      ctx.font = `800 ${Math.round(minDim * 0.016)}px ${family}`;
+      ctx.fillText('▲ LIVE', 0, 0.5);
+      ctx.restore();
 
       if (label) {
         ctx.globalAlpha = progressWindow(time, 0.16, 0.35);
         ctx.fillStyle = palette.muted;
-        ctx.font = `600 ${Math.round(minDim * 0.025)}px ${family}`;
-        ctx.fillText(fitText(ctx, label, cardW - pad * 2), -cardW / 2 + pad, cardH * 0.20);
+        ctx.textAlign = 'left';
+        ctx.font = `600 ${Math.round(minDim * 0.023)}px ${family}`;
+        ctx.fillText(fitText(ctx, label, cardW - 44), -cardW / 2 + 26, cardH * 0.24);
         ctx.globalAlpha = 1;
       }
 
-      const barY = cardH / 2 - Math.round(minDim * 0.014);
-      const barW = cardW - pad * 2;
+      const barY = cardH / 2 - Math.round(minDim * 0.012);
+      const barW = cardW - 44;
       ctx.fillStyle = palette.trackBg;
       ctx.beginPath();
-      ctx.roundRect(-cardW / 2 + pad, barY, barW, 5, 3);
+      ctx.roundRect(-cardW / 2 + 22, barY, barW, 4, 2);
       ctx.fill();
       ctx.fillStyle = g.accent;
       ctx.beginPath();
-      ctx.roundRect(-cardW / 2 + pad, barY, Math.max(4, barW * progressWindow(time, 0.1, 0.75)), 5, 3);
+      ctx.roundRect(-cardW / 2 + 22, barY, Math.max(4, barW * progressWindow(time, 0.1, 0.75)), 4, 2);
       ctx.fill();
 
       ctx.restore();
@@ -1062,55 +1156,106 @@ export function drawGraphicPanel(
     }
 
     case 'progress-ring': {
+      // HUD Dial Assembly with outer calibrated degree ticks + floating pill metric label (no heavy rectangular slab)
       const parsed = parseNumericFromText(titleText);
       const pct = clamp(g.value ?? parsed.value, 0, 100);
-      const cardW = Math.round(minDim * 0.62);
-      const cardH = Math.round(minDim * 0.175);
-      const pad = Math.round(minDim * 0.024);
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
-
-      const ringR = Math.round(cardH * 0.33);
-      const cx = -cardW / 2 + pad + ringR + 4;
+      const cardW = Math.round(minDim * 0.64);
+      const cardH = Math.round(minDim * 0.2);
+      const ringR = Math.round(cardH * 0.39);
+      const cx = -cardW * 0.26;
       const cy = 0;
+
+      // Floating horizontal backdrop pill emerging from behind the circular dial
+      const pillX = cx;
+      const pillW = cardW * 0.72;
+      const pillH = Math.round(cardH * 0.66);
+      const slide = progressWindow(time, 0.06, 0.38);
+      ctx.save();
+      ctx.globalAlpha = slide;
+      ctx.shadowColor = palette.shadow;
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = palette.bg;
+      ctx.beginPath();
+      ctx.roundRect(pillX, -pillH / 2, pillW * slide + ringR * 0.5, pillH, Math.round(pillH * 0.35));
+      ctx.fill();
+      ctx.strokeStyle = palette.border;
+      ctx.lineWidth = 1.2;
+      safeStroke(ctx);
+      ctx.restore();
+
+      // Circular dial medallion
+      ctx.save();
+      ctx.shadowColor = palette.shadow;
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = palette.bg;
+      ctx.beginPath();
+      safeCircle(ctx, cx, cy, ringR + 10);
+      ctx.fill();
+      ctx.strokeStyle = hexToRgba(g.accent, 0.32);
+      ctx.lineWidth = 1.5;
+      safeStroke(ctx);
+      ctx.restore();
+
+      // Subtle 12 radial tick marks around dial
+      ctx.strokeStyle = palette.trackBg;
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 12; i++) {
+        const a = (i * Math.PI * 2) / 12;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * (ringR + 4), cy + Math.sin(a) * (ringR + 4));
+        ctx.lineTo(cx + Math.cos(a) * (ringR + 8), cy + Math.sin(a) * (ringR + 8));
+        safeStroke(ctx);
+      }
+
       const prog = progressWindow(time, 0.08, 0.78);
       const currentPct = pct * prog;
+      const endAngle = -Math.PI / 2 + (Math.PI * 2 * currentPct) / 100;
 
       ctx.save();
-      ctx.lineWidth = Math.max(4, Math.round(minDim * 0.011));
+      ctx.lineWidth = Math.max(5, Math.round(minDim * 0.013));
       ctx.lineCap = 'round';
       ctx.strokeStyle = palette.trackBg;
       ctx.beginPath();
-      safeCircle(ctx, cx, cy, ringR);
+      safeCircle(ctx, cx, cy, ringR - 2);
       safeStroke(ctx);
 
       ctx.strokeStyle = g.accent;
       ctx.beginPath();
-      safeCircle(ctx, cx, cy, ringR, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * currentPct) / 100);
+      safeCircle(ctx, cx, cy, ringR - 2, -Math.PI / 2, endAngle);
       safeStroke(ctx);
+
+      // Glowing tip bead
+      if (currentPct > 2) {
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        safeCircle(ctx, cx + Math.cos(endAngle) * (ringR - 2), cy + Math.sin(endAngle) * (ringR - 2), 3);
+        ctx.fill();
+      }
       ctx.restore();
 
       ctx.fillStyle = palette.title;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `800 ${Math.round(minDim * 0.032)}px ${family}`;
-      ctx.fillText(`${Math.round(currentPct)}${g.suffix || '%'}`, cx, cy);
+      ctx.font = `800 ${Math.round(minDim * 0.036)}px ${family}`;
+      ctx.fillText(`${Math.round(currentPct)}${g.suffix || '%'}`, cx, cy + 1);
 
-      const textX = cx + ringR + pad;
-      const maxTextW = cardW / 2 - textX - pad;
+      const textX = cx + ringR + 18;
+      const maxTextW = pillX + pillW - textX;
       ctx.textAlign = 'left';
-      ctx.globalAlpha = progressWindow(time, 0.12, 0.32);
-      ctx.font = `700 ${Math.round(minDim * 0.030)}px ${family}`;
-      ctx.fillText(fitText(ctx, titleText, maxTextW), textX, g.subtitle ? -cardH * 0.12 : 0);
+      ctx.globalAlpha = progressWindow(time, 0.14, 0.34);
+      ctx.font = `700 ${Math.round(minDim * 0.029)}px ${family}`;
+      ctx.fillText(fitText(ctx, titleText, maxTextW), textX, g.subtitle ? -pillH * 0.16 : 0);
       if (g.subtitle) {
         ctx.fillStyle = palette.muted;
-        ctx.font = `500 ${Math.round(minDim * 0.022)}px ${family}`;
-        ctx.fillText(fitText(ctx, g.subtitle, maxTextW), textX, cardH * 0.14);
+        ctx.font = `500 ${Math.round(minDim * 0.020)}px ${family}`;
+        ctx.fillText(fitText(ctx, g.subtitle, maxTextW), textX, pillH * 0.17);
       }
       ctx.restore();
       return { width: cardW, height: cardH, handlesText: true };
     }
 
     case 'bar-chart': {
+      // Staggered rounded column capsule tracks with glowing leading dots
       const bars: GraphicBar[] =
         g.bars && g.bars.length > 0
           ? g.bars.slice(0, 4)
@@ -1120,48 +1265,60 @@ export function drawGraphicPanel(
             ];
       const maxVal = Math.max(1, ...bars.map((b) => b.value));
       const pad = Math.round(minDim * 0.024);
-      const rowH = Math.round(minDim * 0.056);
+      const rowH = Math.round(minDim * 0.058);
       const headerH = Math.round(minDim * 0.048);
-      const cardW = Math.round(minDim * 0.64);
+      const cardW = Math.round(minDim * 0.66);
       const cardH = headerH + bars.length * rowH + pad * 1.4;
       drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
 
       ctx.fillStyle = palette.title;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.font = `700 ${Math.round(minDim * 0.028)}px ${family}`;
-      ctx.fillText(fitText(ctx, titleText, cardW - pad * 2), -cardW / 2 + pad, -cardH / 2 + pad + headerH * 0.35);
+      ctx.font = `800 ${Math.round(minDim * 0.027)}px ${family}`;
+      ctx.fillText(fitText(ctx, titleText, cardW - pad * 2), -cardW / 2 + pad, -cardH / 2 + pad + headerH * 0.32);
 
-      const labelW = cardW * 0.28;
+      const labelW = cardW * 0.25;
       const valW = cardW * 0.16;
-      const trackX = -cardW / 2 + pad + labelW + 8;
-      const trackW = cardW - pad * 2 - labelW - valW - 16;
+      const trackX = -cardW / 2 + pad + labelW + 10;
+      const trackW = cardW - pad * 2 - labelW - valW - 18;
 
       bars.forEach((bar, idx) => {
         const yCenter = -cardH / 2 + pad + headerH + idx * rowH + rowH * 0.42;
-        const rowProg = progressWindow(time, 0.10 + idx * 0.14, 0.52);
+        const rowProg = progressWindow(time, 0.10 + idx * 0.12, 0.52);
+        const barCol = bar.color || g.accent;
         ctx.save();
-        ctx.globalAlpha = clamp(rowProg * 1.25, 0, 1);
+        ctx.globalAlpha = clamp(rowProg * 1.3, 0, 1);
         ctx.fillStyle = palette.muted;
         ctx.font = `600 ${Math.round(minDim * 0.022)}px ${family}`;
         ctx.textAlign = 'left';
         ctx.fillText(fitText(ctx, bar.label, labelW), -cardW / 2 + pad, yCenter);
 
-        const barH = Math.max(10, Math.round(minDim * 0.022));
+        const barH = Math.max(11, Math.round(minDim * 0.024));
         ctx.fillStyle = palette.trackBg;
         ctx.beginPath();
         ctx.roundRect(trackX, yCenter - barH / 2, trackW, barH, barH / 2);
         ctx.fill();
 
-        const fillRatio = clamp(bar.value / maxVal, 0.05, 1) * rowProg;
-        ctx.fillStyle = bar.color || g.accent;
+        const fillW = Math.max(barH, trackW * clamp(bar.value / maxVal, 0.06, 1) * rowProg);
+        ctx.fillStyle = safeGradFill(
+          ctx,
+          trackX,
+          yCenter,
+          trackX + fillW,
+          yCenter,
+          [
+            [0, hexToRgba(barCol, 0.65)],
+            [1, barCol],
+          ],
+          barCol
+        );
         ctx.beginPath();
-        ctx.roundRect(trackX, yCenter - barH / 2, Math.max(barH, trackW * fillRatio), barH, barH / 2);
+        ctx.roundRect(trackX, yCenter - barH / 2, fillW, barH, barH / 2);
         ctx.fill();
 
         ctx.fillStyle = palette.title;
         ctx.textAlign = 'right';
-        ctx.font = `700 ${Math.round(minDim * 0.022)}px ${family}`;
+        ctx.font = `800 ${Math.round(minDim * 0.022)}px ${family}`;
         const valText = bar.displayValue || String(Math.round(bar.value * rowProg));
         ctx.fillText(fitText(ctx, valText, valW), cardW / 2 - pad, yCenter);
         ctx.restore();
@@ -1172,82 +1329,106 @@ export function drawGraphicPanel(
     }
 
     case 'comparison': {
+      // Split-curtain dual contrasting plates + oversized tilted VS orb
       const cmp = g.comparison ?? {
         leftTitle: 'Before',
         leftValue: 'Manual',
         rightTitle: 'After',
         rightValue: titleText,
       };
-      const cardW = Math.round(minDim * 0.66);
-      const cardH = Math.round(minDim * 0.20);
-      const pad = Math.round(minDim * 0.022);
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
+      const cardW = Math.round(minDim * 0.68);
+      const cardH = Math.round(minDim * 0.21);
+      const gap = Math.round(minDim * 0.016);
+      const boxW = (cardW - gap) / 2;
+      const topH = titleText && g.comparison ? Math.round(minDim * 0.044) : 0;
+      const boxH = cardH - topH;
 
-      const hasTopTitle = Boolean(titleText && g.comparison);
-      const topOffset = hasTopTitle ? Math.round(minDim * 0.038) : 0;
-      if (hasTopTitle) {
-        ctx.fillStyle = palette.muted;
+      // Subtle top eyebrow pill
+      if (topH > 0) {
+        ctx.save();
+        ctx.fillStyle = palette.bg;
+        ctx.beginPath();
+        ctx.roundRect(-cardW * 0.34, -cardH / 2, cardW * 0.68, topH - 6, Math.round((topH - 6) / 2));
+        ctx.fill();
+        ctx.fillStyle = palette.title;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font = `700 ${Math.round(minDim * 0.023)}px ${family}`;
-        ctx.fillText(fitText(ctx, titleText, cardW - pad * 2), 0, -cardH / 2 + pad + topOffset * 0.35);
+        ctx.font = `700 ${Math.round(minDim * 0.020)}px ${family}`;
+        ctx.fillText(fitText(ctx, titleText, cardW * 0.6), 0, -cardH / 2 + (topH - 6) / 2);
+        ctx.restore();
       }
 
-      const gap = Math.round(minDim * 0.022);
-      const boxW = (cardW - pad * 2 - gap) / 2;
-      const boxY = -cardH / 2 + pad + topOffset;
-      const boxH = cardH - pad * 2 - topOffset;
-
-      const leftProg = progressWindow(time, 0.05, 0.35);
+      const leftProg = progressWindow(time, 0.04, 0.36);
+      const boxY = -cardH / 2 + topH;
       ctx.save();
       ctx.globalAlpha = leftProg;
-      ctx.fillStyle = palette.innerCardBg;
+      ctx.translate(-(1 - leftProg) * 18, 0);
+      ctx.shadowColor = palette.shadow;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = palette.bg;
       ctx.beginPath();
-      ctx.roundRect(-cardW / 2 + pad, boxY, boxW, boxH, Math.round(radius * 0.7));
+      ctx.roundRect(-cardW / 2, boxY, boxW, boxH, Math.round(radius * 0.9));
       ctx.fill();
+      ctx.strokeStyle = palette.border;
+      ctx.lineWidth = 1.2;
+      safeStroke(ctx);
       ctx.fillStyle = palette.muted;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `700 ${Math.round(minDim * 0.021)}px ${family}`;
-      ctx.fillText(fitText(ctx, cmp.leftTitle.toUpperCase(), boxW - 16), -cardW / 2 + pad + boxW / 2, boxY + boxH * 0.32);
+      ctx.font = `700 ${Math.round(minDim * 0.020)}px ${family}`;
+      ctx.fillText(fitText(ctx, cmp.leftTitle.toUpperCase(), boxW - 18), -cardW / 2 + boxW / 2, boxY + boxH * 0.34);
       ctx.fillStyle = palette.title;
-      ctx.font = `700 ${Math.round(minDim * 0.028)}px ${family}`;
-      ctx.fillText(fitText(ctx, cmp.leftValue, boxW - 16), -cardW / 2 + pad + boxW / 2, boxY + boxH * 0.68);
+      ctx.font = `800 ${Math.round(minDim * 0.032)}px ${family}`;
+      ctx.fillText(fitText(ctx, cmp.leftValue, boxW - 18), -cardW / 2 + boxW / 2, boxY + boxH * 0.68);
       ctx.restore();
 
-      const rightProg = progressWindow(time, 0.22, 0.38);
+      const rightProg = progressWindow(time, 0.18, 0.36);
       ctx.save();
       ctx.globalAlpha = rightProg;
-      ctx.fillStyle = g.accent;
+      ctx.translate((1 - rightProg) * 18, 0);
+      ctx.shadowColor = hexToRgba(g.accent, 0.35);
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = safeGradFill(
+        ctx,
+        gap / 2,
+        boxY,
+        gap / 2 + boxW,
+        boxY + boxH,
+        [
+          [0, g.accent],
+          [1, hexToRgba(g.accent, 0.8)],
+        ],
+        g.accent
+      );
       ctx.beginPath();
-      ctx.roundRect(gap / 2, boxY, boxW, boxH, Math.round(radius * 0.7));
+      ctx.roundRect(gap / 2, boxY, boxW, boxH, Math.round(radius * 0.9));
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillStyle = 'rgba(255,255,255,0.88)';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `700 ${Math.round(minDim * 0.021)}px ${family}`;
-      ctx.fillText(fitText(ctx, cmp.rightTitle.toUpperCase(), boxW - 16), gap / 2 + boxW / 2, boxY + boxH * 0.32);
+      ctx.font = `700 ${Math.round(minDim * 0.020)}px ${family}`;
+      ctx.fillText(fitText(ctx, cmp.rightTitle.toUpperCase(), boxW - 18), gap / 2 + boxW / 2, boxY + boxH * 0.34);
       ctx.fillStyle = '#ffffff';
-      ctx.font = `800 ${Math.round(minDim * 0.029)}px ${family}`;
-      ctx.fillText(fitText(ctx, cmp.rightValue, boxW - 16), gap / 2 + boxW / 2, boxY + boxH * 0.68);
+      ctx.font = `900 ${Math.round(minDim * 0.034)}px ${family}`;
+      ctx.fillText(fitText(ctx, cmp.rightValue, boxW - 18), gap / 2 + boxW / 2, boxY + boxH * 0.68);
       ctx.restore();
 
-      const vsScale = easeOutBack(progressWindow(time, 0.18, 0.28));
-      const vsR = Math.round(minDim * 0.022);
+      const vsScale = easeOutBack(progressWindow(time, 0.16, 0.28));
+      const vsR = Math.round(minDim * 0.026);
       ctx.save();
       ctx.translate(0, boxY + boxH / 2);
       ctx.scale(vsScale, vsScale);
-      ctx.fillStyle = palette.bg;
-      ctx.strokeStyle = palette.border;
-      ctx.lineWidth = 1.5;
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
       ctx.beginPath();
       safeCircle(ctx, 0, 0, vsR);
       ctx.fill();
       safeStroke(ctx);
-      ctx.fillStyle = palette.title;
+      ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `800 ${Math.round(minDim * 0.017)}px ${family}`;
+      ctx.font = `900 ${Math.round(minDim * 0.018)}px ${family}`;
       ctx.fillText('VS', 0, 1);
       ctx.restore();
 
@@ -1256,45 +1437,61 @@ export function drawGraphicPanel(
     }
 
     case 'checklist': {
+      // Individual staggered frosted pills popping sequentially (zero monotonous large box)
       const items =
         g.items && g.items.length > 0
-          ? g.items.slice(0, 5)
+          ? g.items.slice(0, 4)
           : titleText
               .split(/[,;\n]/)
               .map((s) => s.trim())
               .filter(Boolean)
-              .slice(0, 5);
+              .slice(0, 4);
       const list = items.length ? items : [titleText];
-      const pad = Math.round(minDim * 0.024);
-      const headerH = g.items?.length ? Math.round(minDim * 0.044) : 0;
-      const rowH = Math.round(minDim * 0.052);
-      const cardW = Math.round(minDim * 0.60);
-      const cardH = pad * 1.5 + headerH + list.length * rowH;
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
+      const pillH = Math.round(minDim * 0.056);
+      const rowGap = Math.round(minDim * 0.014);
+      const headerH = g.items?.length ? Math.round(minDim * 0.042) : 0;
+      const cardW = Math.round(minDim * 0.62);
+      const cardH = headerH + list.length * pillH + (list.length - 1) * rowGap;
 
       if (headerH > 0) {
-        ctx.fillStyle = palette.title;
+        ctx.save();
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.roundRect(-cardW / 2, -cardH / 2, cardW * 0.72, headerH - 8, 12);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.font = `700 ${Math.round(minDim * 0.028)}px ${family}`;
-        ctx.fillText(fitText(ctx, titleText, cardW - pad * 2), -cardW / 2 + pad, -cardH / 2 + pad + headerH * 0.35);
+        ctx.font = `800 ${Math.round(minDim * 0.022)}px ${family}`;
+        ctx.fillText(fitText(ctx, titleText, cardW * 0.65), -cardW / 2 + 14, -cardH / 2 + (headerH - 8) / 2);
+        ctx.restore();
       }
 
-      const iconR = Math.round(minDim * 0.018);
+      const iconR = Math.round(pillH * 0.34);
       list.forEach((item, idx) => {
-        const yCenter = -cardH / 2 + pad + headerH + idx * rowH + rowH * 0.44;
-        const pRow = progressWindow(time, 0.08 + idx * 0.18, 0.32);
-        const shiftX = (1 - pRow) * 18;
+        const py = -cardH / 2 + headerH + idx * (pillH + rowGap);
+        const pRow = progressWindow(time, 0.06 + idx * 0.16, 0.34);
+        const shiftX = (1 - pRow) * 22;
         ctx.save();
         ctx.globalAlpha = pRow;
         ctx.translate(shiftX, 0);
-        const ix = -cardW / 2 + pad + iconR;
-        drawVectorIcon(ctx, 'check', ix, yCenter, iconR * 1.7, '#ffffff', g.accent);
+        ctx.shadowColor = palette.shadow;
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = palette.bg;
+        ctx.beginPath();
+        ctx.roundRect(-cardW / 2, py, cardW, pillH, Math.round(pillH * 0.34));
+        ctx.fill();
+        ctx.strokeStyle = hexToRgba(g.accent, 0.25);
+        ctx.lineWidth = 1;
+        safeStroke(ctx);
+
+        const ix = -cardW / 2 + 12 + iconR;
+        drawVectorIcon(ctx, 'check', ix, py + pillH / 2, iconR * 1.9, '#ffffff', g.accent);
         ctx.fillStyle = palette.title;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.font = `600 ${Math.round(minDim * 0.025)}px ${family}`;
-        ctx.fillText(fitText(ctx, item, cardW - pad * 2 - iconR * 2.8), ix + iconR * 1.9, yCenter);
+        ctx.font = `600 ${Math.round(minDim * 0.023)}px ${family}`;
+        ctx.fillText(fitText(ctx, item, cardW - 36 - iconR * 2), ix + iconR + 10, py + pillH / 2);
         ctx.restore();
       });
 
@@ -1303,38 +1500,45 @@ export function drawGraphicPanel(
     }
 
     case 'step-flow': {
-      const steps =
-        g.items && g.items.length > 0
-          ? g.items.slice(0, 4)
-          : ['Plan', 'Build', 'Launch'];
+      const steps = g.items && g.items.length > 0 ? g.items.slice(0, 4) : ['Plan', 'Build', 'Launch'];
       const cardW = Math.round(minDim * 0.68);
-      const cardH = Math.round(minDim * 0.175);
+      const cardH = Math.round(minDim * 0.18);
       const pad = Math.round(minDim * 0.024);
       drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
 
-      ctx.fillStyle = palette.muted;
+      ctx.fillStyle = g.accent;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.font = `700 ${Math.round(minDim * 0.022)}px ${family}`;
-      ctx.fillText(fitText(ctx, titleText.toUpperCase(), cardW - pad * 2), -cardW / 2 + pad, -cardH / 2 + pad + 8);
+      ctx.font = `800 ${Math.round(minDim * 0.020)}px ${family}`;
+      ctx.fillText(fitText(ctx, titleText.toUpperCase(), cardW - pad * 2), -cardW / 2 + pad, -cardH / 2 + pad + 6);
 
       const nodeY = 4;
-      const spanW = cardW - pad * 2 - Math.round(minDim * 0.12);
+      const spanW = cardW - pad * 2 - Math.round(minDim * 0.14);
       const startX = -spanW / 2;
-      const lineProg = progressWindow(time, 0.12, 0.8);
+      const lineProg = progressWindow(time, 0.10, 0.82);
       if (steps.length > 1) {
         ctx.fillStyle = palette.trackBg;
-        ctx.fillRect(startX, nodeY - 2, spanW, 4);
+        ctx.beginPath();
+        ctx.roundRect(startX, nodeY - 2, spanW, 4, 2);
+        ctx.fill();
         ctx.fillStyle = g.accent;
-        ctx.fillRect(startX, nodeY - 2, spanW * lineProg, 4);
+        ctx.beginPath();
+        ctx.roundRect(startX, nodeY - 2, spanW * lineProg, 4, 2);
+        ctx.fill();
       }
 
-      const nodeR = Math.round(minDim * 0.024);
+      const nodeR = Math.round(minDim * 0.025);
       steps.forEach((step, idx) => {
         const frac = steps.length === 1 ? 0.5 : idx / (steps.length - 1);
         const nx = startX + spanW * frac;
-        const active = progressWindow(time, 0.12 + idx * 0.22, 0.28);
+        const active = progressWindow(time, 0.1 + idx * 0.22, 0.28);
         ctx.save();
+        if (active > 0.25) {
+          ctx.fillStyle = hexToRgba(g.accent, 0.2);
+          ctx.beginPath();
+          safeCircle(ctx, nx, nodeY, nodeR + 5);
+          ctx.fill();
+        }
         ctx.fillStyle = active > 0.25 ? g.accent : palette.trackBg;
         ctx.beginPath();
         safeCircle(ctx, nx, nodeY, nodeR);
@@ -1348,7 +1552,7 @@ export function drawGraphicPanel(
 
         ctx.globalAlpha = active;
         ctx.fillStyle = palette.title;
-        ctx.font = `600 ${Math.round(minDim * 0.021)}px ${family}`;
+        ctx.font = `700 ${Math.round(minDim * 0.021)}px ${family}`;
         ctx.fillText(fitText(ctx, step, spanW / steps.length + 24), nx, nodeY + nodeR + Math.round(minDim * 0.026));
         ctx.restore();
       });
@@ -1358,36 +1562,43 @@ export function drawGraphicPanel(
     }
 
     case 'notification': {
+      // Sleek pill stadium capsule toast with live glowing badge halo
       const cardW = Math.round(minDim * 0.68);
-      const cardH = Math.round(minDim * 0.145);
-      const pad = Math.round(minDim * 0.02);
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
+      const cardH = Math.round(minDim * 0.135);
+      const pad = Math.round(cardH * 0.18);
+      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, Math.round(cardH / 2), palette);
 
-      const badgeSize = Math.round(cardH * 0.58);
+      const badgeSize = Math.round(cardH * 0.66);
       const bx = -cardW / 2 + pad + badgeSize / 2;
+      ctx.fillStyle = hexToRgba(g.accent, 0.2);
+      ctx.beginPath();
+      safeCircle(ctx, bx, 0, badgeSize * 0.62);
+      ctx.fill();
       ctx.fillStyle = g.accent;
       ctx.beginPath();
-      ctx.roundRect(-cardW / 2 + pad, -badgeSize / 2, badgeSize, badgeSize, Math.round(badgeSize * 0.26));
+      safeCircle(ctx, bx, 0, badgeSize * 0.48);
       ctx.fill();
-      drawVectorIcon(ctx, g.icon && g.icon !== 'none' ? g.icon : 'bolt', bx, 0, badgeSize * 0.82, '#ffffff');
+      drawVectorIcon(ctx, g.icon && g.icon !== 'none' ? g.icon : 'bolt', bx, 0, badgeSize * 0.78, '#ffffff');
 
-      const tx = -cardW / 2 + pad + badgeSize + Math.round(pad * 0.8);
-      const textMaxW = cardW / 2 - tx - pad - 44;
+      const tx = -cardW / 2 + pad + badgeSize + 14;
+      const textMaxW = cardW / 2 - tx - pad - 48;
       ctx.fillStyle = palette.title;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.font = `700 ${Math.round(minDim * 0.027)}px ${family}`;
+      ctx.font = `700 ${Math.round(minDim * 0.026)}px ${family}`;
       ctx.fillText(fitText(ctx, titleText, textMaxW), tx, g.subtitle ? -cardH * 0.15 : 0);
 
-      ctx.fillStyle = palette.muted;
+      // Live green pill dot top-right
+      ctx.fillStyle = g.accent;
       ctx.textAlign = 'right';
-      ctx.font = `500 ${Math.round(minDim * 0.019)}px ${family}`;
-      ctx.fillText('now', cardW / 2 - pad, -cardH * 0.15);
+      ctx.font = `700 ${Math.round(minDim * 0.018)}px ${family}`;
+      ctx.fillText('● LIVE', cardW / 2 - pad - 6, -cardH * 0.15);
 
       if (g.subtitle) {
+        ctx.fillStyle = palette.muted;
         ctx.textAlign = 'left';
-        ctx.font = `500 ${Math.round(minDim * 0.022)}px ${family}`;
-        ctx.fillText(fitText(ctx, g.subtitle, cardW / 2 - tx - pad), tx, cardH * 0.16);
+        ctx.font = `500 ${Math.round(minDim * 0.021)}px ${family}`;
+        ctx.fillText(fitText(ctx, g.subtitle, cardW / 2 - tx - pad - 8), tx, cardH * 0.16);
       }
 
       ctx.restore();
@@ -1395,157 +1606,211 @@ export function drawGraphicPanel(
     }
 
     case 'pointer-callout': {
-      const padX = Math.round(minDim * 0.026);
-      const padY = Math.round(minDim * 0.018);
-      ctx.font = `700 ${Math.round(minDim * 0.028)}px ${family}`;
+      // Tactical HUD dual-ring sonar target + chamfered elbow laser leader + dark/glass HUD tag
+      const padX = Math.round(minDim * 0.024);
+      ctx.font = `700 ${Math.round(minDim * 0.026)}px ${family}`;
       const textW = Math.min(minDim * 0.48, ctx.measureText(titleText).width);
-      const iconW = g.icon && g.icon !== 'none' ? Math.round(minDim * 0.036) : 0;
-      const cardW = Math.round(textW + padX * 2 + (iconW ? iconW + 10 : 0));
-      const cardH = Math.round(minDim * (g.subtitle ? 0.115 : 0.082));
+      const iconW = g.icon && g.icon !== 'none' ? Math.round(minDim * 0.032) : 0;
+      const cardW = Math.round(textW + padX * 2 + (iconW ? iconW + 10 : 0) + 12);
+      const cardH = Math.round(minDim * (g.subtitle ? 0.11 : 0.082));
 
       const frameW = context.frameWidth || 1080;
       const frameH = context.frameHeight || 1920;
       const dx = clamp((g.targetX ?? 0) * frameW * 0.35, -minDim * 0.25, minDim * 0.25);
-      const dy = clamp((g.targetY ?? 0.25) * frameH * 0.18, minDim * 0.07, minDim * 0.22);
-      const lineProg = progressWindow(time, 0.05, 0.35);
+      const dy = clamp((g.targetY ?? 0.25) * frameH * 0.18, minDim * 0.09, minDim * 0.24);
+      const lineProg = progressWindow(time, 0.05, 0.38);
+
+      const elbowX = dx * 0.45 * lineProg;
+      const elbowY = (cardH / 2 + (dy - cardH / 2) * 0.55) * lineProg;
+      const endX = dx * lineProg;
+      const endY = cardH / 2 + (dy - cardH / 2) * lineProg;
 
       ctx.save();
       ctx.strokeStyle = g.accent;
-      ctx.lineWidth = Math.max(2.5, Math.round(minDim * 0.004));
+      ctx.lineWidth = Math.max(2, Math.round(minDim * 0.004));
       ctx.beginPath();
       ctx.moveTo(0, cardH / 2);
-      ctx.lineTo(dx * lineProg, cardH / 2 + (dy - cardH / 2) * lineProg);
+      ctx.lineTo(elbowX, elbowY);
+      ctx.lineTo(endX, endY);
       safeStroke(ctx);
 
-      const dotR = Math.round(minDim * 0.011);
+      const dotR = Math.round(minDim * 0.012);
+      ctx.strokeStyle = hexToRgba(g.accent, 0.45);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      safeCircle(ctx, endX, endY, dotR * (1.8 + 0.4 * Math.sin(time * 5)));
+      safeStroke(ctx);
+
       ctx.fillStyle = g.accent;
       ctx.beginPath();
-      safeCircle(ctx, dx * lineProg, cardH / 2 + (dy - cardH / 2) * lineProg, dotR);
+      safeCircle(ctx, endX, endY, dotR);
       ctx.fill();
       ctx.restore();
 
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, Math.round(cardH * 0.34), palette);
+      // Tag container with left accent bracket bar
+      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, 10, palette);
+      ctx.fillStyle = g.accent;
+      ctx.fillRect(-cardW / 2, -cardH / 2, 5, cardH);
+
       if (iconW) {
-        drawVectorIcon(
-          ctx,
-          g.icon!,
-          -cardW / 2 + padX + iconW * 0.45,
-          0,
-          iconW,
-          '#ffffff',
-          g.accent
-        );
+        drawVectorIcon(ctx, g.icon!, -cardW / 2 + padX + 4 + iconW * 0.45, 0, iconW, '#ffffff', g.accent);
       }
-      const tx = -cardW / 2 + padX + (iconW ? iconW + 10 : 0);
+      const tx = -cardW / 2 + padX + 4 + (iconW ? iconW + 10 : 0);
       ctx.fillStyle = palette.title;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.font = `700 ${Math.round(minDim * 0.028)}px ${family}`;
+      ctx.font = `700 ${Math.round(minDim * 0.026)}px ${family}`;
       ctx.fillText(fitText(ctx, titleText, cardW - padX * 2), tx, g.subtitle ? -cardH * 0.14 : 0);
       if (g.subtitle) {
         ctx.fillStyle = palette.muted;
-        ctx.font = `500 ${Math.round(minDim * 0.020)}px ${family}`;
+        ctx.font = `500 ${Math.round(minDim * 0.019)}px ${family}`;
         ctx.fillText(fitText(ctx, g.subtitle, cardW - padX * 2), tx, cardH * 0.18);
       }
       ctx.restore();
-      return { width: cardW, height: cardH, handlesText: true };
+      return { width: cardW, height: cardH + Math.abs(dy), handlesText: true };
     }
 
     case 'quote-card': {
-      const cardW = Math.round(minDim * 0.68);
+      // Borderless-feel editorial typography block: thick tapered left stripe + translucent backdrop + serif quote
+      const cardW = Math.round(minDim * 0.7);
       const cardH = Math.round(minDim * 0.18);
-      const pad = Math.round(minDim * 0.026);
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
+      const wipe = progressWindow(time, 0, 0.36);
+
+      ctx.save();
+      ctx.fillStyle = hexToRgba(palette.bg, 0.85);
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, 6);
+      ctx.fill();
+      ctx.restore();
 
       ctx.fillStyle = g.accent;
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, -cardH / 2, 7, Math.max(8, cardH * wipe), 3.5);
+      ctx.fill();
+
+      ctx.fillStyle = hexToRgba(g.accent, 0.22);
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.font = `900 ${Math.round(minDim * 0.068)}px Georgia, serif`;
-      ctx.fillText('“', -cardW / 2 + pad, -cardH / 2 + pad + 18);
+      ctx.font = `900 ${Math.round(minDim * 0.11)}px Georgia, serif`;
+      ctx.fillText('“', -cardW / 2 + 18, -cardH * 0.14);
 
+      ctx.globalAlpha = progressWindow(time, 0.08, 0.32);
       ctx.fillStyle = palette.title;
-      ctx.font = `700 ${Math.round(minDim * 0.030)}px ${family}`;
-      ctx.fillText(fitText(ctx, titleText, cardW - pad * 2 - 28), -cardW / 2 + pad + 28, g.subtitle ? -4 : 4);
+      ctx.font = `700 ${Math.round(minDim * 0.032)}px Georgia, ${family}`;
+      ctx.fillText(fitText(ctx, titleText, cardW - 56), -cardW / 2 + 34, g.subtitle ? -cardH * 0.08 : 0);
 
       if (g.subtitle) {
-        ctx.fillStyle = palette.muted;
-        ctx.font = `600 ${Math.round(minDim * 0.021)}px ${family}`;
-        ctx.fillText(fitText(ctx, `— ${g.subtitle}`, cardW - pad * 2 - 28), -cardW / 2 + pad + 28, cardH * 0.25);
+        ctx.fillStyle = g.accent;
+        ctx.font = `700 ${Math.round(minDim * 0.020)}px ${family}`;
+        ctx.fillText(fitText(ctx, `— ${g.subtitle.toUpperCase()}`, cardW - 56), -cardW / 2 + 34, cardH * 0.26);
       }
       ctx.restore();
       return { width: cardW, height: cardH, handlesText: true };
     }
 
     case 'kinetic-badge': {
-      const padX = Math.round(minDim * 0.024);
-      ctx.font = `800 ${Math.round(minDim * 0.032)}px ${family}`;
-      const labelW = Math.min(minDim * 0.46, ctx.measureText(titleText.toUpperCase()).width);
+      // Solid saturated gradient sticker badge with slight dynamic rotation (no flat box!)
+      const padX = Math.round(minDim * 0.028);
+      ctx.font = `900 ${Math.round(minDim * 0.034)}px ${family}`;
+      const labelW = Math.min(minDim * 0.5, ctx.measureText(titleText.toUpperCase()).width);
       const hasIcon = Boolean(g.icon && g.icon !== 'none');
       const iconSize = hasIcon ? Math.round(minDim * 0.044) : 0;
       const cardW = Math.round(labelW + padX * 2 + (iconSize ? iconSize + 12 : 0));
-      const cardH = Math.round(minDim * 0.092);
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, Math.round(cardH / 2), palette);
+      const cardH = Math.round(minDim * 0.098);
+      const pop = easeOutBack(progressWindow(time, 0.02, 0.28));
+
+      ctx.save();
+      safeRotate(ctx, -0.035);
+      ctx.scale(pop, pop);
+      ctx.shadowColor = hexToRgba(g.accent, 0.42);
+      ctx.shadowBlur = 16;
+      ctx.shadowOffsetY = 5;
+      ctx.fillStyle = g.accent;
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, -cardH / 2, cardW, cardH, Math.round(cardH / 2));
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.lineWidth = 1.6;
+      safeStroke(ctx);
 
       if (hasIcon) {
-        const iconPop = easeOutBack(progressWindow(time, 0.03, 0.25));
-        ctx.save();
-        ctx.translate(-cardW / 2 + padX + iconSize * 0.45, 0);
-        ctx.scale(iconPop, iconPop);
-        drawVectorIcon(ctx, g.icon!, 0, 0, iconSize, '#ffffff', g.accent);
-        ctx.restore();
+        drawVectorIcon(ctx, g.icon!, -cardW / 2 + padX + iconSize * 0.45, 0, iconSize, g.accent, '#ffffff');
       }
-      ctx.fillStyle = palette.title;
+      ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.font = `800 ${Math.round(minDim * 0.032)}px ${family}`;
+      ctx.font = `900 ${Math.round(minDim * 0.033)}px ${family}`;
       ctx.fillText(
         fitText(ctx, titleText.toUpperCase(), cardW - padX * 2 - (iconSize ? iconSize + 12 : 0)),
         -cardW / 2 + padX + (iconSize ? iconSize + 12 : 0),
         1
       );
       ctx.restore();
+      ctx.restore();
       return { width: cardW, height: cardH, handlesText: true };
     }
 
     case 'lower-third': {
-      const cardW = Math.round(minDim * 0.62);
-      const cardH = Math.round(minDim * (g.subtitle ? 0.135 : 0.105));
-      const pad = Math.round(minDim * 0.022);
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, Math.round(radius * 0.8), palette);
+      // Broadcast sleek skewed ribbon lower-third without clunky white box border
+      const cardW = Math.round(minDim * 0.66);
+      const cardH = Math.round(minDim * (g.subtitle ? 0.14 : 0.105));
+      const wipe = progressWindow(time, 0, 0.36);
 
-      const wipe = progressWindow(time, 0, 0.35);
+      ctx.save();
+      ctx.shadowColor = palette.shadow;
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = safeGradFill(
+        ctx,
+        -cardW / 2,
+        0,
+        cardW / 2,
+        0,
+        [
+          [0, palette.bg],
+          [0.85, hexToRgba(palette.bg, 0.88)],
+          [1, hexToRgba(g.accent, 0.15)],
+        ],
+        palette.bg
+      );
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, -cardH / 2, cardW * Math.max(0.25, wipe), cardH, 10);
+      ctx.fill();
+      ctx.restore();
+
+      // Thick bright glowing accent left bar
       ctx.fillStyle = g.accent;
       ctx.beginPath();
-      ctx.roundRect(-cardW / 2 + 8, -cardH / 2 + 12, 6, Math.max(8, (cardH - 24) * wipe), 3);
+      ctx.roundRect(-cardW / 2, -cardH / 2, 8, cardH * wipe, 4);
       ctx.fill();
 
       const hasIcon = Boolean(g.icon && g.icon !== 'none');
       const iconSize = hasIcon ? Math.round(cardH * 0.56) : 0;
-      if (hasIcon) {
-        drawVectorIcon(ctx, g.icon!, -cardW / 2 + pad + 14 + iconSize * 0.4, 0, iconSize, '#ffffff', g.accent);
+      if (hasIcon && wipe > 0.4) {
+        drawVectorIcon(ctx, g.icon!, -cardW / 2 + 28 + iconSize * 0.4, 0, iconSize, '#ffffff', g.accent);
       }
 
-      const tx = -cardW / 2 + pad + 16 + (iconSize ? iconSize + 10 : 0);
-      const maxW = cardW / 2 - tx - pad;
-      ctx.globalAlpha = progressWindow(time, 0.08, 0.3);
+      const tx = -cardW / 2 + 26 + (iconSize ? iconSize + 14 : 0);
+      const maxW = cardW / 2 - tx - 16;
+      ctx.globalAlpha = progressWindow(time, 0.1, 0.3);
       ctx.fillStyle = palette.title;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.font = `700 ${Math.round(minDim * 0.031)}px ${family}`;
+      ctx.font = `800 ${Math.round(minDim * 0.032)}px ${family}`;
       ctx.fillText(fitText(ctx, titleText, maxW), tx, g.subtitle ? -cardH * 0.15 : 0);
       if (g.subtitle) {
-        ctx.fillStyle = palette.muted;
-        ctx.font = `500 ${Math.round(minDim * 0.022)}px ${family}`;
-        ctx.fillText(fitText(ctx, g.subtitle, maxW), tx, cardH * 0.17);
+        ctx.fillStyle = g.accent;
+        ctx.font = `600 ${Math.round(minDim * 0.021)}px ${family}`;
+        ctx.fillText(fitText(ctx, g.subtitle, maxW), tx, cardH * 0.19);
       }
       ctx.restore();
       return { width: cardW, height: cardH, handlesText: true };
     }
 
     case 'line-chart': {
-      const cardW = Math.round(minDim * 0.68);
+      // Area chart with smooth curve + gradient fill beneath spline + crosshair vertical guide + peak chip
+      const cardW = Math.round(minDim * 0.70);
       const cardH = Math.round(minDim * 0.28);
-      const pad = Math.round(minDim * 0.026);
+      const pad = Math.round(minDim * 0.024);
       drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
 
       const parsed = parseNumericFromText(titleText);
@@ -1567,24 +1832,22 @@ export function drawGraphicPanel(
       ctx.fillStyle = palette.title;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.font = `700 ${Math.round(minDim * 0.027)}px ${family}`;
+      ctx.font = `700 ${Math.round(minDim * 0.026)}px ${family}`;
       ctx.fillText(fitText(ctx, titleText, cardW * 0.56), -cardW / 2 + pad, -cardH / 2 + pad + 10);
 
+      // Peak value pill
+      ctx.fillStyle = hexToRgba(g.accent, 0.15);
+      ctx.beginPath();
+      ctx.roundRect(cardW / 2 - pad - 102, -cardH / 2 + pad - 2, 102, 26, 13);
+      ctx.fill();
       ctx.fillStyle = g.accent;
-      ctx.textAlign = 'right';
-      ctx.font = `800 ${Math.round(minDim * 0.036)}px ${family}`;
-      ctx.fillText(valStr, cardW / 2 - pad, -cardH / 2 + pad + 12);
-
-      if (g.subtitle) {
-        ctx.fillStyle = palette.muted;
-        ctx.textAlign = 'left';
-        ctx.font = `500 ${Math.round(minDim * 0.019)}px ${family}`;
-        ctx.fillText(fitText(ctx, g.subtitle, cardW * 0.62), -cardW / 2 + pad, -cardH / 2 + pad + 34);
-      }
+      ctx.textAlign = 'center';
+      ctx.font = `800 ${Math.round(minDim * 0.025)}px ${family}`;
+      ctx.fillText(valStr, cardW / 2 - pad - 51, -cardH / 2 + pad + 11);
 
       const gx0 = -cardW / 2 + pad + 4;
       const gx1 = cardW / 2 - pad - 4;
-      const gy0 = -cardH / 2 + pad + 48;
+      const gy0 = -cardH / 2 + pad + 44;
       const gy1 = cardH / 2 - pad - 8;
       const pts = bars.map((b, i) => ({
         x: gx0 + (i / Math.max(1, bars.length - 1)) * (gx1 - gx0),
@@ -1602,10 +1865,33 @@ export function drawGraphicPanel(
       const maxX = gx0 + (gx1 - gx0) * drawProg;
       ctx.save();
       ctx.beginPath();
-      ctx.rect(gx0 - 4, gy0 - 12, (gx1 - gx0 + 8) * drawProg, gy1 - gy0 + 24);
-      ctx.clip();
+      safeRect(ctx, gx0 - 4, gy0 - 12, (gx1 - gx0 + 8) * drawProg, gy1 - gy0 + 24);
+      safeClip(ctx);
+
+      // Soft gradient area underneath line
+      if (pts.length >= 2) {
+        ctx.fillStyle = safeGradFill(
+          ctx,
+          0,
+          gy0,
+          0,
+          gy1,
+          [
+            [0, hexToRgba(g.accent, 0.34)],
+            [1, hexToRgba(g.accent, 0.0)],
+          ],
+          hexToRgba(g.accent, 0.14)
+        );
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, gy1);
+        pts.forEach((pt) => ctx.lineTo(pt.x, pt.y));
+        ctx.lineTo(pts[pts.length - 1].x, gy1);
+        safeClosePath(ctx);
+        ctx.fill();
+      }
+
       ctx.strokeStyle = g.accent;
-      ctx.lineWidth = Math.max(3, Math.round(minDim * 0.005));
+      ctx.lineWidth = Math.max(3, Math.round(minDim * 0.0055));
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.beginPath();
@@ -1621,9 +1907,21 @@ export function drawGraphicPanel(
         const segEnd = pts[segIdx + 1] ?? lastPt;
         const frac = segEnd.x > segStart.x ? (dotX - segStart.x) / (segEnd.x - segStart.x) : 1;
         const dotY = segStart.y + (segEnd.y - segStart.y) * clamp(frac, 0, 1);
+
+        ctx.strokeStyle = hexToRgba(g.accent, 0.35);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(dotX, dotY);
+        ctx.lineTo(dotX, gy1);
+        safeStroke(ctx);
+
+        ctx.fillStyle = hexToRgba(g.accent, 0.25);
+        ctx.beginPath();
+        safeCircle(ctx, dotX, dotY, Math.max(7, minDim * 0.015));
+        ctx.fill();
         ctx.fillStyle = g.accent;
         ctx.beginPath();
-        safeCircle(ctx, dotX, dotY, Math.max(4, minDim * 0.009));
+        safeCircle(ctx, dotX, dotY, Math.max(4, minDim * 0.008));
         ctx.fill();
       }
       ctx.restore();
@@ -1691,7 +1989,7 @@ export function drawGraphicPanel(
       const cardW = Math.round(minDim * 0.64);
       const cardH = Math.round(minDim * 0.135);
       const pad = Math.round(minDim * 0.022);
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, Math.round(cardH * 0.45), palette);
+      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, Math.round(cardH * 0.48), palette);
 
       const avSize = Math.round(cardH * 0.62);
       drawVectorIcon(ctx, g.icon && g.icon !== 'none' ? g.icon : 'user', -cardW / 2 + pad + avSize * 0.48, 0, avSize, '#ffffff', g.accent);
@@ -1730,25 +2028,37 @@ export function drawGraphicPanel(
     }
 
     case 'chapter-card': {
-      const cardW = Math.round(minDim * 0.72);
-      const cardH = Math.round(minDim * 0.17);
-      const pad = Math.round(minDim * 0.028);
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
+      // Wide borderless cinematic chapter reveal with top pill badge + animated edge beam
+      const cardW = Math.round(minDim * 0.78);
+      const cardH = Math.round(minDim * 0.18);
+      const wipe = progressWindow(time, 0.05, 0.44);
+      const slideY = (1 - progressWindow(time, 0.04, 0.36)) * 16;
 
-      const wipe = progressWindow(time, 0.05, 0.42);
-      const slideY = (1 - progressWindow(time, 0.04, 0.35)) * 14;
+      ctx.save();
+      ctx.fillStyle = palette.bg;
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, -cardH / 2, cardW * 0.36, 22, 11);
+      ctx.fill();
       ctx.fillStyle = g.accent;
-      ctx.textAlign = 'left';
+      ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `800 ${Math.round(minDim * 0.019)}px ${family}`;
-      ctx.fillText(fitText(ctx, (g.subtitle || 'CHAPTER').toUpperCase(), cardW - pad * 2), -cardW / 2 + pad, -cardH * 0.24);
+      ctx.font = `800 ${Math.round(minDim * 0.017)}px ${family}`;
+      ctx.fillText(fitText(ctx, (g.subtitle || 'CHAPTER').toUpperCase(), cardW * 0.32), -cardW / 2 + cardW * 0.18, -cardH / 2 + 11);
 
       ctx.fillStyle = palette.title;
-      ctx.font = `800 ${Math.round(minDim * 0.040)}px ${family}`;
-      ctx.fillText(fitText(ctx, titleText, cardW - pad * 2), -cardW / 2 + pad, cardH * 0.06 + slideY);
+      ctx.textAlign = 'left';
+      ctx.font = `900 ${Math.round(minDim * 0.052)}px ${family}`;
+      ctx.fillText(fitText(ctx, titleText, cardW - 16), -cardW / 2 + 4, 8 + slideY);
 
+      ctx.fillStyle = palette.trackBg;
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, cardH / 2 - 6, cardW, 5, 2.5);
+      ctx.fill();
       ctx.fillStyle = g.accent;
-      ctx.fillRect(-cardW / 2 + pad, cardH / 2 - pad + 4, (cardW - pad * 2) * wipe, 4);
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, cardH / 2 - 6, cardW * wipe, 5, 2.5);
+      ctx.fill();
+      ctx.restore();
       ctx.restore();
       return { width: cardW, height: cardH, handlesText: true };
     }
@@ -1756,39 +2066,28 @@ export function drawGraphicPanel(
     case 'kpi-grid': {
       const cardW = Math.round(minDim * 0.70);
       const cardH = Math.round(minDim * 0.22);
-      const pad = Math.round(minDim * 0.024);
-      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
-
+      const gap = Math.round(minDim * 0.02);
+      const colW = (cardW - gap) / 2;
       const bars = g.bars?.length
         ? g.bars.slice(0, 2)
         : [
             { label: 'Views', value: 14200, displayValue: '14.2K' },
             { label: 'Growth', value: 64, displayValue: '+64%' },
           ];
-      ctx.fillStyle = palette.title;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.font = `700 ${Math.round(minDim * 0.025)}px ${family}`;
-      ctx.fillText(fitText(ctx, titleText, cardW - pad * 2), -cardW / 2 + pad, -cardH / 2 + pad + 8);
-
-      const gap = Math.round(minDim * 0.018);
-      const colW = (cardW - pad * 2 - gap) / 2;
-      const boxTop = -cardH / 2 + pad + 26;
-      const boxH = cardH - pad * 2 - 26;
       bars.forEach((b, idx) => {
-        const bx = -cardW / 2 + pad + idx * (colW + gap);
-        const prog = progressWindow(time, 0.06 + idx * 0.12, 0.55);
-        ctx.fillStyle = palette.innerCardBg;
-        ctx.beginPath();
-        ctx.roundRect(bx, boxTop, colW, boxH, Math.round(radius * 0.6));
-        ctx.fill();
-        ctx.fillStyle = b.color || g.accent;
+        const bx = -cardW / 2 + idx * (colW + gap);
+        const prog = progressWindow(time, 0.06 + idx * 0.14, 0.55);
+        const col = b.color || g.accent;
+        drawRoundedCard(ctx, bx, -cardH / 2, colW, cardH, radius, palette);
+        ctx.fillStyle = col;
+        ctx.fillRect(bx + 14, -cardH / 2 + 14, Math.max(12, (colW - 28) * prog * 0.4), 4);
+        ctx.fillStyle = palette.title;
         ctx.textAlign = 'left';
-        ctx.font = `800 ${Math.round(minDim * 0.042)}px ${family}`;
-        ctx.fillText(fitText(ctx, b.displayValue || formatAnimatedNumber(b.value, prog), colW - 16), bx + 10, boxTop + boxH * 0.4);
+        ctx.font = `800 ${Math.round(minDim * 0.048)}px ${family}`;
+        ctx.fillText(fitText(ctx, b.displayValue || formatAnimatedNumber(b.value, prog), colW - 28), bx + 14, -4);
         ctx.fillStyle = palette.muted;
-        ctx.font = `600 ${Math.round(minDim * 0.020)}px ${family}`;
-        ctx.fillText(fitText(ctx, b.label, colW - 16), bx + 10, boxTop + boxH * 0.76);
+        ctx.font = `600 ${Math.round(minDim * 0.022)}px ${family}`;
+        ctx.fillText(fitText(ctx, b.label, colW - 28), bx + 14, cardH * 0.26);
       });
       ctx.restore();
       return { width: cardW, height: cardH, handlesText: true };
@@ -1820,11 +2119,11 @@ export function drawGraphicPanel(
         const pct = clamp((b.value / maxVal) * prog, 0, 1);
         ctx.fillStyle = palette.trackBg;
         ctx.beginPath();
-        ctx.roundRect(-cardW / 2 + pad, y, cardW - pad * 2, rowH, Math.round(rowH * 0.3));
+        ctx.roundRect(-cardW / 2 + pad, y, cardW - pad * 2, rowH, Math.round(rowH * 0.34));
         ctx.fill();
         ctx.fillStyle = idx === 0 ? g.accent : palette.muted;
         ctx.beginPath();
-        ctx.roundRect(-cardW / 2 + pad, y, Math.max(8, (cardW - pad * 2) * pct), rowH, Math.round(rowH * 0.3));
+        ctx.roundRect(-cardW / 2 + pad, y, Math.max(8, (cardW - pad * 2) * pct), rowH, Math.round(rowH * 0.34));
         ctx.fill();
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'left';
@@ -1838,7 +2137,7 @@ export function drawGraphicPanel(
     }
 
     case 'offer-tag': {
-      const cardW = Math.round(minDim * 0.60);
+      const cardW = Math.round(minDim * 0.62);
       const cardH = Math.round(minDim * 0.18);
       const pad = Math.round(minDim * 0.024);
       drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, radius, palette);
@@ -1872,18 +2171,269 @@ export function drawGraphicPanel(
       ctx.fillText(heroPrice, -cardW / 2 + pad, g.subtitle ? 10 : 4);
 
       if (g.subtitle) {
+        const strike = progressWindow(time, 0.16, 0.35);
         ctx.fillStyle = palette.muted;
         ctx.font = `600 ${Math.round(minDim * 0.024)}px ${family}`;
         const oldW = ctx.measureText(g.subtitle).width;
         const ox = -cardW / 2 + pad;
         const oy = -cardH * 0.20;
         ctx.fillText(g.subtitle, ox, oy);
-        ctx.strokeStyle = palette.muted;
+        ctx.strokeStyle = g.accent;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(ox - 2, oy + 2);
+        ctx.lineTo(ox + (oldW + 4) * strike, oy - 2);
+        safeStroke(ctx);
+      }
+      ctx.restore();
+      return { width: cardW, height: cardH, handlesText: true };
+    }
+
+    case 'split-title': {
+      // Pure borderless kinetic documentary title lockup with left reveal bar & glowing underline
+      const cardW = Math.round(minDim * 0.78);
+      const cardH = Math.round(minDim * 0.2);
+      const lineProg = progressWindow(time, 0, 0.42);
+      const slideIn = (1 - progressWindow(time, 0.08, 0.36)) * 24;
+
+      ctx.save();
+      ctx.fillStyle = g.accent;
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2, -cardH / 2 + 8, 8, Math.max(12, (cardH - 16) * lineProg), 4);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2 + 22, -cardH / 2 + 8, 128, 22, 11);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `800 ${Math.round(minDim * 0.016)}px ${family}`;
+      ctx.fillText(fitText(ctx, (g.subtitle || 'KEY INSIGHT').toUpperCase(), 116), -cardW / 2 + 86, -cardH / 2 + 19);
+
+      ctx.globalAlpha = progressWindow(time, 0.1, 0.32);
+      ctx.fillStyle = palette.title;
+      ctx.textAlign = 'left';
+      ctx.font = `900 ${Math.round(minDim * 0.056)}px ${family}`;
+      ctx.fillText(fitText(ctx, titleText, cardW - 32), -cardW / 2 + 22 + slideIn, 14);
+      ctx.restore();
+      ctx.restore();
+      return { width: cardW, height: cardH, handlesText: true };
+    }
+
+    case 'marker-highlight': {
+      // Vox / Ali Abdaal sweeping highlighter pen strip behind bold text
+      const cardW = Math.round(minDim * 0.74);
+      const cardH = Math.round(minDim * 0.16);
+      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, 8, palette);
+
+      const sweep = progressWindow(time, 0.14, 0.48);
+      const markH = Math.round(minDim * 0.054);
+      ctx.fillStyle = hexToRgba(g.accent, 0.36);
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2 + 18, -markH / 2 - 4, Math.max(12, (cardW - 36) * sweep), markH, 6);
+      ctx.fill();
+
+      ctx.fillStyle = palette.title;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `800 ${Math.round(minDim * 0.036)}px Georgia, ${family}`;
+      ctx.fillText(fitText(ctx, titleText, cardW - 44), 0, g.subtitle ? -6 : 0);
+
+      if (g.subtitle) {
+        ctx.fillStyle = palette.muted;
+        ctx.font = `600 ${Math.round(minDim * 0.020)}px ${family}`;
+        ctx.fillText(fitText(ctx, g.subtitle.toUpperCase(), cardW - 44), 0, cardH * 0.28);
+      }
+      ctx.restore();
+      return { width: cardW, height: cardH, handlesText: true };
+    }
+
+    case 'audio-waveform': {
+      // Dark/frosted podcast & voiceover 14-bar live audio equalizer dock
+      const cardW = Math.round(minDim * 0.68);
+      const cardH = Math.round(minDim * 0.15);
+      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, Math.round(cardH / 2), palette);
+
+      // Left speaker badge
+      const avR = Math.round(cardH * 0.33);
+      ctx.fillStyle = g.accent;
+      ctx.beginPath();
+      safeCircle(ctx, -cardW / 2 + avR + 14, 0, avR);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `800 ${Math.round(minDim * 0.018)}px ${family}`;
+      ctx.fillText('MIC', -cardW / 2 + avR + 14, 1);
+
+      const tx = -cardW / 2 + avR * 2 + 26;
+      ctx.fillStyle = palette.title;
+      ctx.textAlign = 'left';
+      ctx.font = `700 ${Math.round(minDim * 0.024)}px ${family}`;
+      ctx.fillText(fitText(ctx, titleText, cardW * 0.36), tx, g.subtitle ? -cardH * 0.14 : 0);
+      if (g.subtitle) {
+        ctx.fillStyle = palette.muted;
+        ctx.font = `500 ${Math.round(minDim * 0.018)}px ${family}`;
+        ctx.fillText(fitText(ctx, g.subtitle, cardW * 0.36), tx, cardH * 0.17);
+      }
+
+      // Live animated 14-bar stereo spectrum on the right half
+      const barStart = cardW * 0.04;
+      const barCount = 14;
+      const bw = 5;
+      const step = (cardW / 2 - barStart - 22) / barCount;
+      for (let i = 0; i < barCount; i++) {
+        const wave = 0.25 + 0.75 * Math.abs(Math.sin(time * 5.2 + i * 0.72));
+        const bh = Math.max(8, cardH * 0.54 * wave);
+        ctx.fillStyle = i % 3 === 0 ? g.accent : hexToRgba(g.accent, 0.65);
+        ctx.beginPath();
+        ctx.roundRect(barStart + i * step, -bh / 2, bw, bh, bw / 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      return { width: cardW, height: cardH, handlesText: true };
+    }
+
+    case 'subscribe-cta': {
+      // YouTube / Creator Subscribe CTA pill with click-state switch + expanding ripple ring
+      const cardW = Math.round(minDim * 0.66);
+      const cardH = Math.round(minDim * 0.13);
+      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, Math.round(cardH / 2), palette);
+
+      const avR = Math.round(cardH * 0.34);
+      ctx.fillStyle = g.accent;
+      ctx.beginPath();
+      safeCircle(ctx, -cardW / 2 + avR + 12, 0, avR);
+      ctx.fill();
+      drawVectorIcon(ctx, 'user', -cardW / 2 + avR + 12, 0, avR * 1.4, '#ffffff');
+
+      const clicked = time > 0.75;
+      const btnScale = time > 0.68 && time < 0.85 ? 0.9 : 1;
+      const btnW = Math.round(minDim * 0.2);
+      const btnH = Math.round(cardH * 0.6);
+      const btnX = cardW / 2 - btnW / 2 - 12;
+
+      if (time > 0.72 && time < 1.25) {
+        const rProg = (time - 0.72) / 0.53;
+        ctx.strokeStyle = hexToRgba(g.accent, 1 - rProg);
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(ox, oy);
-        ctx.lineTo(ox + oldW, oy);
+        safeCircle(ctx, btnX, 0, 14 + rProg * 28);
         safeStroke(ctx);
+      }
+
+      ctx.save();
+      ctx.translate(btnX, 0);
+      ctx.scale(btnScale, btnScale);
+      ctx.fillStyle = clicked ? '#0f172a' : g.accent;
+      ctx.beginPath();
+      ctx.roundRect(-btnW / 2, -btnH / 2, btnW, btnH, Math.round(btnH / 2));
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `800 ${Math.round(minDim * 0.020)}px ${family}`;
+      ctx.fillText(clicked ? 'SUBSCRIBED ✓' : 'SUBSCRIBE', 0, 1);
+      ctx.restore();
+
+      const tx = -cardW / 2 + avR * 2 + 24;
+      ctx.fillStyle = palette.title;
+      ctx.textAlign = 'left';
+      ctx.font = `800 ${Math.round(minDim * 0.026)}px ${family}`;
+      ctx.fillText(fitText(ctx, titleText, btnX - btnW / 2 - tx - 10), tx, g.subtitle ? -cardH * 0.14 : 0);
+      if (g.subtitle) {
+        ctx.fillStyle = palette.muted;
+        ctx.font = `500 ${Math.round(minDim * 0.019)}px ${family}`;
+        ctx.fillText(fitText(ctx, g.subtitle, btnX - btnW / 2 - tx - 10), tx, cardH * 0.17);
+      }
+      ctx.restore();
+      return { width: cardW, height: cardH, handlesText: true };
+    }
+
+    case 'article-citation': {
+      // Documentary editorial press clipping with redacted filler lines + glowing highlighted thesis sentence
+      const cardW = Math.round(minDim * 0.72);
+      const cardH = Math.round(minDim * 0.24);
+      const pad = Math.round(minDim * 0.024);
+      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, 10, palette);
+
+      // Publication header pill
+      ctx.fillStyle = g.accent;
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2 + pad, -cardH / 2 + 12, 130, 18, 9);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `800 ${Math.round(minDim * 0.014)}px ${family}`;
+      ctx.fillText(fitText(ctx, (g.subtitle || 'SOURCE REPORT').toUpperCase(), 118), -cardW / 2 + pad + 65, -cardH / 2 + 21);
+
+      // Redacted top context bar
+      ctx.fillStyle = palette.trackBg;
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2 + pad, -cardH * 0.16, cardW * 0.65, 8, 4);
+      ctx.fill();
+
+      // Highlighted focal insight strip
+      const mark = progressWindow(time, 0.12, 0.45);
+      ctx.fillStyle = hexToRgba(g.accent, 0.24);
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2 + pad, 0, Math.max(12, (cardW - pad * 2) * mark), 28, 6);
+      ctx.fill();
+
+      ctx.fillStyle = palette.title;
+      ctx.textAlign = 'left';
+      ctx.font = `700 ${Math.round(minDim * 0.025)}px Georgia, ${family}`;
+      ctx.fillText(fitText(ctx, titleText, cardW - pad * 2 - 12), -cardW / 2 + pad + 6, 14);
+
+      // Redacted bottom bar
+      ctx.fillStyle = palette.trackBg;
+      ctx.beginPath();
+      ctx.roundRect(-cardW / 2 + pad, cardH * 0.28, cardW * 0.48, 8, 4);
+      ctx.fill();
+      ctx.restore();
+      return { width: cardW, height: cardH, handlesText: true };
+    }
+
+    case 'timer-badge': {
+      // Split-second countdown capsule with sweeping timer gauge
+      const cardW = Math.round(minDim * 0.56);
+      const cardH = Math.round(minDim * 0.13);
+      drawRoundedCard(ctx, -cardW / 2, -cardH / 2, cardW, cardH, Math.round(cardH / 2), palette);
+
+      const startSec = g.value ?? 5;
+      const frac = 1 - clamp(time / 2.6, 0, 1);
+      const rem = Math.max(0, startSec * frac);
+      const r = Math.round(cardH * 0.34);
+      const rx = -cardW / 2 + r + 14;
+
+      ctx.strokeStyle = palette.trackBg;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      safeCircle(ctx, rx, 0, r);
+      safeStroke(ctx);
+
+      ctx.strokeStyle = g.accent;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      safeCircle(ctx, rx, 0, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
+      safeStroke(ctx);
+
+      ctx.fillStyle = palette.title;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `800 ${Math.round(minDim * 0.020)}px monospace`;
+      ctx.fillText(rem.toFixed(1), rx, 1);
+
+      const tx = rx + r + 14;
+      ctx.textAlign = 'left';
+      ctx.font = `800 ${Math.round(minDim * 0.026)}px ${family}`;
+      ctx.fillText(fitText(ctx, titleText, cardW / 2 - tx - 14), tx, g.subtitle ? -cardH * 0.14 : 0);
+      if (g.subtitle) {
+        ctx.fillStyle = palette.muted;
+        ctx.font = `500 ${Math.round(minDim * 0.018)}px ${family}`;
+        ctx.fillText(fitText(ctx, g.subtitle, cardW / 2 - tx - 14), tx, cardH * 0.17);
       }
       ctx.restore();
       return { width: cardW, height: cardH, handlesText: true };

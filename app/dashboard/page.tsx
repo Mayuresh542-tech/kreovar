@@ -20,10 +20,21 @@ import {
 } from "lucide-react";
 import StudioShell from "../components/StudioShell";
 import AuthLoadingScreen from "../components/AuthLoadingScreen";
+import CreatorObject3D from "../components/3d/CreatorObject3D";
+import SpatialTiltCard from "../components/3d/SpatialTiltCard";
+import MotionGraphicCanvasPreview from "../components/assets/MotionGraphicCanvasPreview";
+import { KREOVAR_MOTION_TEMPLATES } from "../lib/editor/kreovarMotionTemplates";
 import { useAuthGate } from "../lib/useAuthGate";
 import { getProjects, deleteProject } from "../lib/services/projectService";
 import { VeeloxProject } from "../lib/services/types";
 import CreateProjectModal from "../components/projects/CreateProjectModal";
+
+const DASHBOARD_MOTION_IDS = [
+  "split-kinetic-title",
+  "podcast-waveform-pill",
+  "vox-marker-highlight",
+  "stat-hero-counter",
+];
 
 export default function Dashboard() {
   const router = useRouter();
@@ -187,16 +198,13 @@ export default function Dashboard() {
                 <Link href="/projects" className="vx-hero-secondary">My Projects <ArrowRight size={15} aria-hidden="true" /></Link>
               </div>
             </div>
-            <div className="vx-creation-art" aria-hidden="true">
-              <div className="vx-art-orbit" />
-              <div className="vx-art-frame vx-art-frame-back"><Film size={26} /></div>
-              <div className="vx-art-frame vx-art-frame-front">
-                <span className="vx-art-spark"><Sparkles size={31} strokeWidth={1.4} /></span>
-                <div className="vx-art-timeline"><i /><i /><i /></div>
-                <div className="vx-art-wave">{[12, 22, 15, 30, 40, 25, 34, 18, 28, 12, 22, 16].map((height, i) => <i key={i} style={{height}} />)}</div>
-              </div>
-              <span className="vx-art-chip vx-art-chip-top"><Mic size={14} /> Your voice</span>
-              <span className="vx-art-chip vx-art-chip-bottom"><Layers size={14} /> Your vision</span>
+            <div className="vx-3d-viewport-dark w-full h-56 sm:h-64 lg:h-68">
+              <CreatorObject3D
+                variant="timeline-deck"
+                surface="dark"
+                height={264}
+                ariaLabel="Interactive 3D timeline tracks and playhead"
+              />
             </div>
           </div>
 
@@ -234,34 +242,80 @@ export default function Dashboard() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div className="vx-stagger-row grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (
-                <Link
-                  key={action.title}
-                  href={action.href}
-                  className="vx-tool-card group"
-                >
-                  <div className="vx-tool-icon">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">
-                        {action.title}
-                      </h3>
-                      {action.badge === "Coming soon" && (
-                        <span className="vx-tool-badge">Coming soon</span>
-                      )}
+                <SpatialTiltCard key={action.title} maxTilt={4.5} className="rounded-2xl">
+                  <Link
+                    href={action.href}
+                    className="vx-tool-card group h-full"
+                  >
+                    <div className="vx-tool-icon">
+                      <Icon className="w-5 h-5" />
                     </div>
-                    <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                      {action.description}
-                    </p>
-                  </div>
-                </Link>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="text-sm font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">
+                          {action.title}
+                        </h3>
+                        {action.badge === "Coming soon" && (
+                          <span className="vx-tool-badge">Coming soon</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                        {action.description}
+                      </p>
+                    </div>
+                  </Link>
+                </SpatialTiltCard>
               );
             })}
+          </div>
+        </section>
+
+        {/* Live Motion Graphics Previews Showcase */}
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-base sm:text-lg font-semibold tracking-tight text-slate-900">
+                Live Motion Graphics Previews
+              </h2>
+              <p className="text-xs text-slate-500">
+                Real animated Canvas2D overlays ready to drop onto your timeline
+              </p>
+            </div>
+            <Link
+              href="/motion-graphics"
+              className="text-xs font-semibold text-[#1D4FB1] hover:text-blue-800 inline-flex items-center gap-1 transition-colors"
+            >
+              <span>Browse all 24 templates</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="vx-stagger-row grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {KREOVAR_MOTION_TEMPLATES.filter((t) => DASHBOARD_MOTION_IDS.includes(t.id)).map((tpl) => (
+              <SpatialTiltCard
+                key={tpl.id}
+                maxTilt={4}
+                className="vx-frosted-surface rounded-2xl p-3 flex flex-col justify-between gap-2.5"
+              >
+                <MotionGraphicCanvasPreview template={tpl} compact aspect="16:10" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-[#142440] truncate">{tpl.name}</p>
+                    <p className="text-[11px] text-[#52647e] truncate">{tpl.category}</p>
+                  </div>
+                  <Link
+                    href="/motion-graphics"
+                    className="shrink-0 rounded-lg bg-[#13223E] hover:bg-[#1D4FB1] px-2.5 py-1 text-[11px] font-semibold text-white transition-colors"
+                  >
+                    Preview
+                  </Link>
+                </div>
+              </SpatialTiltCard>
+            ))}
           </div>
         </section>
 
@@ -311,10 +365,11 @@ export default function Dashboard() {
                   };
 
               return (
-                <div
+                <SpatialTiltCard
                   key={project.id}
+                  maxTilt={4}
                   onClick={() => router.push(`/editor?projectId=${project.id}`)}
-                  className="vx-project-card bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 overflow-hidden hover:border-slate-300 hover:shadow-xs transition-all cursor-pointer group flex flex-col justify-between"
+                  className="vx-project-card vx-frosted-surface rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer group flex flex-col justify-between"
                 >
                   {/* Thumbnail Banner */}
                   <div className="relative aspect-video w-full bg-slate-900 overflow-hidden">
@@ -411,7 +466,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </SpatialTiltCard>
               );
             })}
           </div>

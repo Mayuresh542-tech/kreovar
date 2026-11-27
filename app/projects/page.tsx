@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Play, MoreVertical, Plus, Trash2, Edit3, Film, Layers, Sparkles } from "lucide-react";
 import StudioShell from "../components/StudioShell";
 import AuthLoadingScreen from "../components/AuthLoadingScreen";
+import SpatialTiltCard from "../components/3d/SpatialTiltCard";
 import { useAuthGate } from "../lib/useAuthGate";
 import { getProjects, deleteProject, saveProjectWithResult } from "../lib/services/projectService";
 import { VeeloxProject } from "../lib/services/types";
@@ -118,29 +119,31 @@ function ProjectsContent() {
   return (
     <StudioShell active="projects">
       <div className="vx-projects-page space-y-8 pb-12">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Frosted Studio Header */}
+        <div className="vx-frosted-surface rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#142440]">
               My Projects
             </h1>
-            
+            <p className="text-xs sm:text-sm text-[#52647e]">
+              Organize multi-track edits, timelines, captions, and voice assets in one frosted studio.
+            </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => router.push("/editor?projectId=demo_creator_starter")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-semibold text-xs sm:text-sm transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1D4FB1] border border-blue-200/80 font-semibold text-xs sm:text-sm transition-colors cursor-pointer"
             >
-              <Sparkles className="w-4 h-4 text-blue-600" />
+              <Sparkles className="w-4 h-4 text-[#1D4FB1]" />
               <span>Try Demo</span>
             </button>
 
             <button
               type="button"
               onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs sm:text-sm transition-colors shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#13223E] hover:bg-[#1D4FB1] text-white font-semibold text-xs sm:text-sm transition-colors shadow-xs cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>New Project</span>
@@ -222,10 +225,11 @@ function ProjectsContent() {
                   };
 
             return (
-              <div
+              <SpatialTiltCard
                 key={project.id}
+                maxTilt={3}
                 onClick={() => router.push(`/editor?projectId=${project.id}`)}
-                className="bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 p-3 sm:p-4 hover:border-blue-500/50 hover:shadow-sm transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 cursor-pointer group"
+                className="vx-frosted-surface rounded-xl sm:rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 cursor-pointer group"
               >
                 {/* Left: Thumbnail & Details */}
                 <div className="flex items-start sm:items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
@@ -330,7 +334,7 @@ function ProjectsContent() {
                   </div>
                 </div>
               </div>
-            </div>
+            </SpatialTiltCard>
           );
           })}
         </div>

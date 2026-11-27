@@ -166,11 +166,16 @@ function TrendsContent() {
       <div className="mb-5 space-y-3"><ContentWorkflow step="trends" topic={searchQuery}/>{libraryMessage&&<p role="status" className="text-sm text-slate-600">{libraryMessage}</p>}{unsaved&&libraryMessage.includes("failed")&&<button type="button" className="text-sm underline" onClick={()=>void saveWork(unsaved.title,unsaved.text,unsaved.topic)}>Retry saving</button>}</div>
       <div className="space-y-8 pb-12">
         {/* Header */}
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+        <div className="vx-frosted-surface rounded-2xl p-5 sm:p-6 space-y-1.5">
+          <span className="inline-flex items-center rounded-full bg-blue-50 border border-blue-200/80 px-2.5 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-[#1D4FB1]">
+            Trend Scanner
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#142440]">
             Find content ideas
           </h1>
-          
+          <p className="text-xs sm:text-sm text-[#52647e]">
+            Spot high-velocity formats and launch new scripts straight into your workflow.
+          </p>
         </div>
 
         {/* Search Bar */}

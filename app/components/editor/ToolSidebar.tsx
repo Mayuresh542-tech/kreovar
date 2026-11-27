@@ -80,7 +80,7 @@ const TOOLS: ToolItem[] = [
     id: "graphics",
     label: "Graphics",
     icon: Sparkles,
-    description: "18 editable animated charts, lower-thirds, callouts & infographics",
+    description: "24 editable animated titles, charts, citations, waveforms & CTAs",
   },
   {
     id: "broll",

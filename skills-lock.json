@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "skills": {
+    "talking-head-b-roll": {
+      "source": "iart-ai/b-roll-skills",
+      "commit": "bcd56742a8a99edaa699a6f7bc5a45922a8ec567",
+      "sourceType": "github",
+      "skillPath": "skills/talking-head-b-roll/SKILL.md",
+      "computedHash": "6eba23c4ccaca57f373d97cbbfcfbef9ec12f5fb2c1e4511b7144855ea64f45e",
+      "installMode": "copy"
+    }
+  }
+}
