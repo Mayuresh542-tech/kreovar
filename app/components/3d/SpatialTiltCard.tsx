@@ -41,6 +41,13 @@ export default function SpatialTiltCard({
       onPointerMove?.(e);
       if (!enabledRef.current || !cardRef.current) return;
       const el = cardRef.current;
+      // Do not tilt the outer wrapper when pointer is interacting directly with an embedded 3D WebGL stage
+      if ((e.target as HTMLElement | null)?.closest?.(".vx-3d-viewport")) {
+        el.style.setProperty("--vx-rx", "0deg");
+        el.style.setProperty("--vx-ry", "0deg");
+        el.removeAttribute("data-tilted");
+        return;
+      }
       const rect = el.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
       const px = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));

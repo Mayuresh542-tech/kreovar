@@ -454,24 +454,29 @@ function buildVariantScene(
     rearRing.position.z = -0.78;
     root.add(rearRing);
 
+    let stoppedDown = false;
+
     return {
       root,
       triggerAction: () => {
         actionPulse = 1;
+        stoppedDown = !stoppedDown;
       },
       step: (t, dt) => {
         const active = actionPulse > 0.001;
-        actionPulse = Math.max(0, actionPulse - dt * 1.4);
-        const stopDown = Math.sin(actionPulse * Math.PI);
-        irisGroup.rotation.z = t * 0.14 + stopDown * 0.9;
+        actionPulse = Math.max(0, actionPulse - dt * 1.35);
+        const stopWave = Math.sin(actionPulse * Math.PI);
+        const targetClose = stoppedDown ? 0.14 : 0;
+        const detentAngle = stoppedDown ? 0.42 : 0;
+        irisGroup.rotation.z += ((t * 0.14 + detentAngle + stopWave * 0.9) - irisGroup.rotation.z) * 0.22;
         blades.forEach((b, i) => {
           const a = (i * Math.PI * 2) / 11;
-          const r = 0.48 - stopDown * 0.18;
+          const r = 0.48 - targetClose - stopWave * 0.14;
           b.position.set(Math.cos(a) * r, Math.sin(a) * r, (i % 2) * 0.008);
-          b.rotation.z = a + 0.56 + stopDown * 0.38;
+          b.rotation.z = a + 0.56 + targetClose * 1.4 + stopWave * 0.35;
         });
-        focusRing.position.z = 0.42 + stopDown * 0.1;
-        focusRing.rotation.y = stopDown * 0.5;
+        focusRing.position.z += ((0.42 + (stoppedDown ? 0.06 : 0) + stopWave * 0.08) - focusRing.position.z) * 0.22;
+        focusRing.rotation.y += ((detentAngle + stopWave * 0.45) - focusRing.rotation.y) * 0.22;
         return active;
       },
     };
@@ -536,20 +541,24 @@ function buildVariantScene(
       armPivot.add(stripe);
     }
 
+    let clapped = false;
+
     return {
       root,
       triggerAction: () => {
         actionPulse = 1;
+        clapped = !clapped;
       },
       step: (t, dt) => {
         const active = actionPulse > 0.001;
         actionPulse = Math.max(0, actionPulse - dt * 1.9);
         const snap =
           actionPulse > 0.55
-            ? Math.sin(((actionPulse - 0.55) / 0.45) * (Math.PI / 2)) * 0.46
+            ? Math.sin(((actionPulse - 0.55) / 0.45) * (Math.PI / 2)) * 0.42
             : Math.sin((actionPulse / 0.55) * Math.PI) * 0.07;
-        const idleAngle = 0.25 + Math.sin(t * 1.1) * 0.035;
-        armPivot.rotation.z = Math.max(0.01, idleAngle - snap * 0.55);
+        const baseAngle = clapped ? 0.025 : 0.27 + Math.sin(t * 1.1) * 0.035;
+        const targetRot = Math.max(0.01, baseAngle - snap * 0.45);
+        armPivot.rotation.z += (targetRot - armPivot.rotation.z) * 0.28;
         return active;
       },
     };
@@ -625,17 +634,25 @@ function buildVariantScene(
     playhead.position.set(-0.4, -0.54, 0.24);
     consoleGroup.add(playhead);
 
+    let scrubStep = 0;
+
     return {
       root,
       triggerAction: () => {
         actionPulse = 1;
+        scrubStep = (scrubStep + 1) % 3;
       },
       step: (t, dt) => {
         const active = actionPulse > 0.001;
-        actionPulse = Math.max(0, actionPulse - dt * 1.1);
-        const sweep = Math.sin(t * 0.75) * 0.92 + Math.sin(actionPulse * Math.PI * 2) * 0.35;
-        playhead.position.x = Math.max(-1.05, Math.min(1.05, sweep));
-        const dialAngle = playhead.position.x * 2.2;
+        actionPulse = Math.max(0, actionPulse - dt * 1.15);
+        const stepOffsets = [-0.55, 0.12, 0.72];
+        const targetX =
+          stepOffsets[scrubStep] +
+          Math.sin(t * 0.75) * 0.22 +
+          Math.sin(actionPulse * Math.PI * 2) * 0.26;
+        const clampedX = Math.max(-1.05, Math.min(1.05, targetX));
+        playhead.position.x += (clampedX - playhead.position.x) * 0.2;
+        const dialAngle = playhead.position.x * 2.5;
         wheelDimple.position.set(0.92 + Math.cos(dialAngle) * 0.2, 0.18 + Math.sin(dialAngle) * 0.2, 0.2);
         return active;
       },
@@ -699,21 +716,44 @@ function buildVariantScene(
   haloOuter.position.y = 0.42;
   root.add(haloOuter);
 
+  let micBoost = false;
+
   return {
     root,
     triggerAction: () => {
       actionPulse = 1;
+      micBoost = !micBoost;
     },
     step: (t, dt) => {
       const active = actionPulse > 0.001;
       actionPulse = Math.max(0, actionPulse - dt * 1.3);
       const wave = Math.sin(actionPulse * Math.PI);
-      const s = 1 + Math.sin(t * 2.0) * 0.03 + wave * 0.25;
+      const s = 1 + (micBoost ? 0.12 : 0) + Math.sin(t * 2.0) * 0.03 + wave * 0.22;
       haloOuter.scale.setScalar(s);
-      haloOuter.rotation.z = t * 0.35;
+      haloOuter.rotation.z = t * 0.35 + (micBoost ? 0.45 : 0);
       return active;
     },
   };
+}
+
+function createWebGLRendererWithFallback(): THREE.WebGLRenderer | null {
+  try {
+    return new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+      powerPreference: "high-performance",
+    });
+  } catch {
+    try {
+      return new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: false,
+        powerPreference: "default",
+      });
+    } catch {
+      return null;
+    }
+  }
 }
 
 export default function CreatorObject3D({
@@ -728,25 +768,25 @@ export default function CreatorObject3D({
   const triggerRef = useRef<(() => void) | null>(null);
   const [webglReady, setWebglReady] = useState(true);
   const [pulseCount, setPulseCount] = useState(0);
+  const [fallbackDrag, setFallbackDrag] = useState({ rx: 8, ry: -14, active: false });
 
   useEffect(() => {
     const host = containerRef.current;
     if (!host) return;
 
-    let renderer: THREE.WebGLRenderer | null = null;
-    try {
-      renderer = new THREE.WebGLRenderer({
-        alpha: true,
-        antialias: true,
-        powerPreference: "high-performance",
-      });
-    } catch {
+    const renderer = createWebGLRendererWithFallback();
+    if (!renderer) {
       queueMicrotask(() => setWebglReady(false));
       return;
     }
+    queueMicrotask(() => setWebglReady(true));
 
-    const w = host.clientWidth || 340;
-    const h = host.clientHeight || (typeof height === "number" ? height : 300);
+    const rect = host.getBoundingClientRect();
+    const w = Math.max(1, Math.round(host.clientWidth || rect.width || 340));
+    const h = Math.max(
+      1,
+      Math.round(host.clientHeight || rect.height || (typeof height === "number" ? height : 300))
+    );
 
     const scene = new THREE.Scene();
     const env = getSharedStudioEnv();
@@ -757,7 +797,7 @@ export default function CreatorObject3D({
     const camera = new THREE.PerspectiveCamera(38, w / Math.max(1, h), 0.1, 100);
     camera.position.set(0, 0.18, 4.75);
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     renderer.setSize(w, h);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -786,6 +826,7 @@ export default function CreatorObject3D({
     const { root, triggerAction, step } = buildVariantScene(variant, surface);
     scene.add(root);
 
+    let disposed = false;
     let isDragging = false;
     let movedDuringDrag = false;
     let hovered = false;
@@ -797,105 +838,11 @@ export default function CreatorObject3D({
     let hoverY = 0;
     let velYaw = 0;
     let velPitch = 0;
-    let needsBurstFrames = 18;
-
-    triggerRef.current = () => {
-      triggerAction();
-      needsBurstFrames = 75;
-    };
-
-    const onPointerDown = (e: PointerEvent) => {
-      isDragging = true;
-      movedDuringDrag = false;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      needsBurstFrames = 60;
-      host.setPointerCapture?.(e.pointerId);
-    };
-
-    const onPointerEnter = () => {
-      hovered = true;
-      needsBurstFrames = 30;
-    };
-
-    const onPointerLeave = () => {
-      hovered = false;
-      hoverX = 0;
-      hoverY = 0;
-      needsBurstFrames = 24;
-    };
-
-    const onPointerMove = (e: PointerEvent) => {
-      const rect = host.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        hoverX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.4;
-        hoverY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.28;
-      }
-      if (!isDragging) return;
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-      if (Math.abs(dx) + Math.abs(dy) > 3) movedDuringDrag = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      velYaw = dx * 0.011;
-      velPitch = dy * 0.009;
-      userYaw += velYaw;
-      userPitch = Math.max(-0.85, Math.min(0.85, userPitch + velPitch));
-      needsBurstFrames = 45;
-    };
-
-    const onPointerUp = (e: PointerEvent) => {
-      if (isDragging && !movedDuringDrag) {
-        triggerAction();
-        needsBurstFrames = 75;
-        setPulseCount((c) => c + 1);
-      }
-      isDragging = false;
-      needsBurstFrames = 45;
-      try {
-        host.releasePointerCapture?.(e.pointerId);
-      } catch {
-        // ignore if already released
-      }
-    };
-
-    host.addEventListener("pointerdown", onPointerDown);
-    host.addEventListener("pointerenter", onPointerEnter);
-    host.addEventListener("pointerleave", onPointerLeave);
-    host.addEventListener("pointermove", onPointerMove);
-    host.addEventListener("pointerup", onPointerUp);
-    host.addEventListener("pointercancel", onPointerUp);
-
+    let needsBurstFrames = 24;
     let inView = true;
-    const io =
-      typeof IntersectionObserver !== "undefined"
-        ? new IntersectionObserver(
-            (entries) => {
-              for (const entry of entries) inView = entry.isIntersecting;
-            },
-            { threshold: 0.04 }
-          )
-        : null;
-    io?.observe(host);
 
-    const reducedMotion = Boolean(
-      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
-    );
-
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver((entries) => {
-            for (const entry of entries) {
-              const nw = Math.max(1, Math.round(entry.contentRect.width));
-              const nh = Math.max(1, Math.round(entry.contentRect.height));
-              camera.aspect = nw / nh;
-              camera.updateProjectionMatrix();
-              renderer?.setSize(nw, nh);
-              needsBurstFrames = Math.max(needsBurstFrames, 2);
-            }
-          })
-        : null;
-    resizeObserver?.observe(host);
+    const motionMq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    let reducedMotion = Boolean(motionMq?.matches);
 
     let rafId = 0;
     let lastDrawTime = 0;
@@ -910,37 +857,182 @@ export default function CreatorObject3D({
       }
       const idleFloat = reducedMotion ? 0 : Math.sin(t * 0.9) * 0.035;
       const idleSway = reducedMotion ? 0 : Math.sin(t * 0.45) * 0.07;
-      root.rotation.y += ((userYaw + idleSway + hoverX) - root.rotation.y) * 0.18;
-      root.rotation.x += ((userPitch + hoverY) - root.rotation.x) * 0.18;
+      root.rotation.y += ((userYaw + idleSway + hoverX) - root.rotation.y) * 0.24;
+      root.rotation.x += ((userPitch + hoverY) - root.rotation.x) * 0.24;
       root.position.y = idleFloat;
 
       const animBusy = step(t, dt, Math.abs(velYaw) + Math.abs(velPitch));
-      renderer?.render(scene, camera);
+      renderer.render(scene, camera);
       return animBusy || isDragging || Math.abs(velYaw) > 0.0008 || Math.abs(velPitch) > 0.0008;
     };
 
-    if (reducedMotion) {
-      renderFrame(0.5, 0.016);
-    } else {
-      const animate = (now: number) => {
+    const animate = (now: number) => {
+      rafId = 0;
+      if (disposed || document.visibilityState === "hidden") return;
+
+      const interacting = isDragging || hovered || needsBurstFrames > 0;
+      if (!inView && !interacting) return;
+      if (reducedMotion && !interacting) return;
+
+      const minInterval = interacting ? 0 : 42;
+      if (minInterval > 0 && now - lastDrawTime < minInterval) {
         rafId = requestAnimationFrame(animate);
-        if (!inView || document.visibilityState === "hidden") return;
+        return;
+      }
+      lastDrawTime = now;
 
-        // Full native FPS while interacting/hovered/bursting; light ~24fps breathing cadence at rest to save GPU/battery
-        const minInterval = isDragging || hovered || needsBurstFrames > 0 ? 0 : 42;
-        if (minInterval > 0 && now - lastDrawTime < minInterval) return;
-        lastDrawTime = now;
+      const dt = Math.min(0.05, clock.getDelta() || 0.016);
+      const busy = renderFrame(clock.elapsedTime, dt);
+      if (!busy && needsBurstFrames > 0) {
+        needsBurstFrames--;
+      }
 
-        const dt = Math.min(0.05, clock.getDelta());
-        const busy = renderFrame(clock.elapsedTime, dt);
-        if (!busy && needsBurstFrames > 0) {
-          needsBurstFrames--;
-        }
-      };
-      rafId = requestAnimationFrame(animate);
-    }
+      if (!disposed && ((!reducedMotion && inView) || busy || isDragging || needsBurstFrames > 0)) {
+        rafId = requestAnimationFrame(animate);
+      }
+    };
+
+    const scheduleRender = (burstFrames = 36) => {
+      if (disposed) return;
+      needsBurstFrames = Math.max(needsBurstFrames, burstFrames);
+      if (!rafId) {
+        clock.getDelta();
+        rafId = requestAnimationFrame(animate);
+      }
+    };
+
+    triggerRef.current = () => {
+      inView = true;
+      triggerAction();
+      velYaw += 0.025;
+      scheduleRender(75);
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      inView = true;
+      isDragging = true;
+      movedDuringDrag = false;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      host.setPointerCapture?.(e.pointerId);
+      scheduleRender(70);
+    };
+
+    const onPointerEnter = () => {
+      inView = true;
+      hovered = true;
+      scheduleRender(36);
+    };
+
+    const onPointerLeave = () => {
+      hovered = false;
+      hoverX = 0;
+      hoverY = 0;
+      scheduleRender(28);
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      inView = true;
+      const box = host.getBoundingClientRect();
+      if (box.width > 0 && box.height > 0) {
+        hoverX = ((e.clientX - box.left) / box.width - 0.5) * 0.42;
+        hoverY = ((e.clientY - box.top) / box.height - 0.5) * 0.28;
+      }
+      if (!isDragging) {
+        if (hovered) scheduleRender(14);
+        return;
+      }
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      if (Math.abs(dx) + Math.abs(dy) > 3) movedDuringDrag = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      velYaw = dx * 0.014;
+      velPitch = dy * 0.011;
+      userYaw += velYaw;
+      userPitch = Math.max(-0.85, Math.min(0.85, userPitch + velPitch));
+      scheduleRender(60);
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      if (isDragging && !movedDuringDrag) {
+        triggerAction();
+        setPulseCount((c) => c + 1);
+      }
+      isDragging = false;
+      scheduleRender(75);
+      try {
+        host.releasePointerCapture?.(e.pointerId);
+      } catch {
+        // ignore if already released
+      }
+    };
+
+    const onContextLost = (e: Event) => {
+      e.preventDefault();
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = 0;
+      }
+      setWebglReady(false);
+    };
+
+    const onContextRestored = () => {
+      setWebglReady(true);
+      scheduleRender(30);
+    };
+
+    const onMotionChange = (e: MediaQueryListEvent) => {
+      reducedMotion = e.matches;
+      scheduleRender(reducedMotion ? 8 : 30);
+    };
+
+    host.addEventListener("pointerdown", onPointerDown);
+    host.addEventListener("pointerenter", onPointerEnter);
+    host.addEventListener("pointerleave", onPointerLeave);
+    host.addEventListener("pointermove", onPointerMove);
+    host.addEventListener("pointerup", onPointerUp);
+    host.addEventListener("pointercancel", onPointerUp);
+    renderer.domElement.addEventListener("webglcontextlost", onContextLost);
+    renderer.domElement.addEventListener("webglcontextrestored", onContextRestored);
+    motionMq?.addEventListener?.("change", onMotionChange);
+
+    const io =
+      typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver(
+            (entries) => {
+              for (const entry of entries) {
+                inView = entry.isIntersecting;
+                if (inView) scheduleRender(12);
+              }
+            },
+            { threshold: 0.02 }
+          )
+        : null;
+    io?.observe(host);
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver((entries) => {
+            for (const entry of entries) {
+              const nw = Math.max(1, Math.round(entry.contentRect.width));
+              const nh = Math.max(1, Math.round(entry.contentRect.height));
+              camera.aspect = nw / nh;
+              camera.updateProjectionMatrix();
+              renderer.setSize(nw, nh);
+              scheduleRender(8);
+            }
+          })
+        : null;
+    resizeObserver?.observe(host);
+
+    // Draw initial crisp frame immediately & start interactive rAF burst
+    renderFrame(0.5, 0.016);
+    scheduleRender(reducedMotion ? 6 : 30);
 
     return () => {
+      disposed = true;
       if (rafId) cancelAnimationFrame(rafId);
       io?.disconnect();
       resizeObserver?.disconnect();
@@ -950,12 +1042,13 @@ export default function CreatorObject3D({
       host.removeEventListener("pointermove", onPointerMove);
       host.removeEventListener("pointerup", onPointerUp);
       host.removeEventListener("pointercancel", onPointerUp);
+      renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
+      renderer.domElement.removeEventListener("webglcontextrestored", onContextRestored);
+      motionMq?.removeEventListener?.("change", onMotionChange);
       disposeObjectTree(scene);
-      if (renderer) {
-        renderer.dispose();
-        if (renderer.domElement.parentNode === host) {
-          host.removeChild(renderer.domElement);
-        }
+      renderer.dispose();
+      if (renderer.domElement.parentNode === host) {
+        host.removeChild(renderer.domElement);
       }
       triggerRef.current = null;
     };
@@ -972,14 +1065,37 @@ export default function CreatorObject3D({
         ref={containerRef}
         role="img"
         aria-label={ariaLabel || `${hint.title} interactive 3D object`}
+        style={{ touchAction: "none" }}
         className="h-full w-full cursor-grab active:cursor-grabbing"
       />
 
       {!webglReady && (
-        <div className="absolute inset-0 flex items-center justify-center rounded-2xl border border-slate-200/70 bg-white/60 backdrop-blur-md">
-          <div className="text-center px-4">
-            <div className="mx-auto mb-2 h-12 w-12 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-500/20 to-teal-500/20 shadow-inner" />
-            <p className="text-xs font-semibold text-slate-800">{hint.title}</p>
+        <div
+          onPointerMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const ry = ((e.clientX - rect.left) / Math.max(1, rect.width) - 0.5) * 34;
+            const rx = -((e.clientY - rect.top) / Math.max(1, rect.height) - 0.5) * 24;
+            setFallbackDrag((prev) => ({ ...prev, rx, ry }));
+          }}
+          onPointerLeave={() => setFallbackDrag((prev) => ({ ...prev, rx: 8, ry: -14 }))}
+          onClick={() => {
+            setFallbackDrag((prev) => ({ ...prev, active: !prev.active }));
+            setPulseCount((c) => c + 1);
+          }}
+          className="absolute inset-0 flex items-center justify-center rounded-2xl border border-slate-200/70 bg-gradient-to-br from-slate-100/70 via-white/80 to-blue-50/70 cursor-pointer"
+        >
+          <div
+            className="transition-transform duration-300 ease-out"
+            style={{
+              transform: `perspective(700px) rotateX(${fallbackDrag.rx}deg) rotateY(${fallbackDrag.ry}deg) scale(${fallbackDrag.active ? 1.07 : 1})`,
+            }}
+          >
+            <div className="w-36 h-24 rounded-2xl border border-blue-300/80 bg-gradient-to-br from-[#13223E] via-[#1D4FB1] to-[#0f172a] shadow-xl flex flex-col items-center justify-center gap-1.5 px-3 text-center">
+              <div className="w-9 h-9 rounded-full border-2 border-sky-300/80 bg-sky-400/20 flex items-center justify-center">
+                <div className={`rounded-full bg-sky-300 transition-all duration-300 ${fallbackDrag.active ? "w-2.5 h-2.5" : "w-4.5 h-4.5"}`} />
+              </div>
+              <p className="text-[11px] font-bold text-white truncate max-w-full">{hint.title}</p>
+            </div>
           </div>
         </div>
       )}
@@ -988,18 +1104,22 @@ export default function CreatorObject3D({
         <button
           type="button"
           onClick={() => {
-            triggerRef.current?.();
+            if (webglReady) {
+              triggerRef.current?.();
+            } else {
+              setFallbackDrag((prev) => ({ ...prev, active: !prev.active }));
+            }
             setPulseCount((c) => c + 1);
           }}
           title={hint.action}
-          className={`absolute bottom-2.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-mono backdrop-blur-md transition-all shadow-xs cursor-pointer ${
+          className={`absolute bottom-2.5 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-mono backdrop-blur-md transition-all shadow-xs cursor-pointer ${
             surface === "dark"
               ? "border border-white/15 bg-slate-900/55 text-blue-100 hover:bg-slate-900/80"
               : "border border-white/90 bg-white/85 text-slate-700 hover:bg-white hover:text-blue-700"
           }`}
         >
           <span
-            className="h-1.5 w-1.5 rounded-full bg-blue-500"
+            className="h-1.5 w-1.5 rounded-full bg-blue-500 transition-transform"
             style={{ transform: pulseCount > 0 ? "scale(1.25)" : "scale(1)" }}
           />
           <span className="whitespace-nowrap">{hint.action}</span>

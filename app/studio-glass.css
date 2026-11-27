@@ -307,6 +307,15 @@
   opacity: 1;
 }
 
+.vx-tilt-card:has(.vx-3d-viewport) {
+  transform-style: flat;
+  will-change: auto;
+}
+
+.vx-tilt-card:has(.vx-3d-viewport)::before {
+  display: none;
+}
+
 /* Enhanced Dashboard, Tool Card, & Project Card frosted polish */
 .vx-glass-shell .vx-studio-sidebar {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.84) 0%, rgba(242, 245, 251, 0.88) 100%);

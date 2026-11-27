@@ -235,6 +235,7 @@ test("Task 13: Canvas object movement through full-frame outline & clean AssetDr
   assert.ok(toolSidebar.includes('"graphics"'), "ToolSidebar must include Graphics tab");
   assert.ok(assetDrawer.includes("KREOVAR_MOTION_TEMPLATES"), "AssetDrawer must render Kreovar motion graphic templates");
   assert.ok(!inspector.includes("GraphicControls"), "Legacy GraphicControls import must be removed from Inspector");
+  assert.ok(inspector.includes('inspectorType === "graphic"') && inspector.includes("showMediaTabs"), "Motion graphic inspector must hide unused Audio/Speed/Animation media tabs");
 });
 
 
